@@ -1,0 +1,50 @@
+#pragma once
+
+#include <cstddef>
+#include <string>
+#include <atomic>
+#include <thread>
+
+#include <enet/enet.h>
+
+#include <util/tick_clock.hpp>
+#include <alias/hash_map.hpp>
+#include <alias/ref.hpp>
+#include <net/ip.hpp>
+#include <player.hpp>
+#include <world.hpp>
+
+class Server
+{
+public:
+    Server(uint16_t port, double tick_rate);
+    ~Server();
+
+    void start();
+    void stop();
+
+    void kick_player(net::Ip ip, std::string reason = "unknown");
+private:
+    enum State
+    {
+        NOT_STARTED,
+        RUNNING,
+        STOPPED
+    };
+    const std::size_t MAX_CLIENTS = 16;
+
+    void run();
+    void tick();
+    void handle_events();
+    void disconnect_player(net::Ip ip);
+    void add_player(ENetPeer *peer);
+
+    std::thread        thread;
+    std::atomic<State> state;
+    ENetAddress        enet_address;
+    ENetHost          *enet_server;
+    util::TickClock    tick_clock;
+    World              world;
+
+    HashMap<net::Ip, Player> players; //TODO reference to player ip?
+};
