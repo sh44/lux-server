@@ -23,7 +23,7 @@ WARNINGS_FLAGS  = \
 	-Weffc++ \
 	-Wconversion
 
-CXX       = clang++
+CXX       = g++
 CXXFLAGS += -I$(SRC_DIR) $(WARNINGS) $(DEBUG_FLAGS) -std=c++17 -pedantic
 LDLIBS   += -lenet -lcurses -pthread
 LDFLAGS  +=

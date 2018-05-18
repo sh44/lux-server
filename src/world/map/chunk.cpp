@@ -2,10 +2,10 @@
 //
 #include "chunk.hpp"
 
-namespace world::map
+namespace world::map::chunk
 {
 
-chunk::Point Chunk::point_map_to_chunk(map::Point point)
+Point Chunk::point_map_to_chunk(map::Point point)
 {
     chunk::Point result = point;
     if(result.x < 0)
@@ -26,7 +26,7 @@ chunk::Point Chunk::point_map_to_chunk(map::Point point)
     return result;
 }
 
-Chunk::Index Chunk::point_map_to_index(map::Point point)
+Index Chunk::point_map_to_index(map::Point point)
 {
     linear::Point3d<Index> result = point;
     result.x %= SIZE_X;

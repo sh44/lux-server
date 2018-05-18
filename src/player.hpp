@@ -4,7 +4,7 @@
 //
 #include <enet/enet.h>
 
-namespace world { class Entity; }
+namespace world { inline namespace entity { class Entity; } }
 
 class Player
 {

@@ -6,22 +6,27 @@
 #include <world/entity.hpp>
 #include <world/map.hpp>
 
+inline namespace world
+{
+
 class World
 {
 public:
-    world::Entity &create_player();
+    Entity &create_player();
 private:
     template<typename... Args>
-    world::Entity &create_entity(Args... args);
+    Entity &create_entity(Args... args);
 
-    world::Map map;
+    Map map;
 
-    std::list<world::Entity> entity_storage;
+    std::list<Entity> entity_storage;
 };
 
 template<typename... Args>
-world::Entity &World::create_entity(Args... args)
+Entity &World::create_entity(Args... args)
 {
     entity_storage.emplace_back(args...);
     return entity_storage.back();
+}
+
 }

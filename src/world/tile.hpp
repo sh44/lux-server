@@ -5,13 +5,16 @@
 
 namespace world
 {
+inline namespace tile
+{
 
 class Tile
 {
     public:
-    Tile(const tile::Type &type = tile::default_type);
+    Tile(const Type &type = default_type);
 
-    Ref<const tile::Type> type;
+    Ref<const Type> type;
 };
 
+}
 }
