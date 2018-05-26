@@ -3,6 +3,8 @@
 #include <functional>
 //
 #include <glm/detail/type_vec2.hpp>
+//
+#include <util/merge_hash.hpp>
 
 namespace linear
 {
@@ -22,10 +24,8 @@ struct hash<Point2d<T>>
 {
     size_t operator()(Point2d<T> const &k) const
     {
-        return ((hash<T>()(k.x) ^
-                (hash<T>()(k.y) << 1))>> 1);
+        return util::merge_hash(hash<T>()(k.x), hash<T>()(k.y));
     }
 };
 
 }
-
