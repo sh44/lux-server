@@ -5,7 +5,7 @@
 #include <player.hpp>
 #include "server.hpp"
 
-Server::Server(uint16_t port, double tick_rate) :
+Server::Server(net::Port port, double tick_rate) :
     state(NOT_STARTED),
     enet_address({ENET_HOST_ANY, port}),
     enet_server(enet_host_create(&enet_address, MAX_CLIENTS, 1, 0, 0)),

@@ -11,13 +11,14 @@
 #include <alias/hash_map.hpp>
 #include <alias/ref.hpp>
 #include <net/ip.hpp>
+#include <net/port.hpp>
 #include <player.hpp>
 #include <world.hpp>
 
 class Server
 {
 public:
-    Server(uint16_t port, double tick_rate);
+    Server(net::Port port, double tick_rate);
     ~Server();
 
     void start();
