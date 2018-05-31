@@ -7,9 +7,10 @@
 
 #include <enet/enet.h>
 
-#include <util/tick_clock.hpp>
+#include <alias/string.hpp>
 #include <alias/hash_map.hpp>
 #include <alias/ref.hpp>
+#include <util/tick_clock.hpp>
 #include <net/ip.hpp>
 #include <net/port.hpp>
 #include <player.hpp>
@@ -24,7 +25,7 @@ public:
     void start();
     void stop();
 
-    void kick_player(net::Ip ip, std::string reason = "unknown");
+    void kick_player(net::Ip ip, String reason = "unknown");
 private:
     enum State
     {
