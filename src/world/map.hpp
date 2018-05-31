@@ -16,6 +16,7 @@ class Map
     Tile &operator[](Point pos);
     private:
     Chunk &load_chunk(chunk::Point pos);
+    void unload_chunk(chunk::Point pos);
     Chunk &get_chunk(chunk::Point pos);
 
     HashMap<chunk::Point, Chunk> chunks;

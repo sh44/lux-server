@@ -11,7 +11,7 @@ inline namespace tile
 class Tile
 {
     public:
-    Tile(const Type &type = default_type);
+    Tile(const Type &type);
 
     Ref<const Type> type;
 };

@@ -15,8 +15,19 @@ Tile &Map::operator[](Point pos)
 
 Chunk &Map::load_chunk(chunk::Point pos)
 {
-    chunks.emplace(pos, Chunk{}); //TODO non-copy solution?
-    generator.generate_chunk(chunks[pos], pos);
+    chunks.emplace(pos, (Tile *)::operator new(sizeof(Tile) * Chunk::TILE_SIZE));
+    generator.generate_chunk(chunks.at(pos), pos);
+}
+
+void Map::unload_chunk(chunk::Point pos)
+{
+    auto chunk = chunks.at(pos);
+    for(std::size_t i = 0; i < Chunk::TILE_SIZE; ++i)
+    {
+        (*(chunk.tiles + i)).~Tile();
+    }
+    ::operator delete[](chunk.tiles);
+    chunks.erase(pos);
 }
 
 Chunk &Map::get_chunk(chunk::Point pos)

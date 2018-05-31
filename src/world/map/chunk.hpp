@@ -19,10 +19,12 @@ struct Chunk
     static const std::size_t SIZE_Z = 3; //
     static const std::size_t TILE_SIZE = SIZE_X * SIZE_Y * SIZE_Z;
 
+    Chunk(Tile *tiles);
+
     static chunk::Point point_map_to_chunk(Point point);
     static chunk::Index point_map_to_index(Point point);
 
-    Tile tiles[TILE_SIZE];
+    Tile *tiles;
 };
 
 }

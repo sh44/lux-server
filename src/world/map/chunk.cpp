@@ -5,6 +5,12 @@
 namespace world::map::chunk
 {
 
+Chunk::Chunk(Tile *tiles) :
+    tiles(tiles)
+{
+
+}
+
 Point Chunk::point_map_to_chunk(map::Point point)
 {
     chunk::Point result = point;
