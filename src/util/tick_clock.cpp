@@ -36,7 +36,7 @@ typename TickClock::Duration TickClock::synchronize()
     Duration delta = rate - cycle;
     if(cycle < rate)
     {
-        std::this_thread::sleep_for(delta);
+        if(delta > Duration::zero()) std::this_thread::sleep_for(delta);
         reset();
     }
     cycle = Duration::zero();
