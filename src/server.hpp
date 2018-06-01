@@ -39,7 +39,8 @@ private:
 
     void run();
     void tick();
-    void handle_events();
+    void handle_input();
+    void handle_output();
     void disconnect_player(net::Ip ip);
     void add_player(ENetPeer *peer);
 

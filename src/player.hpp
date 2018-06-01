@@ -16,7 +16,7 @@ class Player
     ENetPeer *peer;
 
     void receive(ENetPacket *packet);
-    ENetPacket *send();
+    ENetPacket *send() const;
     private:
     linear::Size2d<uint16_t> window_size; //in tiles
     world::Entity *entity;

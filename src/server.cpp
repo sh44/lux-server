@@ -75,7 +75,7 @@ void Server::run()
         auto delta = tick_clock.synchronize();
         if(delta < util::TickClock::Duration::zero())
         {
-            util::log("SERVER", util::WARN, "game loop overhead of %f seconds",
+            util::log("SERVER", util::WARN, "main loop overhead of %f seconds",
                       std::abs(delta.count()));
         }
     }
@@ -83,23 +83,56 @@ void Server::run()
 
 void Server::tick()
 {
-    handle_events();
+    handle_input();
+    handle_output();
 }
 
-void Server::handle_events()
+void Server::handle_input()
 {
     ENetEvent event;
-    while(enet_host_service(enet_server, &event, 0) > 0);
-    switch(event.type)
+    while(enet_host_service(enet_server, &event, 0) > 0)
     {
-        case ENET_EVENT_TYPE_NONE: break;
+        if(event.type != ENET_EVENT_TYPE_NONE)
+        {
+            net::Ip ip = event.peer->address.host;
+            util::log("SERVER", util::TRACE, "received packet from %u.%u.%u.%u",
+                  ip & 0xFF,
+                 (ip >>  8) & 0xFF,
+                 (ip >> 16) & 0xFF,
+                 (ip >> 24) & 0xFF);
+        }
+        switch(event.type)
+        {
+            case ENET_EVENT_TYPE_NONE: break;
 
-        case ENET_EVENT_TYPE_CONNECT: add_player(event.peer); break;
+            case ENET_EVENT_TYPE_CONNECT:
+                add_player(event.peer);
+                break;
 
-        case ENET_EVENT_TYPE_RECEIVE: players.at(event.peer->address.host)
-                                             .receive(event.packet); break;
+            case ENET_EVENT_TYPE_RECEIVE:
+                players.at(event.peer->address.host).receive(event.packet);
+                enet_packet_destroy(event.packet);
+                break;
 
-        case ENET_EVENT_TYPE_DISCONNECT: disconnect_player(event.peer->address.host); break;
+            case ENET_EVENT_TYPE_DISCONNECT:
+                disconnect_player(event.peer->address.host);
+                break;
+        }
+    }
+}
+
+void Server::handle_output()
+{
+    for(auto const &player : players)
+    {
+        ENetPacket *packet = player.second.send();
+        enet_peer_send(player.second.peer, 0, packet);
+        net::Ip ip = player.second.peer->address.host;
+        util::log("SERVER", util::TRACE, "sent packet to player %u.%u.%u.%u",
+              ip & 0xFF,
+             (ip >>  8) & 0xFF,
+             (ip >> 16) & 0xFF,
+             (ip >> 24) & 0xFF);
     }
 }
 
@@ -116,10 +149,10 @@ void Server::disconnect_player(net::Ip ip)
 void Server::add_player(ENetPeer *peer)
 {
     net::Ip ip = peer->address.host;
-    players.insert({peer->address.host, {peer, world.create_player()}});
     util::log("SERVER", util::INFO, "player %u.%u.%u.%u connected",
               ip & 0xFF,
              (ip >>  8) & 0xFF,
              (ip >> 16) & 0xFF,
              (ip >> 24) & 0xFF);
+    players.insert({peer->address.host, {peer, world.create_player()}});
 }

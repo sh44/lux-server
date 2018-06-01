@@ -1,13 +1,13 @@
 #include <iostream>
 //
+#include <net/enet_handle.hpp>
 #include <server.hpp>
-//
-#include <lua.hpp>
 #include <data/lua_engine.hpp>
 
 int main()
 {
-    Server server(30337, 128.0);
+    net::ENetHandle enet_handle;
+    Server server(31337, 128.0);
     server.start();
     std::string input;
     while(input != "stop")
@@ -15,4 +15,5 @@ int main()
         std::cin >> input;
     }
     server.stop();
+    return 0;
 }

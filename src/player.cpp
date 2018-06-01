@@ -17,7 +17,7 @@ void Player::receive(ENetPacket *packet)
 
 }
 
-ENetPacket *Player::send()
+ENetPacket *Player::send() const
 {
     std::vector<world::tile::Type> tile_types;
     tile_types.reserve(window_size.x * window_size.y);
