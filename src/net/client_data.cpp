@@ -27,7 +27,10 @@ ClientData ClientData::deserialize(std::vector<uint8_t> const &bytes)
     static_assert(sizeof(view_size) == 4);
 
     const std::size_t single_size = sizeof(view_size);
-    assert(bytes.size() == single_size);
+    if(bytes.size() != single_size)
+    {
+        throw std::runtime_error("invalid client data deserialization input");
+    }
     const std::size_t tile_num    = bytes.size() / single_size;
     ClientData result = {{0, 0}};
     result.view_size.x = net_order((unsigned)

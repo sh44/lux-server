@@ -1,4 +1,4 @@
-#include <cassert>
+#include <stdexcept>
 #include <cstdint>
 #include <net/net_order.hpp>
 #include "server_data.hpp"
@@ -28,7 +28,10 @@ std::vector<uint8_t> ServerData::serialize() //TODO take reference instead of re
 ServerData ServerData::deserialize(std::vector<uint8_t> const &bytes)
 {
     const std::size_t single_size = sizeof(world::tile::Type);
-    assert((bytes.size() % single_size) == 0);
+    if((bytes.size() % single_size) != 0)
+    {
+        throw std::runtime_error("invalid server data deserialization input");
+    }
     const std::size_t tile_num    = bytes.size() / single_size;
     ServerData result;
     result.tiles.reserve(tile_num);
