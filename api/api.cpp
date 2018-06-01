@@ -13,6 +13,6 @@ void *entity_type_ctor(const char *name)
     return new world::entity::Type{name};
 }
 void entity_type_dtor(void *ptr) {delete (world::entity::Type *)ptr;}
-const char *entity_type_name(void *ptr) {return ((world::entity::Type *)ptr)->name.c_str();}
+const char *entity_type_name(void *ptr) {return ((world::entity::Type *)ptr)->name;}
 
 }

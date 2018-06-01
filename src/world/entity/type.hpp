@@ -7,7 +7,7 @@ namespace world::entity
 
 struct Type
 {
-    String name;
+    const char *name;
 };
 
 }
