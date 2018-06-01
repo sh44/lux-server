@@ -3,11 +3,17 @@
 namespace world::entity
 {
 
-Entity::Entity(Type const &type, Point pos) :
+Entity::Entity(World const &world, Type const &type, Point pos) :
+    world(world),
     type(type),
     pos(pos)
 {
 
+}
+
+Point Entity::get_pos() const
+{
+    return pos;
 }
 
 }

@@ -10,7 +10,9 @@ Server::Server(net::Port port, double tick_rate) :
     state(NOT_STARTED),
     enet_address({ENET_HOST_ANY, port}),
     enet_server(enet_host_create(&enet_address, MAX_CLIENTS, 1, 0, 0)),
-    tick_clock(util::TickClock::Duration(1.0 / tick_rate))
+    tick_clock(util::TickClock::Duration(1.0 / tick_rate)),
+    config(data::load_config(lua_engine, "data/config.lua")),
+    world(config)
 {
     if(enet_server == NULL)
     {

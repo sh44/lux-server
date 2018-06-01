@@ -24,8 +24,8 @@ WARNINGS_FLAGS  = \
 	-Wconversion
 
 CXX       = g++
-CXXFLAGS += -I$(SRC_DIR) $(WARNINGS) $(DEBUG_FLAGS) -std=c++17 -pedantic
-LDLIBS   += -lenet -lcurses -pthread
+CXXFLAGS += -I$(SRC_DIR) $(WARNINGS) $(DEBUG_FLAGS) -std=c++17 -pedantic -fPIC
+LDLIBS   += -lenet -pthread -lluajit
 LDFLAGS  +=
 
 CPP_FILES = $(shell find $(SRC_DIR) -type f -name "*.cpp" -printf '%p ')
@@ -34,7 +34,7 @@ OBJ_FILES = $(subst $(SRC_DIR),$(BUILD_DIR),$(patsubst %.cpp,%.o,$(CPP_FILES)))
 
 .PHONY : clean
 
-$(TARGET) : $(OBJ_FILES)
+$(TARGET) : $(OBJ_FILES) libapi.so
 	@echo "Linking $@..."
 	@mkdir -p $(dir $@)
 	$(CXX) $(LDFLAGS) $(OBJ_FILES) -o $@ $(LDLIBS)
@@ -49,8 +49,11 @@ $(BUILD_DIR)/%.d : $(SRC_DIR)/%.cpp
 	$(CXX) -MM $(CXXFLAGS) $< > $@
 	@sed -i "1s~^~$(dir $@)~" $@
 
+libapi.so : api/api.cpp api/decl.h $(OBJ_FILES)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< -o $@ -shared $(LDLIBS) $(OBJ_FILES)
+
 clean :
 	@echo "Cleaning up..."
-	@$(RM) -r $(TARGET) $(BUILD_DIR)
+	@$(RM) -r $(TARGET) $(BUILD_DIR) libapi.so
 
 -include $(DEP_FILES)

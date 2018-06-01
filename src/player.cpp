@@ -1,3 +1,8 @@
+#include <world/tile/type.hpp>
+#include <world/map/point.hpp>
+#include <world/entity.hpp>
+#include <world.hpp>
+#include <net/server_data.hpp>
 #include "player.hpp"
 
 Player::Player(ENetPeer *peer, world::Entity &entity) :
@@ -9,15 +14,20 @@ Player::Player(ENetPeer *peer, world::Entity &entity) :
 
 void Player::receive(ENetPacket *packet)
 {
-    packet_queue.push(packet);
+
 }
 
-void Player::update()
+ENetPacket *Player::send()
 {
-    if(!packet_queue.empty())
+    std::vector<world::tile::Type> tile_types;
+    tile_types.reserve(window_size.x * window_size.y);
+    for(std::size_t i = 0; i < window_size.x * window_size.y; ++i)
     {
-        ENetPacket *packet = packet_queue.front();
-
-        packet_queue.pop();
+        world::map::Point offset = {i % window_size.x, i / window_size.x, 0};
+        world::map::Point tile_pos = (world::map::Point)(entity->get_pos() + 0.5f) + offset;
+        tile_types.push_back(entity->world[tile_pos].type);
     }
+    net::ServerData server_data = {tile_types};
+    auto serialized = server_data.serialize();
+    return enet_packet_create(serialized.data(), serialized.size(), 0);
 }

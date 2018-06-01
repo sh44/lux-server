@@ -3,6 +3,8 @@
 #include <queue>
 //
 #include <enet/enet.h>
+//
+#include <linear/size_2d.hpp>
 
 namespace world { inline namespace entity { class Entity; } }
 
@@ -14,8 +16,8 @@ class Player
     ENetPeer *peer;
 
     void receive(ENetPacket *packet);
-    void update();
+    ENetPacket *send();
     private:
+    linear::Size2d<uint16_t> window_size; //in tiles
     world::Entity *entity;
-    std::queue<ENetPacket *> packet_queue;
 };

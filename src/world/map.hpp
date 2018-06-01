@@ -13,14 +13,15 @@ inline namespace map
 class Map
 {
     public:
-    Tile &operator[](Point pos);
+    Tile       &operator[](Point pos);
+    Tile const &operator[](Point pos) const;
     private:
-    Chunk &load_chunk(chunk::Point pos);
-    void unload_chunk(chunk::Point pos);
-    Chunk &get_chunk(chunk::Point pos);
+    Chunk &load_chunk(chunk::Point pos) const;
+    void unload_chunk(chunk::Point pos) const;
+    Chunk &get_chunk(chunk::Point pos)  const;
 
-    HashMap<chunk::Point, Chunk> chunks;
-    chunk::Generator generator;
+    mutable HashMap<chunk::Point, Chunk> chunks;
+    mutable chunk::Generator generator;
 };
 
 }
