@@ -14,6 +14,7 @@ struct ServerData
     //tiles view size (in w and h) are client-side
 
     std::vector<uint8_t> serialize();
+    static ServerData deserialize(std::vector<uint8_t> const &bytes);
 };
 
 }

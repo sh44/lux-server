@@ -8,6 +8,9 @@ namespace net
 struct ClientData
 {
     linear::Size2d<uint16_t> view_size; //in tiles
+
+    std::vector<uint8_t> serialize();
+    static ClientData deserialize(std::vector<uint8_t> const &bytes);
 };
 
 }

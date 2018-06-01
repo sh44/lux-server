@@ -3,6 +3,7 @@
 #include <world/entity.hpp>
 #include <world.hpp>
 #include <net/server_data.hpp>
+#include <net/client_data.hpp>
 #include "player.hpp"
 
 Player::Player(ENetPeer *peer, world::Entity &entity) :
@@ -14,16 +15,18 @@ Player::Player(ENetPeer *peer, world::Entity &entity) :
 
 void Player::receive(ENetPacket *packet)
 {
-
+    std::vector<uint8_t> bytes(packet->data, packet->data + packet->dataLength);
+    net::ClientData client_data = net::ClientData::deserialize(bytes);
+    view_size = client_data.view_size;
 }
 
 ENetPacket *Player::send() const
 {
     std::vector<world::tile::Type> tile_types;
-    tile_types.reserve(window_size.x * window_size.y);
-    for(std::size_t i = 0; i < window_size.x * window_size.y; ++i)
+    tile_types.reserve(view_size.x * view_size.y);
+    for(std::size_t i = 0; i < view_size.x * view_size.y; ++i)
     {
-        world::map::Point offset = {i % window_size.x, i / window_size.x, 0};
+        world::map::Point offset = {i % view_size.x, i / view_size.x, 0};
         world::map::Point tile_pos = (world::map::Point)(entity->get_pos() + 0.5f) + offset;
         tile_types.push_back(entity->world[tile_pos].type);
     }

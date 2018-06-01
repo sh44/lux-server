@@ -12,20 +12,20 @@ T net_order(T val);
 
 //TODO use BSWAP asm instruction?
 template<>
-uint8_t net_order(uint8_t val)
+inline uint8_t net_order(uint8_t val)
 {
     return val;
 }
 
 template<>
-uint16_t net_order(uint16_t val)
+inline uint16_t net_order(uint16_t val)
 {
     return ((val & 0x00FF) << 8) |
            ((val & 0xFF00) >> 8);
 }
 
 template<>
-uint32_t net_order(uint32_t val)
+inline uint32_t net_order(uint32_t val)
 {
     return ((val & 0x000000FF) << 24) |
            ((val & 0x0000FF00) <<  8) |
@@ -34,7 +34,7 @@ uint32_t net_order(uint32_t val)
 }
 
 template<>
-uint64_t net_order(uint64_t val)
+inline uint64_t net_order(uint64_t val)
 {
     return ((val & 0x00000000000000FF) << 56) |
            ((val & 0x000000000000FF00) << 40) |

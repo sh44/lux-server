@@ -18,6 +18,6 @@ class Player
     void receive(ENetPacket *packet);
     ENetPacket *send() const;
     private:
-    linear::Size2d<uint16_t> window_size; //in tiles
+    linear::Size2d<uint16_t> view_size; //in tiles
     world::Entity *entity;
 };
