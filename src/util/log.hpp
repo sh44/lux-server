@@ -58,7 +58,7 @@ void log(std::string const &prefix, Level level, std::string const &fmt, Args...
     }
     output += fmt;
     output += '\n';
-    std::printf(output.c_str(), args...);
+    std::printf(output.c_str(), args...); //TODO fix this annoying warning
 }
 
 

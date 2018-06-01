@@ -17,7 +17,7 @@ Config load_config(LuaEngine &lua_engine, String path)
             throw std::runtime_error(lua_engine.call(lua_tolstring, -1, (size_t *)NULL));
         case LUA_ERRMEM: throw std::bad_alloc();
     }
-    switch(lua_engine.call(lua_pcall, 0, 0, 0))
+    switch(lua_engine.call(lua_pcall, 0, 0, 0)) //TODO internal lua memory leak here?
     {
         case 0: break;
         case LUA_ERRRUN:
