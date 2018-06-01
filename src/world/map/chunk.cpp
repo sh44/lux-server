@@ -16,41 +16,41 @@ Point Chunk::point_map_to_chunk(map::Point point)
     chunk::Point result = point;
     if(result.x < 0)
     {
-        result.x -= SIZE_X - 1;
+        result.x -= SIZE.x - 1;
     }
     if(result.y < 0)
     {
-        result.y -= SIZE_Y - 1;
+        result.y -= SIZE.y - 1;
     }
     if(result.z < 0)
     {
-        result.z -= SIZE_Z - 1;
+        result.z -= SIZE.z - 1;
     }
-    result.x /= SIZE_X;
-    result.y /= SIZE_Y;
-    result.z /= SIZE_Z;
+    result.x /= SIZE.x;
+    result.y /= SIZE.y;
+    result.z /= SIZE.z;
     return result;
 }
 
 Index Chunk::point_map_to_index(map::Point point)
 {
     linear::Point3d<Index> result = point;
-    result.x %= SIZE_X;
-    result.y %= SIZE_Y;
-    result.z %= SIZE_Z;
+    result.x %= SIZE.x;
+    result.y %= SIZE.y;
+    result.z %= SIZE.z;
     if(result.x < 0)
     {
-        result.x += SIZE_X;
+        result.x += SIZE.x;
     }
     if(result.y < 0)
     {
-        result.y += SIZE_Y;
+        result.y += SIZE.y;
     }
     if(result.z < 0)
     {
-        result.z += SIZE_Z;
+        result.z += SIZE.z;
     }
-    return result.x + (result.y * SIZE_X) + (result.z * SIZE_X * SIZE_Y);
+    return result.x + (result.y * SIZE.x) + (result.z * SIZE.x * SIZE.y);
 
 }
 

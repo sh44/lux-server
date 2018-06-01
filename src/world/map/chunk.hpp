@@ -2,6 +2,7 @@
 
 #include <cstddef>
 //
+#include <linear/size_3d.hpp>
 #include <world/map/chunk/index.hpp>
 #include <world/map/chunk/point.hpp>
 #include <world/map/point.hpp>
@@ -14,10 +15,8 @@ inline namespace chunk
 
 struct Chunk
 {
-    static const std::size_t SIZE_X = 16; //TODO replace with a 3d vec?
-    static const std::size_t SIZE_Y = 16; //
-    static const std::size_t SIZE_Z = 3; //
-    static const std::size_t TILE_SIZE = SIZE_X * SIZE_Y * SIZE_Z;
+    static constexpr linear::Size3d<std::size_t> SIZE = {16, 16, 3};
+    static const std::size_t TILE_SIZE = SIZE.x * SIZE.y * SIZE.z;
 
     Chunk(Tile *tiles);
 
