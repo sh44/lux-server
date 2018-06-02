@@ -1,6 +1,5 @@
 #pragma once
 
-#include <alias/ref.hpp>
 #include <world/tile/type.hpp>
 
 namespace world
@@ -13,7 +12,7 @@ class Tile
     public:
     Tile(const Type &type);
 
-    Ref<const Type> type;
+    Type const *type;
 };
 
 }

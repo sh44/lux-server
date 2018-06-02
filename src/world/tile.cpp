@@ -6,7 +6,7 @@ inline namespace tile
 {
 
 Tile::Tile(const Type &type) :
-    type(type)
+    type(&type)
 {
 
 }
