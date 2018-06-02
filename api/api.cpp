@@ -1,3 +1,4 @@
+#include <alias/string.hpp>
 #include <util/log.hpp>
 #include <world/entity/type.hpp>
 #include "api.hpp"

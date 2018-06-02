@@ -1,4 +1,4 @@
-#include <iostream>
+#include <stdexcept>
 #include <lua.hpp>
 //
 #include <data/lua_engine.hpp>

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <list>
-#include <unordered_map>
 //
 #include <data/config.hpp>
 #include <world/entity.hpp>

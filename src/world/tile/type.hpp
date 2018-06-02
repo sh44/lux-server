@@ -1,7 +1,6 @@
 #pragma once
 
-#include <cstdint>
-//
+#include <alias/int.hpp>
 #include <linear/point_2d.hpp>
 
 namespace world::tile
@@ -9,6 +8,7 @@ namespace world::tile
 
 struct Type
 {
+    typedef linear::Point2d<U8> TexPos;
     enum Shape : uint8_t
     {
         EMPTY,
@@ -16,10 +16,10 @@ struct Type
         WALL
     };
 
-    Type(Shape shape, linear::Point2d<uint8_t> tex_pos);
+    Type(Shape shape, TexPos tex_pos);
 
     Shape shape;
-    linear::Point2d<uint8_t> tex_pos; //TODO typedef?
+    TexPos tex_pos;
 };
 
 }

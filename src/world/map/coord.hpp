@@ -1,8 +1,8 @@
 #pragma once
 
-#include <cstddef>
+#include <alias/int.hpp>
 
 namespace world::map
 {
-    typedef std::size_t Coord;
+    typedef SizeT Coord;
 }

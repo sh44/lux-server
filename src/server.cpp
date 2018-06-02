@@ -1,5 +1,3 @@
-#include <ncurses.h>
-#include <cstdint>
 #include <stdexcept>
 //
 #include <util/log.hpp>
@@ -57,7 +55,7 @@ void Server::kick_player(net::Ip ip, String reason)
              (ip >> 16) & 0xFF,
              (ip >> 24) & 0xFF);
     ENetPeer *peer = players.at(ip).peer;
-    enet_peer_disconnect(peer, (uint32_t)(std::size_t)("KICKED FOR: " + reason).c_str());
+    enet_peer_disconnect(peer, (U32)(SizeT)("KICKED FOR: " + reason).c_str());
     /* uint32_t is smaller than a pointer, so it's probably a bad idea,
      * but that's how ENet does it, unless I misunderstood something,
      * and the uint32_t value shouldn't really be a pointer

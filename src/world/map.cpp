@@ -1,3 +1,4 @@
+#include <alias/int.hpp>
 #include <world/map/chunk/index.hpp>
 #include <world/map/chunk.hpp>
 //
@@ -29,7 +30,7 @@ Chunk &Map::load_chunk(chunk::Point pos) const
 void Map::unload_chunk(chunk::Point pos) const
 {
     auto chunk = chunks.at(pos);
-    for(std::size_t i = 0; i < Chunk::TILE_SIZE; ++i)
+    for(SizeT i = 0; i < Chunk::TILE_SIZE; ++i)
     {
         (*(chunk.tiles + i)).~Tile();
     }

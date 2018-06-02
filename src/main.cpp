@@ -2,7 +2,6 @@
 //
 #include <net/enet_handle.hpp>
 #include <server.hpp>
-#include <data/lua_engine.hpp>
 
 int main()
 {

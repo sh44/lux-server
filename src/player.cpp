@@ -1,3 +1,4 @@
+#include <alias/int.hpp>
 #include <world/tile/type.hpp>
 #include <world/map/point.hpp>
 #include <world/entity.hpp>
@@ -15,7 +16,7 @@ Player::Player(ENetPeer *peer, world::Entity &entity) :
 
 void Player::receive(ENetPacket *packet)
 {
-    std::vector<uint8_t> bytes(packet->data, packet->data + packet->dataLength);
+    Vector<U8> bytes(packet->data, packet->data + packet->dataLength);
     net::ClientData client_data;
     net::ClientData::deserialize(client_data, bytes);
     view_size = client_data.view_size;
@@ -24,9 +25,9 @@ void Player::receive(ENetPacket *packet)
 ENetPacket *Player::send() const
 {
     //TODO store buffer in Player?
-    std::vector<net::TileState> tiles;
+    Vector<net::TileState> tiles;
     tiles.reserve(view_size.x * view_size.y);
-    for(std::size_t i = 0; i < view_size.x * view_size.y; ++i)
+    for(SizeT i = 0; i < view_size.x * view_size.y; ++i)
     {
         world::map::Point offset = {i % view_size.x, i / view_size.x, 0};
         world::map::Point tile_pos = (world::map::Point)(entity->get_pos() + 0.5f) + offset;
@@ -35,7 +36,7 @@ ENetPacket *Player::send() const
                            tile_type->tex_pos);
     }
     net::ServerData server_data = {tiles};
-    std::vector<uint8_t> bytes;
+    Vector<U8> bytes;
     net::ServerData::serialize(server_data, bytes);
     return enet_packet_create(bytes.data(), bytes.size(), 0);
 }

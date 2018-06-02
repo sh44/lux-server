@@ -1,12 +1,10 @@
 #pragma once
 
-#include <cstddef>
-#include <string>
 #include <atomic>
 #include <thread>
-
+//
 #include <enet/enet.h>
-
+//
 #include <alias/string.hpp>
 #include <alias/hash_map.hpp>
 #include <alias/ref.hpp>
@@ -35,7 +33,7 @@ private:
         RUNNING,
         STOPPED
     };
-    const std::size_t MAX_CLIENTS = 16;
+    const SizeT MAX_CLIENTS = 16;
 
     void run();
     void tick();

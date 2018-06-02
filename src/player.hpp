@@ -1,9 +1,8 @@
 #pragma once
 
-#include <queue>
-//
 #include <enet/enet.h>
 //
+#include <alias/int.hpp>
 #include <linear/size_2d.hpp>
 
 namespace world { inline namespace entity { class Entity; } }
@@ -18,6 +17,6 @@ class Player
     void receive(ENetPacket *packet);
     ENetPacket *send() const;
     private:
-    linear::Size2d<uint16_t> view_size; //in tiles
+    linear::Size2d<U16> view_size; //in tiles
     world::Entity *entity;
 };
