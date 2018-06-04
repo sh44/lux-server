@@ -16,8 +16,8 @@ struct Type
         WALL
     };
 
-    Type(Shape shape, TexPos tex_pos);
-
+    const char *id;
+    const char *name;
     Shape shape;
     TexPos tex_pos;
 };

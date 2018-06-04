@@ -1,5 +1,9 @@
+typedef void *ApiHashMap;
+
 void *malloc(size_t size);
 void    free(void *ptr);
+
+void hash_map_insert(ApiHashMap *hash_map, ApiCString key, void *val);
 
 typedef enum
 {
@@ -11,25 +15,42 @@ typedef enum
     DEBUG,
     TRACE,
     ALL = TRACE
-} LogLevel;
+} ApiLogLevel;
 
-void log_msg(LogLevel level, const char *msg);
-
-typedef struct {      int x, y; } Point2i;
-typedef struct { unsigned x, y; } Point2u;
-typedef struct {    float x, y; } Point2f;
-typedef struct {   double x, y; } Point2d;
-
-typedef struct {      int x, y, z; } Point3i;
-typedef struct { unsigned x, y, z; } Point3u;
-typedef struct {    float x, y, z; } Point3f;
-typedef struct {   double x, y, z; } Point3d;
+void log_msg(ApiLogLevel level, ApiCString msg);
 
 typedef struct
 {
-    void *player_type;
-} Config;
+    ApiCString id;
+    ApiCString name;
+    enum
+    {
+        EMPTY,
+        FLOOR,
+        WALL
+    } shape;
 
-void       *entity_type_ctor(const char *name);
-const char *entity_type_name(void *ptr);
-void        entity_type_dtor(void *ptr);
+    struct
+    {
+        ApiU8 x;
+        ApiU8 y;
+    } tex_pos;
+} ApiTileType;
+
+typedef struct
+{
+    ApiCString id;
+    ApiCString name;
+} ApiEntityType;
+
+typedef struct
+{
+    ApiHashMap tile_types;
+    ApiHashMap entity_types;
+} ApiDatabase;
+
+typedef struct
+{
+    ApiDatabase   *db;
+    ApiEntityType *player_type;
+} ApiConfig;

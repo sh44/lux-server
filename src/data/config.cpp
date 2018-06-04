@@ -5,6 +5,9 @@
 #include "config.hpp"
 #include <world/entity/type.hpp>
 
+#include <util/log.hpp>
+#include <data/database.hpp>
+
 namespace data
 {
 
@@ -36,6 +39,7 @@ Config load_config(LuaEngine &lua_engine, String path)
         case LUA_ERRMEM: throw std::bad_alloc();
         case LUA_ERRERR: throw std::runtime_error("error while running load_config function");
     }
+    util::log("CONFIG", util::TRACE, "%s\n", result.db->entity_type_at("human").id);
     return result;
 }
 

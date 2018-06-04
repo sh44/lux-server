@@ -9,15 +9,11 @@ namespace world::tile   { class Type; }
 namespace data
 {
 
-class LuaEngine;
-
-class GeneratorData
+class Database
 {
     public:
-    GeneratorData(LuaEngine &lua_engine);
-
-    world::entity::Type &entity_type_at(String const &id);
-    world::tile::Type   &tile_type_at(String const &id);
+    world::entity::Type const &entity_type_at(String const &id) const;
+    world::tile::Type   const &tile_type_at(String const &id)   const;
     private:
     HashMap<String, world::entity::Type *> entity_types;
     HashMap<String, world::tile::Type *>   tile_types;

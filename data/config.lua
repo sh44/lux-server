@@ -2,16 +2,13 @@ ffi = require "ffi"
 
 require "lux"
 
-require "default_generator"
+require "generator_data"
 require "entity_type/human"
-
-config =
-{
-    generator   = default_generator,
-    player_type = human,
-}
+require "db"
 
 function load_config(config_ptr)
-    config_struct = ffi.cast("Config *", config_ptr);
-    config_struct.player_type = config.player_type
+    config_struct = ffi.cast("ApiConfig *", config_ptr);
+    table_to_hash_map(db.tile_types,   config_struct.db.tile_types);
+    table_to_hash_map(db.entity_types, config_struct.db.entity_types);
+    config_struct.player_type = human
 end

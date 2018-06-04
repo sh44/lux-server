@@ -1,7 +1,18 @@
-ffi = require("ffi")
+local ffi = require("ffi")
 
-local api_header = assert(io.open("api/decl.h", "r"));
+local function load_def(path)
+    local header = assert(io.open(path, "r"));
+    ffi.cdef(header:read("*all"))
+    header:close()
+end
+
+load_def("api/alias.h")
+load_def("api/decl.h")
 
 lux = ffi.load("./libapi.so")
-ffi.cdef(api_header:read("*all"))
-api_header:close()
+
+function table_to_hash_map(tab, hash_map)
+    for k, v in pairs(tab) do
+        lux.hash_map_insert(hash_map, k, v)
+    end
+end
