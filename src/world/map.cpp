@@ -48,7 +48,7 @@ Chunk &Map::load_chunk(ChunkPoint pos) const
 
 void Map::unload_chunk(ChunkPoint pos) const
 {
-    auto chunk = chunks.at(pos);
+    auto &chunk = chunks.at(pos);
     for(SizeT i = 0; i < Chunk::TILE_SIZE; ++i)
     {
         (*(chunk.tiles + i)).~Tile();

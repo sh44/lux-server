@@ -2,12 +2,12 @@
 
 #include <world/map/chunk/common.hpp>
 
-namespace data { class Config; }
+namespace data { struct Config; }
 
 namespace world
 {
 
-class Chunk;
+struct Chunk;
 
 class Generator
 {

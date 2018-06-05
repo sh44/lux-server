@@ -1,3 +1,4 @@
+#include <alias/ref.hpp>
 #include <world/entity/common.hpp>
 #include "world.hpp"
 
@@ -23,7 +24,7 @@ Tile const &World::operator[](MapPoint pos) const
 
 Entity &World::create_player()
 {
-    return create_entity(*this, *config.player_type, EntityPoint(0, 0, 0));
+    return create_entity(Ref<World>(*this), *config.player_type, EntityPoint(0, 0, 0));
 }
 
 }

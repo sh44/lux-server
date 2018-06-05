@@ -13,6 +13,8 @@ class World
 {
 public:
     World(data::Config const &config);
+    World(World const &that) = delete;
+    World &operator=(World const &that) = delete;
 
     Tile       &operator[](MapPoint pos);
     Tile const &operator[](MapPoint pos) const;

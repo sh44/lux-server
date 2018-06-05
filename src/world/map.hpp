@@ -6,7 +6,7 @@
 #include <world/map/chunk.hpp>
 #include <world/map/generator.hpp>
 
-namespace data { class Config; }
+namespace data { struct Config; }
 
 namespace world
 {
