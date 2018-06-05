@@ -2,12 +2,12 @@
 
 #include <alias/string.hpp>
 
-namespace world { class EntityType; }
+namespace world { struct EntityType; }
 
 namespace data
 {
 
-class Database;
+struct Database;
 
 struct Config
 {

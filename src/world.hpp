@@ -6,7 +6,7 @@
 #include <world/entity.hpp>
 #include <world/map.hpp>
 
-inline namespace world
+namespace world
 {
 
 class World

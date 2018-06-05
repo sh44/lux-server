@@ -5,8 +5,8 @@
 
 namespace world
 {
-    class EntityType;
-    class TileType;
+    struct EntityType;
+    struct TileType;
 }
 
 namespace data
