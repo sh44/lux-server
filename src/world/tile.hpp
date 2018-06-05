@@ -8,7 +8,9 @@ namespace world
 class Tile
 {
     public:
-    Tile(const TileType &type);
+    Tile(TileType const &type);
+    Tile(Tile const &that) = delete;
+    Tile &operator=(Tile const &that) = delete;
 
     TileType const *type;
 };

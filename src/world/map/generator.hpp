@@ -13,6 +13,7 @@ class Generator
 {
     public:
     Generator(data::Config const &config);
+    Generator &operator=(Generator const &that) = delete;
 
     void generate_chunk(Chunk &chunk, ChunkPoint pos);
     private:

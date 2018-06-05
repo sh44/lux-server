@@ -19,6 +19,8 @@ class Server
 {
 public:
     Server(net::Port port, double tick_rate);
+    Server(Server const &that) = delete;
+    Server &operator=(Server const &that) = delete;
     ~Server();
 
     void start();

@@ -12,6 +12,8 @@ class Entity
 {
 public:
     Entity(World const &world, EntityType const &type, EntityPoint pos);
+    Entity(Entity const &that) = delete;
+    Entity &operator=(Entity const &that) = delete;
 
     EntityPoint get_pos() const;
 

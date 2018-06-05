@@ -11,6 +11,8 @@ class Player
 {
     public:
     Player(ENetPeer *peer, world::Entity &entity);
+    Player(Player const &that) = delete;
+    Player &operator=(Player const &that) = delete;
 
     ENetPeer *peer;
 

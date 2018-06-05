@@ -153,5 +153,8 @@ void Server::add_player(ENetPeer *peer)
              (ip >>  8) & 0xFF,
              (ip >> 16) & 0xFF,
              (ip >> 24) & 0xFF);
-    players.insert({peer->address.host, {peer, world.create_player()}});
+    players.emplace(std::piecewise_construct,
+                    std::forward_as_tuple(peer->address.host),
+                    std::forward_as_tuple(peer, world.create_player()));
+    // ^ why you so ugly C++?
 }

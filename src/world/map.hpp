@@ -15,6 +15,8 @@ class Map
 {
     public:
     Map(data::Config const &config);
+    Map(Map const &that) = delete;
+    Map &operator=(Map const &that) = delete;
     ~Map();
 
     Tile       &operator[](MapPoint pos);

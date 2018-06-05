@@ -22,6 +22,7 @@ WARNINGS_FLAGS  = \
 	-Wnon-virtual-dtor \
 	-Wctor-dtor-privacy \
 	-Wno-long-long \
+	-Weffc++ \
 	-Wconversion
 
 CXX       = clang++
