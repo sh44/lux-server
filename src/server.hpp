@@ -8,7 +8,6 @@
 #include <alias/string.hpp>
 #include <alias/hash_map.hpp>
 #include <alias/ref.hpp>
-#include <data/lua_engine.hpp>
 #include <data/config.hpp>
 #include <util/tick_clock.hpp>
 #include <net/ip.hpp>
@@ -47,7 +46,6 @@ private:
     ENetAddress        enet_address;
     ENetHost          *enet_server;
     util::TickClock    tick_clock;
-    data::LuaEngine    lua_engine;
     data::Config       config;
     World              world;
 

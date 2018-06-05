@@ -5,7 +5,7 @@
 #include <alias/int.hpp>
 #include <linear/size_2d.hpp>
 
-namespace world { inline namespace entity { class Entity; } }
+namespace world { class Entity; }
 
 class Player
 {

@@ -1,28 +1,29 @@
-#include <world/entity/point.hpp>
+#include <world/entity/common.hpp>
 #include "world.hpp"
 
 namespace world
 {
 
 World::World(data::Config const &config) :
-    config(config)
+    config(config),
+    map(config)
 {
 
 }
 
-Tile &World::operator[](map::Point pos)
+Tile &World::operator[](MapPoint pos)
 {
     return map[pos];
 }
 
-Tile const &World::operator[](map::Point pos) const
+Tile const &World::operator[](MapPoint pos) const
 {
     return map[pos];
 }
 
 Entity &World::create_player()
 {
-    return create_entity(*this, *config.player_type, entity::Point(0, 0, 0));
+    return create_entity(*this, *config.player_type, EntityPoint(0, 0, 0));
 }
 
 }

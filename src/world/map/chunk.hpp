@@ -2,28 +2,24 @@
 
 #include <alias/int.hpp>
 #include <linear/size_3d.hpp>
-#include <world/map/chunk/index.hpp>
-#include <world/map/chunk/point.hpp>
-#include <world/map/point.hpp>
+#include <world/map/chunk/common.hpp>
+#include <world/map/common.hpp>
 #include <world/tile.hpp>
 
-namespace world::map
-{
-inline namespace chunk
+namespace world
 {
 
 struct Chunk
 {
-    static constexpr linear::Size3d<SizeT> SIZE = {16, 16, 3};
+    static constexpr linear::Size3d<U16> SIZE = {16, 16, 3};
     static const SizeT TILE_SIZE = SIZE.x * SIZE.y * SIZE.z;
 
     Chunk(Tile *tiles);
 
-    static chunk::Point point_map_to_chunk(Point point);
-    static chunk::Index point_map_to_index(Point point);
+    static ChunkPoint point_map_to_chunk(MapPoint point);
+    static ChunkIndex point_map_to_index(MapPoint point);
 
     Tile *tiles;
 };
 
-}
 }

@@ -3,6 +3,8 @@
 #include <net/enet_handle.hpp>
 #include <server.hpp>
 
+#include <data/obj.hpp>
+
 int main()
 {
     net::ENetHandle enet_handle;

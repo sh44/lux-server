@@ -1,6 +1,6 @@
 #include <alias/int.hpp>
 #include <world/tile/type.hpp>
-#include <world/map/point.hpp>
+#include <world/map/common.hpp>
 #include <world/entity.hpp>
 #include <world.hpp>
 #include <net/server_data.hpp>
@@ -27,10 +27,10 @@ ENetPacket *Player::send() const
     //TODO store buffer in Player?
     Vector<net::TileState> tiles;
     tiles.reserve(view_size.x * view_size.y);
-    for(SizeT i = 0; i < view_size.x * view_size.y; ++i)
+    for(SizeT i = 0; i < (SizeT)(view_size.x * view_size.y); ++i)
     {
-        world::map::Point offset = {i % view_size.x, i / view_size.x, 0};
-        world::map::Point tile_pos = (world::map::Point)(entity->get_pos() + 0.5f) + offset;
+        world::MapPoint offset = {i % view_size.x, i / view_size.x, 0};
+        world::MapPoint tile_pos = (world::MapPoint)(entity->get_pos() + 0.5f) + offset;
         auto const &tile_type = entity->world[tile_pos].type;
         tiles.emplace_back((net::TileState::Shape)tile_type->shape,
                            tile_type->tex_pos);

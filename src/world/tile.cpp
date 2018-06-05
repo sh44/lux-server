@@ -2,14 +2,11 @@
 
 namespace world
 {
-inline namespace tile
-{
 
-Tile::Tile(const Type &type) :
+Tile::Tile(const TileType &type) :
     type(&type)
 {
 
 }
 
-}
 }

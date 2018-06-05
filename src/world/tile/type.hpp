@@ -3,13 +3,13 @@
 #include <alias/int.hpp>
 #include <linear/point_2d.hpp>
 
-namespace world::tile
+namespace world
 {
 
-struct Type
+struct TileType
 {
     typedef linear::Point2d<U8> TexPos;
-    enum Shape : uint8_t
+    enum Shape : U8
     {
         EMPTY,
         FLOOR,

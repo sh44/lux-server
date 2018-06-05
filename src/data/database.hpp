@@ -3,20 +3,19 @@
 #include <alias/hash_map.hpp>
 #include <alias/string.hpp>
 
-namespace world::entity { class Type; }
-namespace world::tile   { class Type; }
+namespace world
+{
+    class EntityType;
+    class TileType;
+}
 
 namespace data
 {
 
-class Database
+struct Database
 {
-    public:
-    world::entity::Type const &entity_type_at(String const &id) const;
-    world::tile::Type   const &tile_type_at(String const &id)   const;
-    private:
-    HashMap<String, world::entity::Type *> entity_types;
-    HashMap<String, world::tile::Type *>   tile_types;
+    HashMap<String, world::EntityType const *> entity_types;
+    HashMap<String, world::TileType   const *>   tile_types;
 };
 
 }

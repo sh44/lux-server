@@ -1,9 +1,9 @@
 #pragma once
 
-namespace world::entity
+namespace world
 {
 
-struct Type
+struct EntityType
 {
     const char *id;
     const char *name;

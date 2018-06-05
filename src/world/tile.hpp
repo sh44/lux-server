@@ -4,16 +4,13 @@
 
 namespace world
 {
-inline namespace tile
-{
 
 class Tile
 {
     public:
-    Tile(const Type &type);
+    Tile(const TileType &type);
 
-    Type const *type;
+    TileType const *type;
 };
 
-}
 }

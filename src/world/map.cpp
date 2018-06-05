@@ -1,33 +1,52 @@
 #include <alias/int.hpp>
-#include <world/map/chunk/index.hpp>
+#include <util/log.hpp>
+#include <world/map/chunk/common.hpp>
 #include <world/map/chunk.hpp>
 //
 #include "map.hpp"
 
-namespace world::map
+namespace world
 {
 
-Tile &Map::operator[](Point pos)
+Map::Map(data::Config const &config) :
+    generator(config)
 {
-    chunk::Point chunk_pos   = Chunk::point_map_to_chunk(pos);
-    chunk::Index chunk_index = Chunk::point_map_to_index(pos);
+
+}
+
+Map::~Map()
+{
+    for(auto &i : chunks)
+    {
+        unload_chunk(i.first);
+    }
+}
+
+Tile &Map::operator[](MapPoint pos)
+{
+    ChunkPoint chunk_pos   = Chunk::point_map_to_chunk(pos);
+    ChunkIndex chunk_index = Chunk::point_map_to_index(pos);
+    util::log("MAP", util::TRACE, "idx %zu", chunk_index);
     return get_chunk(chunk_pos).tiles[chunk_index];
 }
 
-Tile const &Map::operator[](Point pos) const
+Tile const &Map::operator[](MapPoint pos) const
 {
-    chunk::Point chunk_pos   = Chunk::point_map_to_chunk(pos);
-    chunk::Index chunk_index = Chunk::point_map_to_index(pos);
+    ChunkPoint chunk_pos   = Chunk::point_map_to_chunk(pos);
+    ChunkIndex chunk_index = Chunk::point_map_to_index(pos);
     return get_chunk(chunk_pos).tiles[chunk_index];
 }
 
-Chunk &Map::load_chunk(chunk::Point pos) const
+Chunk &Map::load_chunk(ChunkPoint pos) const
 {
+    util::log("MAP", util::DEBUG, "loading chunk %zd, %zd, %zd", pos.x, pos.y, pos.z);
     chunks.emplace(pos, (Tile *)::operator new(sizeof(Tile) * Chunk::TILE_SIZE));
-    generator.generate_chunk(chunks.at(pos), pos);
+    Chunk &chunk = chunks.at(pos);
+    generator.generate_chunk(chunk, pos);
+    return chunk;
 }
 
-void Map::unload_chunk(chunk::Point pos) const
+void Map::unload_chunk(ChunkPoint pos) const
 {
     auto chunk = chunks.at(pos);
     for(SizeT i = 0; i < Chunk::TILE_SIZE; ++i)
@@ -38,7 +57,7 @@ void Map::unload_chunk(chunk::Point pos) const
     chunks.erase(pos);
 }
 
-Chunk &Map::get_chunk(chunk::Point pos) const
+Chunk &Map::get_chunk(ChunkPoint pos) const
 {
     if(chunks.count(pos) == 0)
     {

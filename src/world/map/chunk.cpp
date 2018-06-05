@@ -2,7 +2,7 @@
 //
 #include "chunk.hpp"
 
-namespace world::map::chunk
+namespace world
 {
 
 Chunk::Chunk(Tile *tiles) :
@@ -11,9 +11,9 @@ Chunk::Chunk(Tile *tiles) :
 
 }
 
-Point Chunk::point_map_to_chunk(map::Point point)
+ChunkPoint Chunk::point_map_to_chunk(MapPoint point)
 {
-    chunk::Point result = point;
+    ChunkPoint result = point;
     if(result.x < 0)
     {
         result.x -= SIZE.x - 1;
@@ -32,26 +32,25 @@ Point Chunk::point_map_to_chunk(map::Point point)
     return result;
 }
 
-Index Chunk::point_map_to_index(map::Point point)
+ChunkIndex Chunk::point_map_to_index(MapPoint point)
 {
-    linear::Point3d<Index> result = point;
-    result.x %= SIZE.x;
-    result.y %= SIZE.y;
-    result.z %= SIZE.z;
-    if(result.x < 0)
+    point.x %= SIZE.x;
+    point.y %= SIZE.y;
+    point.z %= SIZE.z;
+    if(point.x < 0)
     {
-        result.x += SIZE.x;
+        point.x += SIZE.x;
     }
-    if(result.y < 0)
+    if(point.y < 0)
     {
-        result.y += SIZE.y;
+        point.y += SIZE.y;
     }
-    if(result.z < 0)
+    if(point.z < 0)
     {
-        result.z += SIZE.z;
+        point.z += SIZE.z;
     }
+    linear::Point3d<ChunkIndex> result = point;
     return result.x + (result.y * SIZE.x) + (result.z * SIZE.x * SIZE.y);
-
 }
 
 }

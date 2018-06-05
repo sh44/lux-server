@@ -1,9 +1,9 @@
 #include "entity.hpp"
 
-namespace world::entity
+namespace world
 {
 
-Entity::Entity(World const &world, Type const &type, Point pos) :
+Entity::Entity(World const &world, EntityType const &type, EntityPoint pos) :
     world(world),
     type(type),
     pos(pos)
@@ -11,7 +11,7 @@ Entity::Entity(World const &world, Type const &type, Point pos) :
 
 }
 
-Point Entity::get_pos() const
+EntityPoint Entity::get_pos() const
 {
     return pos;
 }

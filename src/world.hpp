@@ -14,8 +14,8 @@ class World
 public:
     World(data::Config const &config);
 
-    Tile       &operator[](map::Point pos);
-    Tile const &operator[](map::Point pos) const;
+    Tile       &operator[](MapPoint pos);
+    Tile const &operator[](MapPoint pos) const;
 
     Entity &create_player();
 private:

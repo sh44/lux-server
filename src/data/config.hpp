@@ -2,20 +2,17 @@
 
 #include <alias/string.hpp>
 
-namespace world::entity { class Type; }
+namespace world { class EntityType; }
 
 namespace data
 {
 
 class Database;
-class LuaEngine;
 
 struct Config
 {
-    Database            *db;
-    world::entity::Type *player_type;
+    Database          const *db;
+    world::EntityType const *player_type;
 };
-
-Config load_config(LuaEngine &lua_engine, String path);
 
 }
