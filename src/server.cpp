@@ -93,12 +93,7 @@ void Server::handle_input()
     {
         if(event.type != ENET_EVENT_TYPE_NONE)
         {
-            net::Ip ip = event.peer->address.host;
-            util::log("SERVER", util::TRACE, "received packet from %u.%u.%u.%u",
-                  ip & 0xFF,
-                 (ip >>  8) & 0xFF,
-                 (ip >> 16) & 0xFF,
-                 (ip >> 24) & 0xFF);
+            //TODO
         }
         switch(event.type)
         {
@@ -126,12 +121,6 @@ void Server::handle_output()
     {
         ENetPacket *packet = player.second.send();
         enet_peer_send(player.second.peer, 0, packet);
-        net::Ip ip = player.second.peer->address.host;
-        util::log("SERVER", util::TRACE, "sent packet to player %u.%u.%u.%u",
-              ip & 0xFF,
-             (ip >>  8) & 0xFF,
-             (ip >> 16) & 0xFF,
-             (ip >> 24) & 0xFF);
     }
 }
 

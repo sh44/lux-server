@@ -2,6 +2,7 @@
 
 #include <list>
 //
+#include <util/log.hpp>
 #include <data/config.hpp>
 #include <world/entity.hpp>
 #include <world/map.hpp>
@@ -34,7 +35,11 @@ template<typename... Args>
 Entity &World::create_entity(Args... args)
 {
     entity_storage.emplace_back(args...);
-    return entity_storage.back();
+    Entity &result = entity_storage.back();
+    auto pos = result.get_pos();
+    util::log("WORLD", util::DEBUG, "created new entity, typeid: %s, pos: %f, %f, %f",
+              result.type.id, pos.x, pos.y, pos.z);
+    return result;
 }
 
 }

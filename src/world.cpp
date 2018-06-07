@@ -24,6 +24,7 @@ Tile const &World::operator[](MapPoint pos) const
 
 Entity &World::create_player()
 {
+    util::log("WORLD", util::DEBUG, "created player");
     return create_entity(Ref<World>(*this), *config.player_type, EntityPoint(0, 0, 0));
 }
 
