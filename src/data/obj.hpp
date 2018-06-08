@@ -17,6 +17,14 @@ const world::TileType void_tile =
     {0, 0}
 };
 
+const world::TileType grass_tile =
+{
+    "grass",
+    "Grass",
+    world::TileType::FLOOR,
+    {1, 0}
+};
+
 const data::Database default_db =
 {
     {
