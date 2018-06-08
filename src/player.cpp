@@ -30,7 +30,7 @@ ENetPacket *Player::send() const
     for(SizeT i = 0; i < (SizeT)(view_size.x * view_size.y); ++i)
     {
         world::MapPoint offset = {i % view_size.x, i / view_size.x, 0};
-        world::MapPoint tile_pos = (world::MapPoint)(entity->get_pos() + 0.5f) + offset;
+        world::MapPoint tile_pos = (world::MapPoint)entity->get_pos() + offset;
         auto const &tile_type = entity->world[tile_pos].type;
         tiles.emplace_back((net::TileState::Shape)tile_type->shape,
                            tile_type->tex_pos);

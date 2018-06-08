@@ -37,7 +37,7 @@ Entity &World::create_entity(Args... args)
     entity_storage.emplace_back(args...);
     Entity &result = entity_storage.back();
     auto pos = result.get_pos();
-    util::log("WORLD", util::DEBUG, "created new entity, typeid: %s, pos: %f, %f, %f",
+    util::log("WORLD", util::DEBUG, "created new entity, typeid: %s, pos: %.2f, %.2f, %.2f",
               result.type.id, pos.x, pos.y, pos.z);
     return result;
 }
