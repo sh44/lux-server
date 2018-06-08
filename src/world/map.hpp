@@ -13,6 +13,7 @@ namespace world
 
 class Map
 {
+    typedef HashMap<ChunkPoint, Chunk>::iterator ChunkIterator;
     public:
     Map(data::Config const &config);
     Map(Map const &that) = delete;
@@ -23,7 +24,7 @@ class Map
     Tile const &operator[](MapPoint pos) const;
     private:
     Chunk &load_chunk(ChunkPoint pos) const;
-    void unload_chunk(ChunkPoint pos) const;
+    ChunkIterator unload_chunk(ChunkIterator iter) const;
     Chunk &get_chunk(ChunkPoint pos)  const;
 
     mutable HashMap<ChunkPoint, Chunk> chunks;

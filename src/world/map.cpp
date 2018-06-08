@@ -16,9 +16,9 @@ Map::Map(data::Config const &config) :
 
 Map::~Map()
 {
-    for(auto &i : chunks)
+    for(auto i = chunks.begin() ; i != chunks.end();)
     {
-        unload_chunk(i.first);
+        i = unload_chunk(i);
     }
 }
 
@@ -40,21 +40,21 @@ Tile const &Map::operator[](MapPoint pos) const
 Chunk &Map::load_chunk(ChunkPoint pos) const
 {
     util::log("MAP", util::DEBUG, "loading chunk %zd, %zd, %zd", pos.x, pos.y, pos.z);
-    chunks.emplace(pos, (Tile *)::operator new(sizeof(Tile) * Chunk::TILE_SIZE));
+    chunks.emplace(pos, (Tile*)::operator new(sizeof(Tile) * Chunk::TILE_SIZE));
     Chunk &chunk = chunks.at(pos);
     generator.generate_chunk(chunk, pos);
     return chunk;
 }
 
-void Map::unload_chunk(ChunkPoint pos) const
+Map::ChunkIterator Map::unload_chunk(Map::ChunkIterator iter) const
 {
-    auto &chunk = chunks.at(pos);
+    Chunk &chunk = iter->second;
     for(SizeT i = 0; i < Chunk::TILE_SIZE; ++i)
     {
         (*(chunk.tiles + i)).~Tile();
     }
-    ::operator delete[](chunk.tiles);
-    chunks.erase(pos);
+    ::operator delete(chunk.tiles);
+    return chunks.erase(iter);
 }
 
 Chunk &Map::get_chunk(ChunkPoint pos) const

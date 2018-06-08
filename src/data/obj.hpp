@@ -31,7 +31,8 @@ const data::Database default_db =
         {human.id, &human}
     },
     {
-        {void_tile.id, &void_tile}
+        {void_tile.id,  &void_tile},
+        {grass_tile.id, &grass_tile}
     },
 };
 

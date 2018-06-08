@@ -91,10 +91,6 @@ void Server::handle_input()
     ENetEvent event;
     while(enet_host_service(enet_server, &event, 0) > 0)
     {
-        if(event.type != ENET_EVENT_TYPE_NONE)
-        {
-            //TODO
-        }
         switch(event.type)
         {
             case ENET_EVENT_TYPE_NONE: break;
