@@ -22,8 +22,6 @@ void Player::receive(ENetPacket *packet)
     view_size = client_data.view_size;
 }
 
-#include <iostream>
-
 ENetPacket *Player::send() const
 {
     //TODO store buffer in Player?
@@ -32,9 +30,9 @@ ENetPacket *Player::send() const
     world::MapPoint offset;
     world::MapPoint entity_pos = (world::MapPoint)entity->get_pos();
     offset.z = 0;
-    for(offset.y = -(int)(view_size.y / 2); offset.y <= view_size.y / 2; ++offset.y)
+    for(offset.y = -(int)((view_size.y + 1) / 2); offset.y < view_size.y / 2; ++offset.y)
     {
-        for(offset.x = -(int)(view_size.x / 2); offset.x <= view_size.x / 2; ++offset.x)
+        for(offset.x = -(int)((view_size.x + 1) / 2); offset.x < view_size.x / 2; ++offset.x)
         {
             world::MapPoint tile_pos = entity_pos + offset;
             auto const &tile_type = entity->world[tile_pos].type;
