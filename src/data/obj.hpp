@@ -17,12 +17,20 @@ const world::TileType void_tile =
     {0, 0}
 };
 
-const world::TileType grass_tile =
+const world::TileType stone_floor =
 {
-    "grass",
-    "Grass",
+    "stone_floor",
+    "Stone Floor",
     world::TileType::FLOOR,
     {1, 0}
+};
+
+const world::TileType stone_wall =
+{
+    "stone_wall",
+    "Stone Wall",
+    world::TileType::WALL,
+    {2, 0}
 };
 
 const data::Database default_db =
@@ -32,7 +40,8 @@ const data::Database default_db =
     },
     {
         {void_tile.id,  &void_tile},
-        {grass_tile.id, &grass_tile}
+        {stone_floor.id, &stone_floor},
+        {stone_wall.id, &stone_wall}
     },
 };
 

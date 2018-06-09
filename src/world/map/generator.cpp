@@ -20,13 +20,16 @@ void Generator::generate_chunk(Chunk &chunk, ChunkPoint pos)
     num_gen.seed(std::hash<ChunkPoint>()(pos));
     for(SizeT i = 0; i < Chunk::TILE_SIZE; ++i)
     {
-        if(num_gen() % 10 == 0)
+        if((i % Chunk::SIZE.x) % 8 == 0 || ((i / Chunk::SIZE.y) % 8) == 0)
         {
-            new (chunk.tiles + i) Tile(*config.db->tile_types.at("void"));
+            if(num_gen() % 6 >= 5)
+                new (chunk.tiles + i) Tile(*config.db->tile_types.at("stone_floor"));
+            else
+                new (chunk.tiles + i) Tile(*config.db->tile_types.at("stone_wall"));
         }
         else
         {
-            new (chunk.tiles + i) Tile(*config.db->tile_types.at("grass"));
+            new (chunk.tiles + i) Tile(*config.db->tile_types.at("stone_floor"));
         }
     }
 }
