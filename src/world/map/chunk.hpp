@@ -18,8 +18,8 @@ struct Chunk
     Chunk(Chunk const &that) = delete;
     Chunk operator=(Chunk const &that) = delete;
 
-    static ChunkPoint point_map_to_chunk(MapPoint point);
-    static ChunkIndex point_map_to_index(MapPoint point);
+    static ChunkPoint point_map_to_chunk(MapPoint const &point);
+    static ChunkIndex point_map_to_index(MapPoint const &point);
 
     Tile *tiles;
 };

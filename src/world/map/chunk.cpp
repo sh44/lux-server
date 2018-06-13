@@ -11,7 +11,7 @@ Chunk::Chunk(Tile *tiles) :
 
 }
 
-ChunkPoint Chunk::point_map_to_chunk(MapPoint point)
+ChunkPoint Chunk::point_map_to_chunk(MapPoint const &point)
 {
     ChunkPoint result = point;
     if(result.x < 0)
@@ -32,25 +32,25 @@ ChunkPoint Chunk::point_map_to_chunk(MapPoint point)
     return result;
 }
 
-ChunkIndex Chunk::point_map_to_index(MapPoint point)
+ChunkIndex Chunk::point_map_to_index(MapPoint const &point)
 {
-    point.x %= SIZE.x;
-    point.y %= SIZE.y;
-    point.z %= SIZE.z;
-    if(point.x < 0)
+    MapPoint result = point;
+    result.x %= SIZE.x;
+    result.y %= SIZE.y;
+    result.z %= SIZE.z;
+    if(result.x < 0)
     {
-        point.x += SIZE.x;
+        result.x += SIZE.x;
     }
-    if(point.y < 0)
+    if(result.y < 0)
     {
-        point.y += SIZE.y;
+        result.y += SIZE.y;
     }
-    if(point.z < 0)
+    if(result.z < 0)
     {
-        point.z += SIZE.z;
+        result.z += SIZE.z;
     }
-    linear::Point3d<ChunkIndex> result = point;
-    return result.x + (result.y * SIZE.x) + (result.z * SIZE.x * SIZE.y);
+    return (ChunkIndex)(result.x + (result.y * SIZE.x) + (result.z * SIZE.x * SIZE.y));
 }
 
 }

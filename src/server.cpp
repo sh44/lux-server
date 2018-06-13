@@ -48,7 +48,7 @@ void Server::stop()
     thread.join();
 }
 
-void Server::kick_player(net::Ip ip, String reason)
+void Server::kick_player(net::Ip ip, String const &reason)
 {
     util::log("SERVER", util::INFO, "kicking player %u.%u.%u.%u, reason: " + reason,
               ip & 0xFF,

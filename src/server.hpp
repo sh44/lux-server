@@ -26,7 +26,7 @@ public:
     void start();
     void stop();
 
-    void kick_player(net::Ip ip, String reason = "unknown");
+    void kick_player(net::Ip ip, String const &reason = "unknown");
 private:
     enum State
     {

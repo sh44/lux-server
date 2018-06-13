@@ -12,12 +12,12 @@ World::World(data::Config const &config) :
 
 }
 
-Tile &World::operator[](MapPoint pos)
+Tile &World::operator[](MapPoint const &pos)
 {
     return map[pos];
 }
 
-Tile const &World::operator[](MapPoint pos) const
+Tile const &World::operator[](MapPoint const &pos) const
 {
     return map[pos];
 }
@@ -25,7 +25,7 @@ Tile const &World::operator[](MapPoint pos) const
 Entity &World::create_player()
 {
     util::log("WORLD", util::DEBUG, "created player");
-    return create_entity(Ref<World>(*this), *config.player_type, EntityPoint(0, 0, 0));
+    return create_entity(*config.player_type, EntityPoint(0, 0, 0));
 }
 
 }

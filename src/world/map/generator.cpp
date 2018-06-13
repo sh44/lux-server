@@ -15,7 +15,7 @@ Generator::Generator(data::Config const &config) :
 
 }
 
-void Generator::generate_chunk(Chunk &chunk, ChunkPoint pos)
+void Generator::generate_chunk(Chunk &chunk, ChunkPoint const &pos)
 {
     num_gen.seed(std::hash<ChunkPoint>()(pos));
     for(SizeT i = 0; i < Chunk::TILE_SIZE; ++i)

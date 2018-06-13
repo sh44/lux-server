@@ -22,7 +22,7 @@ Map::~Map()
     }
 }
 
-Tile &Map::operator[](MapPoint pos)
+Tile &Map::operator[](MapPoint const &pos)
 {
     ChunkPoint chunk_pos   = Chunk::point_map_to_chunk(pos);
     ChunkIndex chunk_index = Chunk::point_map_to_index(pos);
@@ -30,14 +30,14 @@ Tile &Map::operator[](MapPoint pos)
     return get_chunk(chunk_pos).tiles[chunk_index];
 }
 
-Tile const &Map::operator[](MapPoint pos) const
+Tile const &Map::operator[](MapPoint const &pos) const
 {
     ChunkPoint chunk_pos   = Chunk::point_map_to_chunk(pos);
     ChunkIndex chunk_index = Chunk::point_map_to_index(pos);
     return get_chunk(chunk_pos).tiles[chunk_index];
 }
 
-Chunk &Map::load_chunk(ChunkPoint pos) const
+Chunk &Map::load_chunk(ChunkPoint const &pos) const
 {
     util::log("MAP", util::DEBUG, "loading chunk %zd, %zd, %zd", pos.x, pos.y, pos.z);
     chunks.emplace(pos, (Tile*)::operator new(sizeof(Tile) * Chunk::TILE_SIZE));
@@ -46,7 +46,7 @@ Chunk &Map::load_chunk(ChunkPoint pos) const
     return chunk;
 }
 
-Map::ChunkIterator Map::unload_chunk(Map::ChunkIterator iter) const
+Map::ChunkIterator Map::unload_chunk(Map::ChunkIterator const &iter) const
 {
     Chunk &chunk = iter->second;
     for(SizeT i = 0; i < Chunk::TILE_SIZE; ++i)
@@ -57,7 +57,7 @@ Map::ChunkIterator Map::unload_chunk(Map::ChunkIterator iter) const
     return chunks.erase(iter);
 }
 
-Chunk &Map::get_chunk(ChunkPoint pos) const
+Chunk &Map::get_chunk(ChunkPoint const &pos) const
 {
     if(chunks.count(pos) == 0)
     {
