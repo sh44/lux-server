@@ -11,9 +11,14 @@ Entity::Entity(World const &world, EntityType const &type, EntityPoint pos) :
 
 }
 
-EntityPoint Entity::get_pos() const
+EntityPoint const &Entity::get_pos() const
 {
     return pos;
+}
+
+void Entity::move(EntityVector const &by)
+{
+    pos += by;
 }
 
 }

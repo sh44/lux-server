@@ -15,7 +15,9 @@ public:
     Entity(Entity const &that) = delete;
     Entity &operator=(Entity const &that) = delete;
 
-    EntityPoint get_pos() const;
+    EntityPoint const &get_pos() const;
+
+    void move(EntityVector const &by);
 
     World const &world;
     EntityType const &type;

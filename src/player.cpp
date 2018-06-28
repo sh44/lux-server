@@ -18,7 +18,7 @@ void Player::receive(ENetPacket *packet)
 {
     Vector<U8> bytes(packet->data, packet->data + packet->dataLength);
     net::ClientData client_data;
-    net::ClientData::deserialize(client_data, bytes);
+    net::deserialize(bytes, client_data);
     view_size = client_data.view_size;
 }
 
@@ -36,12 +36,13 @@ ENetPacket *Player::send() const
         {
             world::MapPoint tile_pos = entity_pos + offset;
             auto const &tile_type = entity->world[tile_pos].type;
-            tiles.emplace_back((net::TileState::Shape)tile_type->shape,
-                               tile_type->tex_pos);
+            tiles.emplace_back();
+            tiles.back().shape = (net::TileState::Shape)tile_type->shape;
+            tiles.back().tex_pos = tile_type->tex_pos;
         }
     }
     net::ServerData server_data = {tiles};
     Vector<U8> bytes;
-    net::ServerData::serialize(server_data, bytes);
+    net::serialize(bytes, server_data);
     return enet_packet_create(bytes.data(), bytes.size(), 0);
 }
