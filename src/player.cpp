@@ -19,7 +19,7 @@ void Player::receive(ENetPacket *packet)
     Vector<U8> bytes(packet->data, packet->data + packet->dataLength);
     net::ClientData client_data;
     net::deserialize(bytes, client_data);
-    view_size = client_data.view_size;
+    view_size = client_data.view_size; //TODO save whole ClientData as buffer?
 }
 
 ENetPacket *Player::send() const
