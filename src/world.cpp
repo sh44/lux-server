@@ -22,6 +22,14 @@ Tile const &World::operator[](MapPoint const &pos) const
     return map[pos];
 }
 
+void World::update()
+{
+    for(auto &entity : entity_storage)
+    {
+        entity.update();
+    }
+}
+
 Entity &World::create_player()
 {
     util::log("WORLD", util::DEBUG, "created player");

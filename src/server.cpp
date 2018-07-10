@@ -82,6 +82,7 @@ void Server::run()
 
 void Server::tick()
 {
+    world.update();
     handle_input();
     handle_output();
 }

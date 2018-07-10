@@ -22,6 +22,7 @@ public:
     Tile const &operator[](MapPoint const &pos) const;
 
     Entity &create_player();
+    void update();
 private:
     template<typename... Args>
     Entity &create_entity(Args const &...args);
