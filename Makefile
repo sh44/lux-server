@@ -26,7 +26,7 @@ WARNINGS_FLAGS  = \
 	-Wconversion
 
 CXX       = clang++
-CXXFLAGS += -I$(SRC_DIR) -isystem $(LUX_SHARED)/src -isystem $(LUX_SHARED)/include \
+CXXFLAGS += -I$(SRC_DIR) -I$(LUX_SHARED)/src -isystem $(LUX_SHARED)/include \
 	    $(WARNINGS_FLAGS) $(DEBUG_FLAGS) -std=c++17 -pedantic
 LDLIBS   += -lenet -pthread -llux
 LDFLAGS  += -L$(LUX_SHARED)
