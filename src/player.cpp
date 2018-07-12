@@ -16,9 +16,10 @@ Player::Player(ENetPeer *peer, world::Entity &entity) :
 
 void Player::receive(ENetPacket *packet)
 {
-    Vector<U8> bytes(packet->data, packet->data + packet->dataLength);
     net::ClientData client_data;
-    net::deserialize(bytes, client_data);
+    assert(packet->dataLength >= sizeof(net::ClientData));
+    net::Deserializer deserializer(packet->data, packet->data + packet->dataLength);
+    deserializer.pop(client_data);
     view_size = client_data.view_size; //TODO save whole ClientData as buffer?
 }
 
@@ -42,7 +43,7 @@ ENetPacket *Player::send() const
         }
     }
     net::ServerData server_data = {tiles};
-    Vector<U8> bytes;
-    net::serialize(bytes, server_data);
-    return enet_packet_create(bytes.data(), bytes.size(), 0);
+    net::Serializer serializer(tiles.size() * sizeof(net::TileState));
+    serializer.push(server_data);
+    return enet_packet_create(serializer.get(), serializer.get_size(), 0);
 }
