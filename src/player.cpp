@@ -16,16 +16,14 @@ Player::Player(ENetPeer *peer, Entity &entity) :
 
 void Player::receive(ENetPacket *packet)
 {
-    net::ClientData client_data;
     assert(packet->dataLength >= sizeof(net::ClientData));
     net::Deserializer deserializer(packet->data, packet->data + packet->dataLength);
-    deserializer.pop(client_data);
-    view_size = client_data.view_size; //TODO save whole ClientData as buffer?
+    deserializer.pop(cd);
+    view_size = cd.view_size;
 }
 
 ENetPacket *Player::send() const
 {
-    //TODO store buffer in Player?
     Vector<net::TileState> tiles;
     tiles.reserve(view_size.x * view_size.y);
     MapPoint offset;
@@ -42,8 +40,8 @@ ENetPacket *Player::send() const
             tiles.back().tex_pos = tile_type->tex_pos;
         }
     }
-    net::ServerData server_data = {tiles};
+    sd.tiles = tiles; //TODO differential copy?
     net::Serializer serializer(tiles.size() * sizeof(net::TileState));
-    serializer.push(server_data);
+    serializer.push(sd);
     return enet_packet_create(serializer.get(), serializer.get_size(), 0);
 }
