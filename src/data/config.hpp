@@ -2,7 +2,7 @@
 
 #include <alias/string.hpp>
 
-namespace world { struct EntityType; }
+struct EntityType;
 
 namespace data
 {
@@ -12,7 +12,7 @@ struct Database;
 struct Config
 {
     Database          const *db;
-    world::EntityType const *player_type;
+    EntityType const *player_type;
 };
 
 }

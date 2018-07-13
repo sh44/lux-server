@@ -5,11 +5,8 @@
 #include <alias/ref.hpp>
 #include <util/log.hpp>
 #include <data/config.hpp>
-#include <world/entity.hpp>
-#include <world/map.hpp>
-
-namespace world
-{
+#include <entity/entity.hpp>
+#include <map/map.hpp>
 
 class World
 {
@@ -42,6 +39,4 @@ Entity &World::create_entity(Args const &...args)
     util::log("WORLD", util::DEBUG, "created new entity, typeid: %s, pos: %.2f, %.2f, %.2f",
               result.type.id, pos.x, pos.y, pos.z);
     return result;
-}
-
 }

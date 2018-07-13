@@ -2,12 +2,9 @@
 
 #include <alias/int.hpp>
 #include <linear/size_3d.hpp>
-#include <world/map/chunk/common.hpp>
-#include <world/map/common.hpp>
-#include <world/tile.hpp>
-
-namespace world
-{
+#include <map/chunk/common.hpp>
+#include <map/common.hpp>
+#include <tile/tile.hpp>
 
 struct Chunk
 {
@@ -23,5 +20,3 @@ struct Chunk
 
     Tile *tiles;
 };
-
-}

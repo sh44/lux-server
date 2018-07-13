@@ -1,12 +1,9 @@
 #pragma once
 
 #include <util/num_gen.hpp>
-#include <world/map/chunk/common.hpp>
+#include <map/chunk/common.hpp>
 
 namespace data { struct Config; }
-
-namespace world
-{
 
 struct Chunk;
 
@@ -21,5 +18,3 @@ class Generator
     data::Config const &config;
     util::NumGen num_gen;
 };
-
-}

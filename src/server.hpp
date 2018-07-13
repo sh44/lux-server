@@ -49,7 +49,7 @@ private:
     ENetHost          *enet_server;
     util::TickClock    tick_clock;
     data::Config       config;
-    world::World       world;
+    World       world;
 
     HashMap<net::Ip, Player> players; //TODO reference to player ip?
 };

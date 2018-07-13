@@ -1,12 +1,9 @@
 #include <alias/int.hpp>
 #include <util/log.hpp>
-#include <world/map/chunk/common.hpp>
-#include <world/map/chunk.hpp>
+#include <map/chunk/common.hpp>
+#include <map/chunk/chunk.hpp>
 //
 #include "map.hpp"
-
-namespace world
-{
 
 Map::Map(data::Config const &config) :
     generator(config)
@@ -67,6 +64,4 @@ Chunk &Map::get_chunk(ChunkPoint const &pos) const
     {
         return chunks.at(pos);
     }
-}
-
 }

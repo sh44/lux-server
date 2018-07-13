@@ -1,15 +1,12 @@
 #pragma once
 
 #include <alias/hash_map.hpp>
-#include <world/map/common.hpp>
-#include <world/map/chunk/common.hpp>
-#include <world/map/chunk.hpp>
-#include <world/map/generator.hpp>
+#include <map/common.hpp>
+#include <map/chunk/common.hpp>
+#include <map/chunk/chunk.hpp>
+#include <map/generator.hpp>
 
 namespace data { struct Config; }
-
-namespace world
-{
 
 class Map
 {
@@ -30,5 +27,3 @@ class Map
     mutable HashMap<ChunkPoint, Chunk> chunks;
     mutable Generator generator;
 };
-
-}

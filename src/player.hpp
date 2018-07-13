@@ -5,12 +5,12 @@
 #include <alias/int.hpp>
 #include <linear/size_2d.hpp>
 
-namespace world { class Entity; }
+class Entity;
 
 class Player
 {
     public:
-    Player(ENetPeer *peer, world::Entity &entity);
+    Player(ENetPeer *peer, Entity &entity);
     Player(Player const &that) = delete;
     Player &operator=(Player const &that) = delete;
 
@@ -20,5 +20,5 @@ class Player
     ENetPacket *send() const;
     private:
     linear::Size2d<U16> view_size; //in tiles
-    world::Entity *entity;
+    Entity *entity;
 };

@@ -2,9 +2,6 @@
 //
 #include "chunk.hpp"
 
-namespace world
-{
-
 Chunk::Chunk(Tile *tiles) :
     tiles(tiles)
 {
@@ -51,6 +48,4 @@ ChunkIndex Chunk::point_map_to_index(MapPoint const &point)
         result.z += SIZE.z;
     }
     return (ChunkIndex)(result.x + (result.y * SIZE.x) + (result.z * SIZE.x * SIZE.y));
-}
-
 }

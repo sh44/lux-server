@@ -1,10 +1,7 @@
 #pragma once
 
-#include <world/entity/common.hpp>
-#include <world/entity/type.hpp>
-
-namespace world
-{
+#include <entity/common.hpp>
+#include <entity/entity_type.hpp>
 
 class World;
 
@@ -26,5 +23,3 @@ private:
 
     EntityPoint pos;
 };
-
-}

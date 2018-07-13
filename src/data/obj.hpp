@@ -1,35 +1,35 @@
-#include <world/entity/type.hpp>
-#include <world/tile/type.hpp>
+#include <entity/entity_type.hpp>
+#include <tile/tile_type.hpp>
 #include <data/database.hpp>
 #include <data/config.hpp>
 
-const world::EntityType human =
+const EntityType human =
 {
     "human",
     "Human"
 };
 
-const world::TileType void_tile =
+const TileType void_tile =
 {
     "void",
     "Void",
-    world::TileType::EMPTY,
+    TileType::EMPTY,
     {0, 0}
 };
 
-const world::TileType stone_floor =
+const TileType stone_floor =
 {
     "stone_floor",
     "Stone Floor",
-    world::TileType::FLOOR,
+    TileType::FLOOR,
     {1, 0}
 };
 
-const world::TileType stone_wall =
+const TileType stone_wall =
 {
     "stone_wall",
     "Stone Wall",
-    world::TileType::WALL,
+    TileType::WALL,
     {2, 0}
 };
 

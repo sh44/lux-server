@@ -3,9 +3,6 @@
 #include <alias/int.hpp>
 #include <linear/point_2d.hpp>
 
-namespace world
-{
-
 struct TileType
 {
     typedef linear::Point2d<U8> TexPos;
@@ -21,5 +18,3 @@ struct TileType
     Shape shape;
     TexPos tex_pos;
 };
-
-}

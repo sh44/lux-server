@@ -1,9 +1,6 @@
 #pragma once
 
-#include <world/tile/type.hpp>
-
-namespace world
-{
+#include <tile/tile_type.hpp>
 
 class Tile
 {
@@ -14,5 +11,3 @@ class Tile
 
     TileType const *type;
 };
-
-}

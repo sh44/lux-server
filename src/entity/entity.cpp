@@ -1,8 +1,5 @@
 #include "entity.hpp"
 
-namespace world
-{
-
 Entity::Entity(World const &world, EntityType const &type, EntityPoint pos) :
     world(world),
     type(type),
@@ -24,6 +21,4 @@ void Entity::update()
 void Entity::move(EntityVector const &by)
 {
     pos += by;
-}
-
 }
