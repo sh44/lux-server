@@ -1,5 +1,3 @@
-#include <linear/point_2d.hpp>
-//
 #include "chunk.hpp"
 
 Chunk::Chunk(Tile *tiles) :

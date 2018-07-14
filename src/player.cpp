@@ -18,7 +18,7 @@ void Player::receive(ENetPacket *packet)
 {
     assert(packet->dataLength >= sizeof(net::ClientData));
     net::Deserializer deserializer(packet->data, packet->data + packet->dataLength);
-    deserializer.pop(cd);
+    deserializer >> cd;
     view_size = cd.view_size;
 }
 
@@ -42,6 +42,6 @@ ENetPacket *Player::send() const
     }
     sd.tiles = tiles; //TODO differential copy?
     net::Serializer serializer(tiles.size() * sizeof(net::TileState));
-    serializer.push(sd);
+    serializer << sd;
     return enet_packet_create(serializer.get(), serializer.get_size(), 0);
 }

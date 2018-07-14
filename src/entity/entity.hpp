@@ -19,7 +19,7 @@ public:
     World const &world;
     EntityType const &type;
 private:
-    void move(EntityVector const &by);
+    void move(EntityVec const &by);
 
     EntityPoint pos;
 };

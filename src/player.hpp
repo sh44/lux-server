@@ -3,7 +3,7 @@
 #include <enet/enet.h>
 //
 #include <alias/int.hpp>
-#include <linear/size_2d.hpp>
+#include <linear/vec_2.hpp>
 #include <net/client_data.hpp>
 #include <net/server_data.hpp>
 
@@ -21,7 +21,7 @@ class Player
     void receive(ENetPacket *packet);
     ENetPacket *send() const;
     private:
-    linear::Size2d<U16> view_size; //in tiles
+    linear::Vec2<U16> view_size; //in tiles
     Entity *entity;
 
     net::ClientData cd;

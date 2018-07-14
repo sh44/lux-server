@@ -1,8 +1,8 @@
 #pragma once
 
 #include <alias/int.hpp>
-#include <linear/point_3d.hpp>
+#include <linear/vec_3.hpp>
 
 typedef I32 ChunkCoord;
-typedef linear::Point3d<ChunkCoord> ChunkPoint;
+typedef linear::Vec3<ChunkCoord> ChunkPoint;
 typedef SizeT ChunkIndex;

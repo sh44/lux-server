@@ -1,11 +1,11 @@
 #pragma once
 
 #include <alias/int.hpp>
-#include <linear/point_2d.hpp>
+#include <linear/vec_2.hpp>
 
 struct TileType
 {
-    typedef linear::Point2d<U8> TexPos;
+    typedef linear::Vec2<U8> TexPos;
     enum Shape : U8
     {
         EMPTY,

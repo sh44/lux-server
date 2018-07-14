@@ -1,8 +1,7 @@
 #pragma once
 
-#include <linear/point_3d.hpp>
-#include <linear/vector_3d.hpp>
+#include <linear/vec_3.hpp>
 
 typedef float EntityCoord;
-typedef linear::Point3d<EntityCoord> EntityPoint;
-typedef linear::Vector3d<EntityCoord> EntityVector;
+typedef linear::Vec3<EntityCoord> EntityPoint;
+typedef linear::Vec3<EntityCoord> EntityVec;

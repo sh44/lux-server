@@ -18,7 +18,7 @@ void Entity::update()
     move({0, 1, 0});
 }
 
-void Entity::move(EntityVector const &by)
+void Entity::move(EntityVec const &by)
 {
     pos += by;
 }
