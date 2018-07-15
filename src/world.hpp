@@ -3,6 +3,7 @@
 #include <list>
 //
 #include <alias/ref.hpp>
+#include <alias/vector.hpp>
 #include <util/log.hpp>
 #include <data/config.hpp>
 #include <entity/entity.hpp>
@@ -18,6 +19,7 @@ public:
     Tile       &operator[](MapPoint const &pos);
     Tile const &operator[](MapPoint const &pos) const;
 
+    void get_entities_positions(Vector<EntityPoint> &out) const;
     Entity &create_player();
     void update();
 private:

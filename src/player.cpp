@@ -20,10 +20,14 @@ void Player::receive(ENetPacket *packet)
     net::Deserializer deserializer(packet->data, packet->data + packet->dataLength);
     deserializer >> cd;
     view_size = cd.view_size;
+    auto h_dir = 0.2f * cd.character_dir;
+    if(cd.is_moving) entity->move({h_dir.x, h_dir.y, 0.0});
 }
 
 ENetPacket *Player::send() const
 {
+    sd.tiles.clear();
+    sd.entities.clear();
     Vector<net::TileState> tiles;
     tiles.reserve(view_size.x * view_size.y);
     MapPoint offset;
@@ -41,7 +45,12 @@ ENetPacket *Player::send() const
         }
     }
     sd.tiles = tiles; //TODO differential copy?
-    net::Serializer serializer(tiles.size() * sizeof(net::TileState));
+    entity->world.get_entities_positions(sd.entities);
+    sd.player_pos = entity->get_pos();
+    net::Serializer serializer(sizeof(U32) * 2 +
+                               sd.tiles.size() * sizeof(net::TileState) +
+                               sd.entities.size() * sizeof(EntityPoint) +
+                               sizeof(EntityPoint));
     serializer << sd;
     return enet_packet_create(serializer.get(), serializer.get_size(), 0);
 }

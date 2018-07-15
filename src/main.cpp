@@ -8,7 +8,7 @@
 int main()
 {
     net::ENetHandle enet_handle;
-    Server server(31337, 128.0);
+    Server server(31337, 64.0);
     server.start();
     std::string input;
     while(input != "stop")

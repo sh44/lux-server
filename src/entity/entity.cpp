@@ -15,7 +15,7 @@ EntityPoint const &Entity::get_pos() const
 
 void Entity::update()
 {
-    move({0, 1, 0});
+
 }
 
 void Entity::move(EntityVec const &by)

@@ -32,3 +32,12 @@ Entity &World::create_player()
     util::log("WORLD", util::DEBUG, "created player");
     return create_entity(*config.player_type, EntityPoint(0, 0, 0));
 }
+
+void World::get_entities_positions(Vector<EntityPoint> &out) const
+{
+    out.reserve(entity_storage.size());
+    for(auto &entity : entity_storage)
+    {
+        out.emplace_back(entity.get_pos());
+    }
+}

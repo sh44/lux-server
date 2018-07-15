@@ -15,11 +15,12 @@ public:
     EntityPoint const &get_pos() const;
 
     void update();
+    void move(EntityVec const &by);
 
     World const &world;
     EntityType const &type;
+
 private:
-    void move(EntityVec const &by);
 
     EntityPoint pos;
 };
