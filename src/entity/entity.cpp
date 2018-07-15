@@ -1,3 +1,5 @@
+#include <world.hpp>
+#include <tile/tile_type.hpp>
 #include "entity.hpp"
 
 Entity::Entity(World const &world, EntityType const &type, EntityPoint pos) :
@@ -20,5 +22,9 @@ void Entity::update()
 
 void Entity::move(EntityVec const &by)
 {
-    pos += by;
+    auto new_pos = pos + by;
+    if(world[new_pos].type->shape != TileType::WALL)
+    {
+        pos = new_pos;
+    }
 }

@@ -30,7 +30,7 @@ void World::update()
 Entity &World::create_player()
 {
     util::log("WORLD", util::DEBUG, "created player");
-    return create_entity(*config.player_type, EntityPoint(0, 0, 0));
+    return create_entity(*config.player_type, EntityPoint(1, 1, 0));
 }
 
 void World::get_entities_positions(Vector<EntityPoint> &out) const
