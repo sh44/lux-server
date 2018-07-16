@@ -2,7 +2,7 @@
 #include <tile/tile_type.hpp>
 #include "entity.hpp"
 
-Entity::Entity(World const &world, EntityType const &type, EntityPoint pos) :
+Entity::Entity(World const &world, EntityType const &type, EntityPos pos) :
     world(world),
     type(type),
     pos(pos)
@@ -10,7 +10,7 @@ Entity::Entity(World const &world, EntityType const &type, EntityPoint pos) :
 
 }
 
-EntityPoint const &Entity::get_pos() const
+EntityPos const &Entity::get_pos() const
 {
     return pos;
 }

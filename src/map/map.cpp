@@ -1,7 +1,7 @@
-#include <alias/int.hpp>
+#include <alias/scalar.hpp>
 #include <util/log.hpp>
-#include <map/chunk/common.hpp>
-#include <map/chunk/chunk.hpp>
+#include <common/chunk.hpp>
+#include <map/chunk.hpp>
 //
 #include "map.hpp"
 
@@ -19,22 +19,22 @@ Map::~Map()
     }
 }
 
-Tile &Map::operator[](MapPoint const &pos)
+Tile &Map::operator[](MapPos const &pos)
 {
-    ChunkPoint chunk_pos   = Chunk::point_map_to_chunk(pos);
-    ChunkIndex chunk_index = Chunk::point_map_to_index(pos);
+    ChunkPos chunk_pos   = Chunk::pos_map_to_chunk(pos);
+    ChunkIndex chunk_index = Chunk::pos_map_to_index(pos);
     util::log("MAP", util::TRACE, "idx %zu", chunk_index);
     return get_chunk(chunk_pos).tiles[chunk_index];
 }
 
-Tile const &Map::operator[](MapPoint const &pos) const
+Tile const &Map::operator[](MapPos const &pos) const
 {
-    ChunkPoint chunk_pos   = Chunk::point_map_to_chunk(pos);
-    ChunkIndex chunk_index = Chunk::point_map_to_index(pos);
+    ChunkPos chunk_pos   = Chunk::pos_map_to_chunk(pos);
+    ChunkIndex chunk_index = Chunk::pos_map_to_index(pos);
     return get_chunk(chunk_pos).tiles[chunk_index];
 }
 
-Chunk &Map::load_chunk(ChunkPoint const &pos) const
+Chunk &Map::load_chunk(ChunkPos const &pos) const
 {
     util::log("MAP", util::DEBUG, "loading chunk %zd, %zd, %zd", pos.x, pos.y, pos.z);
     chunks.emplace(pos, (Tile*)::operator new(sizeof(Tile) * Chunk::TILE_SIZE));
@@ -54,7 +54,7 @@ Map::ChunkIterator Map::unload_chunk(Map::ChunkIterator const &iter) const
     return chunks.erase(iter);
 }
 
-Chunk &Map::get_chunk(ChunkPoint const &pos) const
+Chunk &Map::get_chunk(ChunkPos const &pos) const
 {
     if(chunks.count(pos) == 0)
     {

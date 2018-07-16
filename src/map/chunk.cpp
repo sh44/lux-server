@@ -1,4 +1,8 @@
+#include <consts.hpp>
 #include "chunk.hpp"
+
+const ChunkSize &Chunk::SIZE      = consts::CHUNK_SIZE;
+const SizeT     &Chunk::TILE_SIZE = consts::CHUNK_TILE_SIZE;
 
 Chunk::Chunk(Tile *tiles) :
     tiles(tiles)
@@ -6,9 +10,9 @@ Chunk::Chunk(Tile *tiles) :
 
 }
 
-ChunkPoint Chunk::point_map_to_chunk(MapPoint const &point)
+ChunkPos Chunk::pos_map_to_chunk(MapPos const &pos)
 {
-    ChunkPoint result = point;
+    ChunkPos result = pos;
     if(result.x < 0)
     {
         result.x -= SIZE.x - 1;
@@ -27,9 +31,9 @@ ChunkPoint Chunk::point_map_to_chunk(MapPoint const &point)
     return result;
 }
 
-ChunkIndex Chunk::point_map_to_index(MapPoint const &point)
+ChunkIndex Chunk::pos_map_to_index(MapPos const &pos)
 {
-    MapPoint result = point;
+    MapPos result = pos;
     result.x %= SIZE.x;
     result.y %= SIZE.y;
     result.z %= SIZE.z;

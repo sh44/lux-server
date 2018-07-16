@@ -1,7 +1,7 @@
 #pragma once
 
 #include <util/num_gen.hpp>
-#include <map/chunk/common.hpp>
+#include <common/chunk.hpp>
 
 namespace data { struct Config; }
 
@@ -13,7 +13,7 @@ class Generator
     Generator(data::Config const &config);
     Generator &operator=(Generator const &that) = delete;
 
-    void generate_chunk(Chunk &chunk, ChunkPoint const &pos);
+    void generate_chunk(Chunk &chunk, ChunkPos const &pos);
     private:
     data::Config const &config;
     util::NumGen num_gen;

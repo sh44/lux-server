@@ -1,9 +1,9 @@
 #include <functional>
 //
-#include <alias/int.hpp>
+#include <alias/scalar.hpp>
 #include <data/database.hpp>
 #include <data/config.hpp>
-#include <map/chunk/chunk.hpp>
+#include <map/chunk.hpp>
 #include "generator.hpp"
 
 Generator::Generator(data::Config const &config) :
@@ -12,9 +12,9 @@ Generator::Generator(data::Config const &config) :
 
 }
 
-void Generator::generate_chunk(Chunk &chunk, ChunkPoint const &pos)
+void Generator::generate_chunk(Chunk &chunk, ChunkPos const &pos)
 {
-    num_gen.seed(std::hash<ChunkPoint>()(pos));
+    num_gen.seed(std::hash<ChunkPos>()(pos));
     for(SizeT i = 0; i < Chunk::TILE_SIZE; ++i)
     {
         if((i % Chunk::SIZE.x) % 8 == 0 || ((i / Chunk::SIZE.y) % 8) == 0)

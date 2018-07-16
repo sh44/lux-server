@@ -16,10 +16,10 @@ public:
     World(World const &that) = delete;
     World &operator=(World const &that) = delete;
 
-    Tile       &operator[](MapPoint const &pos);
-    Tile const &operator[](MapPoint const &pos) const;
+    Tile       &operator[](MapPos const &pos);
+    Tile const &operator[](MapPos const &pos) const;
 
-    void get_entities_positions(Vector<EntityPoint> &out) const;
+    void get_entities_positions(Vector<EntityPos> &out) const;
     Entity &create_player();
     void update();
 private:

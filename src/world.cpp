@@ -1,5 +1,5 @@
 #include <alias/ref.hpp>
-#include <entity/common.hpp>
+#include <common/entity.hpp>
 #include "world.hpp"
 
 World::World(data::Config const &config) :
@@ -9,12 +9,12 @@ World::World(data::Config const &config) :
 
 }
 
-Tile &World::operator[](MapPoint const &pos)
+Tile &World::operator[](MapPos const &pos)
 {
     return map[pos];
 }
 
-Tile const &World::operator[](MapPoint const &pos) const
+Tile const &World::operator[](MapPos const &pos) const
 {
     return map[pos];
 }
@@ -30,10 +30,10 @@ void World::update()
 Entity &World::create_player()
 {
     util::log("WORLD", util::DEBUG, "created player");
-    return create_entity(*config.player_type, EntityPoint(1, 1, 0));
+    return create_entity(*config.player_type, EntityPos(1, 1, 0));
 }
 
-void World::get_entities_positions(Vector<EntityPoint> &out) const
+void World::get_entities_positions(Vector<EntityPos> &out) const
 {
     out.reserve(entity_storage.size());
     for(auto &entity : entity_storage)

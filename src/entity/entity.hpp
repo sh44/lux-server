@@ -1,6 +1,6 @@
 #pragma once
 
-#include <entity/common.hpp>
+#include <common/entity.hpp>
 #include <entity/entity_type.hpp>
 
 class World;
@@ -8,11 +8,11 @@ class World;
 class Entity
 {
 public:
-    Entity(World const &world, EntityType const &type, EntityPoint pos);
+    Entity(World const &world, EntityType const &type, EntityPos pos);
     Entity(Entity const &that) = delete;
     Entity &operator=(Entity const &that) = delete;
 
-    EntityPoint const &get_pos() const;
+    EntityPos const &get_pos() const;
 
     void update();
     void move(EntityVec const &by);
@@ -22,5 +22,5 @@ public:
 
 private:
 
-    EntityPoint pos;
+    EntityPos pos;
 };

@@ -2,10 +2,10 @@
 
 #include <enet/enet.h>
 //
-#include <alias/int.hpp>
+#include <alias/scalar.hpp>
 #include <linear/vec_2.hpp>
-#include <net/client_data.hpp>
-#include <net/server_data.hpp>
+#include <net/server/server_data.hpp>
+#include <net/client/client_data.hpp>
 
 class Entity;
 
