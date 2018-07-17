@@ -1,4 +1,5 @@
-#include <consts.hpp>
+#include <lux/consts.hpp>
+//
 #include "chunk.hpp"
 
 const ChunkSize &Chunk::SIZE      = consts::CHUNK_SIZE;

@@ -2,10 +2,10 @@
 
 #include <enet/enet.h>
 //
-#include <alias/scalar.hpp>
-#include <linear/vec_2.hpp>
-#include <net/server/server_data.hpp>
-#include <net/client/client_data.hpp>
+#include <lux/alias/scalar.hpp>
+#include <lux/linear/vec_2.hpp>
+#include <lux/net/server/server_data.hpp>
+#include <lux/net/client/client_data.hpp>
 
 class Entity;
 

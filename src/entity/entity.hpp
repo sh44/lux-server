@@ -1,6 +1,7 @@
 #pragma once
 
-#include <common/entity.hpp>
+#include <lux/common/entity.hpp>
+//
 #include <entity/entity_type.hpp>
 
 class World;

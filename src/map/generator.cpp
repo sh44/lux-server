@@ -1,6 +1,7 @@
 #include <functional>
 //
-#include <alias/scalar.hpp>
+#include <lux/alias/scalar.hpp>
+//
 #include <data/database.hpp>
 #include <data/config.hpp>
 #include <map/chunk.hpp>

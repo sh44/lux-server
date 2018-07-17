@@ -1,9 +1,10 @@
 #pragma once
 
-#include <alias/scalar.hpp>
-#include <linear/vec_3.hpp>
-#include <common/chunk.hpp>
-#include <common/map.hpp>
+#include <lux/alias/scalar.hpp>
+#include <lux/linear/vec_3.hpp>
+#include <lux/common/chunk.hpp>
+#include <lux/common/map.hpp>
+//
 #include <tile/tile.hpp>
 
 struct Chunk

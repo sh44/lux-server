@@ -1,5 +1,6 @@
-#include <alias/ref.hpp>
-#include <common/entity.hpp>
+#include <lux/alias/ref.hpp>
+#include <lux/common/entity.hpp>
+//
 #include "world.hpp"
 
 World::World(data::Config const &config) :

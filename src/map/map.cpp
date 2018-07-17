@@ -1,6 +1,7 @@
-#include <alias/scalar.hpp>
-#include <util/log.hpp>
-#include <common/chunk.hpp>
+#include <lux/alias/scalar.hpp>
+#include <lux/util/log.hpp>
+#include <lux/common/chunk.hpp>
+//
 #include <map/chunk.hpp>
 //
 #include "map.hpp"
@@ -23,7 +24,6 @@ Tile &Map::operator[](MapPos const &pos)
 {
     ChunkPos chunk_pos   = Chunk::pos_map_to_chunk(pos);
     ChunkIndex chunk_index = Chunk::pos_map_to_index(pos);
-    util::log("MAP", util::TRACE, "idx %zu", chunk_index);
     return get_chunk(chunk_pos).tiles[chunk_index];
 }
 

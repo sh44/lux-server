@@ -1,6 +1,7 @@
 #include <stdexcept>
 //
-#include <util/log.hpp>
+#include <lux/util/log.hpp>
+//
 #include <player.hpp>
 #include <data/obj.hpp>
 #include "server.hpp"

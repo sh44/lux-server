@@ -1,7 +1,7 @@
 #pragma once
 
-#include <alias/scalar.hpp>
-#include <linear/vec_2.hpp>
+#include <lux/alias/scalar.hpp>
+#include <lux/linear/vec_2.hpp>
 
 struct TileType
 {

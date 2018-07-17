@@ -1,6 +1,6 @@
 #pragma once
 
-#include <alias/string.hpp>
+#include <lux/alias/string.hpp>
 
 struct EntityType;
 

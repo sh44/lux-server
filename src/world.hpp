@@ -2,9 +2,10 @@
 
 #include <list>
 //
-#include <alias/ref.hpp>
-#include <alias/vector.hpp>
-#include <util/log.hpp>
+#include <lux/alias/ref.hpp>
+#include <lux/alias/vector.hpp>
+#include <lux/util/log.hpp>
+//
 #include <data/config.hpp>
 #include <entity/entity.hpp>
 #include <map/map.hpp>

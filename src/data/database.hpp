@@ -1,7 +1,7 @@
 #pragma once
 
-#include <alias/hash_map.hpp>
-#include <alias/string.hpp>
+#include <lux/alias/hash_map.hpp>
+#include <lux/alias/string.hpp>
 
 struct EntityType;
 struct TileType;

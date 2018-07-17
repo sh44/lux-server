@@ -1,7 +1,7 @@
 #pragma once
 
-#include <util/num_gen.hpp>
-#include <common/chunk.hpp>
+#include <lux/util/num_gen.hpp>
+#include <lux/common/chunk.hpp>
 
 namespace data { struct Config; }
 

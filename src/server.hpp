@@ -5,13 +5,14 @@
 //
 #include <enet/enet.h>
 //
-#include <alias/string.hpp>
-#include <alias/hash_map.hpp>
-#include <alias/ref.hpp>
+#include <lux/alias/string.hpp>
+#include <lux/alias/hash_map.hpp>
+#include <lux/alias/ref.hpp>
+#include <lux/util/tick_clock.hpp>
+#include <lux/net/ip.hpp>
+#include <lux/net/port.hpp>
+//
 #include <data/config.hpp>
-#include <util/tick_clock.hpp>
-#include <net/ip.hpp>
-#include <net/port.hpp>
 #include <player.hpp>
 #include <world.hpp>
 

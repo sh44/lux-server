@@ -1,8 +1,9 @@
 #pragma once
 
-#include <alias/hash_map.hpp>
-#include <common/map.hpp>
-#include <common/chunk.hpp>
+#include <lux/alias/hash_map.hpp>
+#include <lux/common/map.hpp>
+#include <lux/common/chunk.hpp>
+//
 #include <map/chunk.hpp>
 #include <map/generator.hpp>
 
