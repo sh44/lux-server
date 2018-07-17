@@ -16,8 +16,5 @@ struct Chunk
     Chunk(Chunk const &that) = delete;
     Chunk operator=(Chunk const &that) = delete;
 
-    static ChunkPos   pos_map_to_chunk(MapPos const &pos);
-    static ChunkIndex pos_map_to_index(MapPos const &pos);
-
     Tile *tiles;
 };
