@@ -12,7 +12,9 @@
 
 Player::Player(ENetPeer *peer, Entity &entity) :
     peer(peer),
-    entity(&entity)
+    entity(&entity),
+    cd({{0, nullptr}, {0, 0}, false}),
+    sd({{0, nullptr}, {0, nullptr}, {0, 0, 0}})
 {
 
 }
@@ -28,7 +30,7 @@ void Player::receive(ENetPacket *packet)
 ENetPacket *Player::send() const
 {
     sd.chunks.len = cd.chunk_requests.len;
-    std::unique_ptr<net::ChunkData> chunks_ptr(new net::ChunkData[sd.chunks.len]);
+    std::unique_ptr<net::ChunkData []> chunks_ptr(new net::ChunkData[sd.chunks.len]);
     sd.chunks.val = chunks_ptr.get();
     for(SizeT i = 0; i < sd.chunks.len; ++i)
     {
@@ -42,7 +44,7 @@ ENetPacket *Player::send() const
     }
     Vector<EntityPos> entities; //TODO
     entity->world.get_entities_positions(entities);
-    std::unique_ptr<EntityPos> entities_ptr(new EntityPos[entities.size()]);
+    std::unique_ptr<EntityPos []> entities_ptr(new EntityPos[entities.size()]);
     sd.entities.val = entities_ptr.get();
     for(SizeT i = 0; i < entities.size(); ++i)
     {
