@@ -1,3 +1,5 @@
+#include <memory>
+//
 #include <lux/alias/scalar.hpp>
 #include <lux/common/entity.hpp>
 #include <lux/net/server/server_data.hpp>
@@ -17,7 +19,6 @@ Player::Player(ENetPeer *peer, Entity &entity) :
 
 void Player::receive(ENetPacket *packet)
 {
-    assert(packet->dataLength >= sizeof(net::ClientData));
     net::Deserializer deserializer(packet->data, packet->data + packet->dataLength);
     deserializer >> cd;
     auto h_dir = 0.2f * cd.character_dir;
@@ -26,16 +27,30 @@ void Player::receive(ENetPacket *packet)
 
 ENetPacket *Player::send() const
 {
-    Vector<net::ChunkData> chunks;
-    /*chunks.reserve(cd.requested_chunks.size());
-    for(auto const &chunk : cd.requested_chunks)
+    sd.chunks.len = cd.chunk_requests.len;
+    std::unique_ptr<net::ChunkData> chunks_ptr(new net::ChunkData[sd.chunks.len]);
+    sd.chunks.val = chunks_ptr.get();
+    for(SizeT i = 0; i < sd.chunks.len; ++i)
     {
-        //chunks.emplace_back(
+        sd.chunks.val[i].pos = cd.chunk_requests.val[i];
+        for(SizeT j = 0; j < consts::CHUNK_TILE_SIZE; ++j)
+        {
+            MapPos map_pos = chunk_to_map_pos(sd.chunks.val[i].pos, j);
+            sd.chunks.val[i].tiles[j].db_hash =
+                std::hash<String>()(entity->world[map_pos].type->id);
+        }
     }
-    //sd.chunks
-    //entity->world.get_entities_positions(sd.entities);*/
-    net::Serializer serializer(sizeof(net::ChunkData) * sd.chunks.len +
-        sizeof(EntityPos) * sd.entities.len + sizeof(EntityPos));
+    Vector<EntityPos> entities; //TODO
+    entity->world.get_entities_positions(entities);
+    std::unique_ptr<EntityPos> entities_ptr(new EntityPos[entities.size()]);
+    sd.entities.val = entities_ptr.get();
+    for(SizeT i = 0; i < entities.size(); ++i)
+    {
+        sd.entities.val[i] = entities[i];
+    }
     sd.player_pos = entity->get_pos();
+    net::Serializer serializer(sizeof(SizeT) * 2 + sizeof(net::ChunkData) * sd.chunks.len +
+        sizeof(EntityPos) * sd.entities.len + sizeof(EntityPos));
+    serializer << sd;
     return enet_packet_create(serializer.get(), serializer.get_size(), 0);
 }
