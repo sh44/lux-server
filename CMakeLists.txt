@@ -20,10 +20,8 @@ add_executable(lux-server ${SOURCES})
 
 find_package(Threads REQUIRED)
 find_library(ENET_LIB enet)
-find_path(ENET_INC enet)
 
 target_link_libraries(lux-server lux)
 target_link_libraries(lux-server Threads::Threads)
 target_link_libraries(lux-server "${ENET_LIB}")
-target_include_directories(lux-server PRIVATE "${ENET_INC}")
 
