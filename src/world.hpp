@@ -31,6 +31,7 @@ private:
     std::list<Entity> entity_storage;
     data::Config const &config;
 
+    PhysicsEngine physics_engine;
     Map map;
 };
 

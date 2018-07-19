@@ -5,8 +5,8 @@
 //
 #include "map.hpp"
 
-Map::Map(data::Config const &config) :
-    generator(config)
+Map::Map(PhysicsEngine &physics_engine, data::Config const &config) :
+    generator(physics_engine, config)
 {
 
 }

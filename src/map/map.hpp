@@ -6,6 +6,7 @@
 //
 #include <map/chunk.hpp>
 #include <map/generator.hpp>
+#include <physics_engine.hpp>
 
 namespace data { struct Config; }
 
@@ -13,7 +14,7 @@ class Map
 {
     typedef HashMap<chunk::Pos, Chunk>::iterator ChunkIterator;
     public:
-    Map(data::Config const &config);
+    Map(PhysicsEngine &physics_engine, data::Config const &config);
     Map(Map const &that) = delete;
     Map &operator=(Map const &that) = delete;
     ~Map();

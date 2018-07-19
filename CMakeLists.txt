@@ -23,6 +23,7 @@ find_library(ENET_LIB enet)
 find_library(BULLET_DYNAMICS_LIB  BulletDynamics)
 find_library(BULLET_COLLISION_LIB BulletCollision)
 find_library(BULLET_LINEAR_LIB    LinearMath)
+find_path(BULLET_INC bullet)
 
 target_link_libraries(lux-server lux)
 target_link_libraries(lux-server Threads::Threads)
@@ -30,4 +31,5 @@ target_link_libraries(lux-server "${ENET_LIB}")
 target_link_libraries(lux-server "${BULLET_DYNAMICS_LIB}")
 target_link_libraries(lux-server "${BULLET_COLLISION_LIB}")
 target_link_libraries(lux-server "${BULLET_LINEAR_LIB}")
+target_include_directories(lux-server PUBLIC "${BULLET_INC}/bullet")
 

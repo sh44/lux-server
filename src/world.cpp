@@ -6,7 +6,7 @@
 
 World::World(data::Config const &config) :
     config(config),
-    map(config)
+    map(physics_engine, config)
 {
 
 }
@@ -26,13 +26,19 @@ void World::update()
     for(auto &entity : entity_storage)
     {
         entity.update();
+        util::log("WORLD", util::DEBUG, "%f, %f, %f",
+            entity.get_pos().x,
+            entity.get_pos().y,
+            entity.get_pos().z);
     }
+    physics_engine.update();
 }
 
 Entity &World::create_player()
 {
     util::log("WORLD", util::DEBUG, "created player");
-    return create_entity(*config.player_type, entity::Pos(1, 1, 0));
+    return create_entity(*config.player_type,
+        physics_engine.add_entity({1, 1, 0.5}));
 }
 
 void World::get_entities_positions(Vector<entity::Pos> &out) const
