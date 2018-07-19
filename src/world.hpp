@@ -8,6 +8,7 @@
 //
 #include <data/config.hpp>
 #include <entity/entity.hpp>
+#include <entity/type.hpp>
 #include <map/map.hpp>
 
 class World
