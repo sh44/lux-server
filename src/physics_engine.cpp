@@ -8,9 +8,11 @@ PhysicsEngine::PhysicsEngine() :
     motion_state(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, 0, 0))),
     block_ci(0, &motion_state, &block_shape, btVector3(0, 0, 0)),
     empty_ci(0, &motion_state, &empty_shape, btVector3(0, 0, 0)),
-    sphere_ci(1, &motion_state, &sphere_shape, btVector3(0, 0, 0))
+    sphere_ci(1, &motion_state, &sphere_shape, btVector3(0, 0, 0)),
+    inertia(0, 0, 0)
 {
     world.setGravity(btVector3(0, 0, -9.8));
+    sphere_shape.calculateLocalInertia(1, inertia);
 }
 
 btRigidBody *PhysicsEngine::add_entity(entity::Pos const &pos)

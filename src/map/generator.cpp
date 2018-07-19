@@ -20,7 +20,9 @@ void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
     for(SizeT i = 0; i < chunk::TILE_SIZE; ++i)
     {
         map::Pos map_pos = chunk::to_map_pos(pos, i);
-        if((i % chunk::SIZE.x) % 8 == 0 || ((i / chunk::SIZE.y) % 8) == 0)
+        if((map_pos.x % 8 == 0 ||
+            map_pos.y % 8 == 0) &&
+            map_pos.z % 4 == 0)
         {
             if(num_gen() % 6 >= 5)
             {

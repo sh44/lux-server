@@ -33,5 +33,7 @@ class PhysicsEngine
     btRigidBody::btRigidBodyConstructionInfo empty_ci;
     btRigidBody::btRigidBodyConstructionInfo sphere_ci;
 
+    btVector3 inertia;
+
     std::list<btRigidBody> bodies;
 };
