@@ -1,6 +1,6 @@
 #include "tile.hpp"
 
-Tile::Tile(const TileType &type) :
+Tile::Tile(const tile::Type &type) :
     type(&type)
 {
 

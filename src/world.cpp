@@ -1,6 +1,7 @@
 #include <lux/alias/ref.hpp>
 #include <lux/common/entity.hpp>
 //
+#include <entity/type.hpp>
 #include "world.hpp"
 
 World::World(data::Config const &config) :
@@ -10,12 +11,12 @@ World::World(data::Config const &config) :
 
 }
 
-Tile &World::operator[](MapPos const &pos)
+Tile &World::operator[](map::Pos const &pos)
 {
     return map[pos];
 }
 
-Tile const &World::operator[](MapPos const &pos) const
+Tile const &World::operator[](map::Pos const &pos) const
 {
     return map[pos];
 }
@@ -31,10 +32,10 @@ void World::update()
 Entity &World::create_player()
 {
     util::log("WORLD", util::DEBUG, "created player");
-    return create_entity(*config.player_type, EntityPos(1, 1, 0));
+    return create_entity(*config.player_type, entity::Pos(1, 1, 0));
 }
 
-void World::get_entities_positions(Vector<EntityPos> &out) const
+void World::get_entities_positions(Vector<entity::Pos> &out) const
 {
     out.reserve(entity_storage.size());
     for(auto &entity : entity_storage)

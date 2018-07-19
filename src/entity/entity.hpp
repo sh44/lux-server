@@ -1,27 +1,27 @@
 #pragma once
 
 #include <lux/common/entity.hpp>
-//
-#include <entity/entity_type.hpp>
 
 class World;
+
+namespace entity { struct Type; }
 
 class Entity
 {
 public:
-    Entity(World const &world, EntityType const &type, EntityPos pos);
+    Entity(World const &world, entity::Type const &type, entity::Pos pos);
     Entity(Entity const &that) = delete;
     Entity &operator=(Entity const &that) = delete;
 
-    EntityPos const &get_pos() const;
+    entity::Pos const &get_pos() const;
 
     void update();
-    void move(EntityVec const &by);
+    void move(entity::Vec const &by);
 
     World const &world;
-    EntityType const &type;
+    entity::Type const &type;
 
 private:
 
-    EntityPos pos;
+    entity::Pos pos;
 };

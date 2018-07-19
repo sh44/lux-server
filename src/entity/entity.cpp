@@ -1,8 +1,8 @@
 #include <world.hpp>
-#include <tile/tile_type.hpp>
+#include <tile/type.hpp>
 #include "entity.hpp"
 
-Entity::Entity(World const &world, EntityType const &type, EntityPos pos) :
+Entity::Entity(World const &world, entity::Type const &type, entity::Pos pos) :
     world(world),
     type(type),
     pos(pos)
@@ -10,7 +10,7 @@ Entity::Entity(World const &world, EntityType const &type, EntityPos pos) :
 
 }
 
-EntityPos const &Entity::get_pos() const
+entity::Pos const &Entity::get_pos() const
 {
     return pos;
 }
@@ -20,10 +20,10 @@ void Entity::update()
 
 }
 
-void Entity::move(EntityVec const &by)
+void Entity::move(entity::Vec const &by)
 {
     auto new_pos = pos + by;
-    if(world[new_pos].type->shape != TileType::WALL)
+    if(world[new_pos].type->shape != tile::Type::WALL)
     {
         pos = new_pos;
     }

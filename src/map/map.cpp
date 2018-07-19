@@ -1,4 +1,3 @@
-#include <lux/alias/scalar.hpp>
 #include <lux/util/log.hpp>
 #include <lux/common/chunk.hpp>
 //
@@ -20,24 +19,24 @@ Map::~Map()
     }
 }
 
-Tile &Map::operator[](MapPos const &pos)
+Tile &Map::operator[](map::Pos const &pos)
 {
-    ChunkPos chunk_pos     = to_chunk_pos(pos);
-    ChunkIndex chunk_index = to_chunk_index(pos);
-    return get_chunk(chunk_pos).tiles[chunk_index];
+    chunk::Pos   chunk_pos = chunk::to_pos(pos);
+    chunk::Index idx       = chunk::to_index(pos);
+    return get_chunk(chunk_pos).tiles[idx];
 }
 
-Tile const &Map::operator[](MapPos const &pos) const
+Tile const &Map::operator[](map::Pos const &pos) const
 {
-    ChunkPos chunk_pos     = to_chunk_pos(pos);
-    ChunkIndex chunk_index = to_chunk_index(pos);
-    return get_chunk(chunk_pos).tiles[chunk_index];
+    chunk::Pos   chunk_pos = chunk::to_pos(pos);
+    chunk::Index idx       = chunk::to_index(pos);
+    return get_chunk(chunk_pos).tiles[idx];
 }
 
-Chunk &Map::load_chunk(ChunkPos const &pos) const
+Chunk &Map::load_chunk(chunk::Pos const &pos) const
 {
     util::log("MAP", util::DEBUG, "loading chunk %zd, %zd, %zd", pos.x, pos.y, pos.z);
-    chunks.emplace(pos, (Tile*)::operator new(sizeof(Tile) * Chunk::TILE_SIZE));
+    chunks.emplace(pos, Chunk());
     Chunk &chunk = chunks.at(pos);
     generator.generate_chunk(chunk, pos);
     return chunk;
@@ -45,16 +44,10 @@ Chunk &Map::load_chunk(ChunkPos const &pos) const
 
 Map::ChunkIterator Map::unload_chunk(Map::ChunkIterator const &iter) const
 {
-    Chunk &chunk = iter->second;
-    for(SizeT i = 0; i < Chunk::TILE_SIZE; ++i)
-    {
-        (*(chunk.tiles + i)).~Tile();
-    }
-    ::operator delete(chunk.tiles);
     return chunks.erase(iter);
 }
 
-Chunk &Map::get_chunk(ChunkPos const &pos) const
+Chunk &Map::get_chunk(chunk::Pos const &pos) const
 {
     if(chunks.count(pos) == 0)
     {

@@ -1,9 +1,13 @@
 #pragma once
 
 #include <lux/alias/scalar.hpp>
+#include <lux/alias/c_string.hpp>
 #include <lux/linear/vec_2.hpp>
 
-struct TileType
+namespace tile
+{
+
+struct Type
 {
     typedef linear::Vec2<U8> TexPos;
     enum Shape : U8
@@ -13,8 +17,10 @@ struct TileType
         WALL
     };
 
-    const char *id;
-    const char *name;
+    CString id;
+    CString name;
     Shape shape;
     TexPos tex_pos;
 };
+
+}

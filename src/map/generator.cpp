@@ -13,21 +13,21 @@ Generator::Generator(data::Config const &config) :
 
 }
 
-void Generator::generate_chunk(Chunk &chunk, ChunkPos const &pos)
+void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
 {
-    num_gen.seed(std::hash<ChunkPos>()(pos));
-    for(SizeT i = 0; i < Chunk::TILE_SIZE; ++i)
+    num_gen.seed(std::hash<chunk::Pos>()(pos));
+    for(SizeT i = 0; i < chunk::TILE_SIZE; ++i)
     {
-        if((i % Chunk::SIZE.x) % 8 == 0 || ((i / Chunk::SIZE.y) % 8) == 0)
+        if((i % chunk::SIZE.x) % 8 == 0 || ((i / chunk::SIZE.y) % 8) == 0)
         {
             if(num_gen() % 6 >= 5)
-                new (chunk.tiles + i) Tile(*config.db->tile_types.at("stone_floor"));
+                chunk.tiles[i] = Tile(*config.db->tile_types.at("stone_floor"));
             else
-                new (chunk.tiles + i) Tile(*config.db->tile_types.at("stone_wall"));
+                chunk.tiles[i] = Tile(*config.db->tile_types.at("stone_wall"));
         }
         else
         {
-            new (chunk.tiles + i) Tile(*config.db->tile_types.at("stone_floor"));
+            chunk.tiles[i] = Tile(*config.db->tile_types.at("stone_floor"));
         }
     }
 }

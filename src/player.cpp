@@ -1,11 +1,12 @@
 #include <memory>
 //
 #include <lux/alias/scalar.hpp>
+#include <lux/alias/string.hpp>
 #include <lux/common/entity.hpp>
 #include <lux/net/server/server_data.hpp>
 #include <lux/net/client/client_data.hpp>
 //
-#include <tile/tile_type.hpp>
+#include <tile/type.hpp>
 #include <entity/entity.hpp>
 #include <world.hpp>
 #include "player.hpp"
@@ -31,9 +32,9 @@ ENetPacket *Player::send() const
     for(SizeT i = 0; i < cd.chunk_requests.size(); ++i)
     {
         sd.chunks[i].pos = cd.chunk_requests[i];
-        for(SizeT j = 0; j < consts::CHUNK_TILE_SIZE; ++j)
+        for(SizeT j = 0; j < chunk::TILE_SIZE; ++j)
         {
-            MapPos map_pos = chunk_to_map_pos(sd.chunks[i].pos, j);
+            map::Pos map_pos = chunk::to_map_pos(sd.chunks[i].pos, j);
             sd.chunks[i].tiles[j].db_hash =
                 std::hash<String>()(entity->world[map_pos].type->id);
         }
@@ -41,7 +42,7 @@ ENetPacket *Player::send() const
     entity->world.get_entities_positions(sd.entities);
     sd.player_pos = entity->get_pos();
     net::Serializer serializer(sizeof(SizeT) * 2 + sizeof(net::ChunkData) * sd.chunks.size() +
-        sizeof(EntityPos) * sd.entities.size() + sizeof(EntityPos));
+        sizeof(entity::Pos) * sd.entities.size() + sizeof(entity::Pos));
     serializer << sd;
     return enet_packet_create(serializer.get(), serializer.get_size(), 0);
 }

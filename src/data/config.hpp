@@ -1,8 +1,6 @@
 #pragma once
 
-#include <lux/alias/string.hpp>
-
-struct EntityType;
+namespace entity { struct Type; }
 
 namespace data
 {
@@ -11,8 +9,8 @@ struct Database;
 
 struct Config
 {
-    Database          const *db;
-    EntityType const *player_type;
+    Database     const *db;
+    entity::Type const *player_type;
 };
 
 }

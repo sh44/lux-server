@@ -1,13 +1,12 @@
 #pragma once
 
-#include <tile/tile_type.hpp>
+#include <tile/type.hpp>
 
 class Tile
 {
     public:
-    Tile(TileType const &type);
-    Tile(Tile const &that) = delete;
-    Tile &operator=(Tile const &that) = delete;
+    Tile() = default;
+    Tile(tile::Type const &type);
 
-    TileType const *type;
+    tile::Type const *type;
 };
