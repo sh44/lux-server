@@ -13,24 +13,21 @@ const tile::Type void_tile =
 {
     "void",
     "Void",
-    tile::Type::EMPTY,
-    {0, 0}
+    tile::Type::EMPTY
 };
 
 const tile::Type stone_floor =
 {
     "stone_floor",
     "Stone Floor",
-    tile::Type::FLOOR,
-    {1, 0}
+    tile::Type::FLOOR
 };
 
 const tile::Type stone_wall =
 {
     "stone_wall",
     "Stone Wall",
-    tile::Type::WALL,
-    {2, 0}
+    tile::Type::WALL
 };
 
 const data::Database default_db =

@@ -18,6 +18,8 @@ class PhysicsEngine
 
     void update();
     private:
+    std::list<btRigidBody> bodies;
+
     btDbvtBroadphase                    broadphase;
     btDefaultCollisionConfiguration     collision_conf;
     btCollisionDispatcher               dispatcher;
@@ -34,6 +36,4 @@ class PhysicsEngine
     btRigidBody::btRigidBodyConstructionInfo sphere_ci;
 
     btVector3 inertia;
-
-    std::list<btRigidBody> bodies;
 };

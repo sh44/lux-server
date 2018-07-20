@@ -1,12 +1,8 @@
 #pragma once
 
-#include <tile/type.hpp>
+namespace tile { struct Type; }
 
-class Tile
+struct Tile
 {
-    public:
-    Tile() = default;
-    Tile(tile::Type const &type);
-
     tile::Type const *type;
 };

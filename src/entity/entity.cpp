@@ -1,5 +1,4 @@
 #include <world.hpp>
-#include <tile/type.hpp>
 #include "entity.hpp"
 
 Entity::Entity(World const &world, entity::Type const &type, btRigidBody *body) :
