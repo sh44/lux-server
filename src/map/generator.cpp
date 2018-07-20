@@ -28,7 +28,6 @@ void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
             if(num_gen() % 6 >= 5)
             {
                 chunk.tiles.emplace_back(*config.db->tile_types.at("stone_floor"));
-                physics_engine.add_empty(map_pos);
             }
             else
             {
@@ -39,7 +38,6 @@ void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
         else
         {
             chunk.tiles.emplace_back(*config.db->tile_types.at("stone_floor"));
-            physics_engine.add_empty(map_pos);
         }
     }
 }
