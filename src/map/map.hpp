@@ -21,6 +21,8 @@ class Map
 
     Tile       &operator[](map::Pos const &pos);
     Tile const &operator[](map::Pos const &pos) const;
+    // TODO a chunk-based read is also needed, it will be much faster when
+    // processing tiles in batches
     private:
     Chunk &load_chunk(chunk::Pos const &pos) const;
     ChunkIterator unload_chunk(ChunkIterator const &iter) const;
