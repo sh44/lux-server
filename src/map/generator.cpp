@@ -17,6 +17,7 @@ Generator::Generator(PhysicsEngine &physics_engine, data::Config const &config) 
 void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
 {
     num_gen.seed(std::hash<chunk::Pos>()(pos));
+    chunk.tiles.reserve(chunk::TILE_SIZE);
     for(SizeT i = 0; i < chunk::TILE_SIZE; ++i)
     {
         map::Pos map_pos = chunk::to_map_pos(pos, i);
@@ -26,18 +27,18 @@ void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
         {
             if(num_gen() % 6 >= 5)
             {
-                chunk.tiles[i] = {config.db->tile_types.at("stone_floor")};
+                chunk.tiles.emplace_back(*config.db->tile_types.at("stone_floor"));
                 physics_engine.add_empty(map_pos);
             }
             else
             {
-                chunk.tiles[i] = {config.db->tile_types.at("stone_wall")};
+                chunk.tiles.emplace_back(*config.db->tile_types.at("stone_wall"));
                 physics_engine.add_block(map_pos);
             }
         }
         else
         {
-            chunk.tiles[i] = {config.db->tile_types.at("stone_floor")};
+            chunk.tiles.emplace_back(*config.db->tile_types.at("stone_floor"));
             physics_engine.add_empty(map_pos);
         }
     }
