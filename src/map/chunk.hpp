@@ -1,7 +1,6 @@
 #pragma once
 
-#include <lux/alias/array.hpp>
-#include <lux/common/chunk.hpp>
+#include <lux/alias/vector.hpp>
 //
 #include <tile/tile.hpp>
 

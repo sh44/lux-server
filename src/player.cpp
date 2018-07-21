@@ -3,8 +3,8 @@
 #include <lux/alias/scalar.hpp>
 #include <lux/alias/string.hpp>
 #include <lux/common/entity.hpp>
-#include <lux/net/server/server_data.hpp>
-#include <lux/net/client/client_data.hpp>
+#include <lux/serial/server_data.hpp>
+#include <lux/serial/client_data.hpp>
 //
 #include <tile/type.hpp>
 #include <entity/entity.hpp>
@@ -20,7 +20,7 @@ Player::Player(ENetPeer *peer, Entity &entity) :
 
 void Player::receive(ENetPacket *packet)
 {
-    net::Deserializer deserializer(packet->data, packet->data + packet->dataLength);
+    deserializer.set_slice(packet->data, packet->data + packet->dataLength);
     deserializer >> cd;
     auto h_dir = 0.2f * cd.character_dir;
     if(cd.is_moving) entity->move({h_dir.x, h_dir.y, 0.0});
@@ -28,6 +28,7 @@ void Player::receive(ENetPacket *packet)
 
 ENetPacket *Player::send() const
 {
+    serializer.clear();
     sd.chunks.resize(cd.chunk_requests.size());
     for(SizeT i = 0; i < cd.chunk_requests.size(); ++i)
     {
@@ -41,8 +42,7 @@ ENetPacket *Player::send() const
     }
     entity->world.get_entities_positions(sd.entities);
     sd.player_pos = entity->get_pos();
-    net::Serializer serializer(sizeof(SizeT) * 2 + sizeof(net::ChunkData) * sd.chunks.size() +
-        sizeof(entity::Pos) * sd.entities.size() + sizeof(entity::Pos));
     serializer << sd;
-    return enet_packet_create(serializer.get(), serializer.get_size(), 0);
+    auto const &bytes = serializer.get();
+    return enet_packet_create(bytes.data(), bytes.size(), 0);
 }
