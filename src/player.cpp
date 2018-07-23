@@ -28,7 +28,7 @@ void Player::receive(ENetPacket *packet)
 
 ENetPacket *Player::send() const
 {
-    serializer.clear();
+    sd.entities.clear(); //TODO not perfect
     sd.chunks.resize(cd.chunk_requests.size());
     for(SizeT i = 0; i < cd.chunk_requests.size(); ++i)
     {
@@ -42,7 +42,7 @@ ENetPacket *Player::send() const
     }
     entity->world.get_entities_positions(sd.entities);
     sd.player_pos = entity->get_pos();
+    serializer.reserve(serial::get_size(sd));
     serializer << sd;
-    auto const &bytes = serializer.get();
-    return enet_packet_create(bytes.data(), bytes.size(), 0);
+    return enet_packet_create(serializer.get(), serializer.get_size(), 0);
 }
