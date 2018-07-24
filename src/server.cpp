@@ -32,11 +32,12 @@ Server::~Server()
 
 void Server::kick_player(net::Ip ip, String const &reason)
 {
-    util::log("SERVER", util::INFO, "kicking player %u.%u.%u.%u, reason: " + reason,
+    util::log("SERVER", util::INFO, "kicking player %u.%u.%u.%u, reason: %s",
               ip & 0xFF,
              (ip >>  8) & 0xFF,
              (ip >> 16) & 0xFF,
-             (ip >> 24) & 0xFF);
+             (ip >> 24) & 0xFF,
+             reason);
     ENetPeer *peer = players.at(ip).peer;
     enet_peer_disconnect(peer, (U32)(SizeT)("KICKED FOR: " + reason).c_str());
     /* uint32_t is smaller than a pointer, so it's probably a bad idea,
