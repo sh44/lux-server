@@ -24,17 +24,8 @@ public:
     Server &operator=(Server const &that) = delete;
     ~Server();
 
-    void start();
-    void stop();
-
     void kick_player(net::Ip ip, String const &reason = "unknown");
 private:
-    enum State
-    {
-        NOT_STARTED,
-        RUNNING,
-        STOPPED
-    };
     const SizeT MAX_CLIENTS = 16;
 
     void run();
@@ -45,12 +36,12 @@ private:
     void add_player(ENetPeer *peer);
 
     std::thread        thread;
-    std::atomic<State> state;
     ENetAddress        enet_address;
     ENetHost          *enet_server;
     data::Config       config;
     util::TickClock    tick_clock;
-    World       world;
+    World              world;
+    std::atomic<bool>  should_close;
 
     HashMap<net::Ip, Player> players; //TODO reference to player ip?
 };

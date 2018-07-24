@@ -8,12 +8,10 @@ int main()
 {
     net::ENetHandle enet_handle;
     Server server(31337);
-    server.start();
     std::string input;
     while(input != "stop")
     {
         std::cin >> input;
     }
-    server.stop();
     return 0;
 }

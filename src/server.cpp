@@ -7,46 +7,27 @@
 #include "server.hpp"
 
 Server::Server(net::Port port) :
-    state(NOT_STARTED),
     config(default_config),
     enet_address({ENET_HOST_ANY, port}),
     enet_server(enet_host_create(&enet_address, MAX_CLIENTS, 1, 0, 0)),
     tick_clock(util::TickClock::Duration(1.0 / config.tick_rate)),
-    world(config)
+    world(config),
+    should_close(false)
 {
-    if(enet_server == NULL)
+    if(enet_server == nullptr)
     {
         throw std::runtime_error("couldn't create ENet server host");
     }
+    util::log("SERVER", util::INFO, "starting server");
+    thread = std::thread(&Server::run, this);
 }
 
 Server::~Server()
 {
-    enet_host_destroy(enet_server);
-}
-
-void Server::start()
-{
-    util::log("SERVER", util::INFO, "starting server");
-    switch(state)
-    {
-        case NOT_STARTED: state = RUNNING; break;
-        case RUNNING: throw std::runtime_error("server has already been started");
-        case STOPPED: state = RUNNING; break;
-    }
-    thread = std::thread(&Server::run, this);
-}
-
-void Server::stop()
-{
     util::log("SERVER", util::INFO, "stopping server");
-    switch(state)
-    {
-        case RUNNING: state = STOPPED; break;
-        case NOT_STARTED: throw std::runtime_error("tried to stop a server that hasn't been started yet");
-        case STOPPED: throw std::runtime_error("tried to stop a stopped server");
-    }
+    should_close = true;
     thread.join();
+    enet_host_destroy(enet_server);
 }
 
 void Server::kick_player(net::Ip ip, String const &reason)
@@ -67,7 +48,7 @@ void Server::kick_player(net::Ip ip, String const &reason)
 
 void Server::run()
 {
-    while(state == RUNNING)
+    while(!should_close)
     {
         tick_clock.start();
         tick();
