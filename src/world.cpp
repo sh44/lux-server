@@ -26,10 +26,6 @@ void World::update()
     for(auto &entity : entity_storage)
     {
         entity.update();
-        util::log("WORLD", util::DEBUG, "%f, %f, %f",
-            entity.get_pos().x,
-            entity.get_pos().y,
-            entity.get_pos().z);
     }
     physics_engine.update();
 }
