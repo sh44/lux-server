@@ -19,7 +19,7 @@
 class Server
 {
 public:
-    Server(net::Port port, double tick_rate);
+    Server(net::Port port);
     Server(Server const &that) = delete;
     Server &operator=(Server const &that) = delete;
     ~Server();
@@ -48,8 +48,8 @@ private:
     std::atomic<State> state;
     ENetAddress        enet_address;
     ENetHost          *enet_server;
-    util::TickClock    tick_clock;
     data::Config       config;
+    util::TickClock    tick_clock;
     World       world;
 
     HashMap<net::Ip, Player> players; //TODO reference to player ip?

@@ -6,12 +6,12 @@
 #include <data/obj.hpp>
 #include "server.hpp"
 
-Server::Server(net::Port port, double tick_rate) :
+Server::Server(net::Port port) :
     state(NOT_STARTED),
+    config(default_config),
     enet_address({ENET_HOST_ANY, port}),
     enet_server(enet_host_create(&enet_address, MAX_CLIENTS, 1, 0, 0)),
-    tick_clock(util::TickClock::Duration(1.0 / tick_rate)),
-    config(default_config),
+    tick_clock(util::TickClock::Duration(1.0 / config.tick_rate)),
     world(config)
 {
     if(enet_server == NULL)
@@ -117,8 +117,7 @@ void Server::handle_output()
 {
     for(auto const &player : players)
     {
-        ENetPacket *packet = player.second.send();
-        enet_peer_send(player.second.peer, 0, packet);
+        player.second.send();
     }
 }
 
@@ -142,6 +141,8 @@ void Server::add_player(ENetPeer *peer)
              (ip >> 24) & 0xFF);
     players.emplace(std::piecewise_construct,
                     std::forward_as_tuple(peer->address.host),
-                    std::forward_as_tuple(peer, world.create_player()));
+                    std::forward_as_tuple(config, peer, world.create_player()));
     // ^ why you so ugly C++?
+    enet_host_flush(enet_server);
+    // ^ so that init data is sent properly
 }

@@ -46,4 +46,6 @@ const data::Config default_config =
 {
     &default_db,
     default_db.entity_types.at("human"),
+    "lux server",
+    64.0
 };

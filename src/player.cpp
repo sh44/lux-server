@@ -1,7 +1,8 @@
-#include <memory>
+#include <algorithm>
 //
 #include <lux/alias/scalar.hpp>
 #include <lux/alias/string.hpp>
+#include <lux/util/log.hpp>
 #include <lux/common/entity.hpp>
 #include <lux/serial/server_data.hpp>
 #include <lux/serial/client_data.hpp>
@@ -11,11 +12,11 @@
 #include <world.hpp>
 #include "player.hpp"
 
-Player::Player(ENetPeer *peer, Entity &entity) :
+Player::Player(data::Config const &conf, ENetPeer *peer, Entity &entity) :
     peer(peer),
     entity(&entity)
 {
-
+    init_to_client(conf.tick_rate, conf.server_name);
 }
 
 void Player::receive(ENetPacket *packet)
@@ -26,7 +27,7 @@ void Player::receive(ENetPacket *packet)
     if(cd.is_moving) entity->move({h_dir.x, h_dir.y, 0.0});
 }
 
-ENetPacket *Player::send() const
+void Player::send() const
 {
     sd.entities.clear(); //TODO not perfect
     sd.chunks.resize(cd.chunk_requests.size());
@@ -44,5 +45,21 @@ ENetPacket *Player::send() const
     sd.player_pos = entity->get_pos();
     serializer.reserve(serial::get_size(sd));
     serializer << sd;
-    return enet_packet_create(serializer.get(), serializer.get_size(), 0);
+    ENetPacket *packet = enet_packet_create(serializer.get(),
+        serializer.get_size(), 0);
+    enet_peer_send(peer, 0, packet);
 }
+
+void Player::init_to_client(F64 tick_rate, String const &server_name)
+{
+    serial::ServerInitData sid;
+    sid.tick_rate = tick_rate;
+    std::copy(server_name.begin(), server_name.end(),
+              std::back_inserter(sid.server_name));
+    serializer.reserve(serial::get_size(sid));
+    serializer << sid;
+    ENetPacket *packet = enet_packet_create(serializer.get(),
+        serializer.get_size(), ENET_PACKET_FLAG_RELIABLE);
+    enet_peer_send(peer, 0, packet);
+}
+
