@@ -27,7 +27,9 @@ void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
            map_pos.y % 8 == 0 ||
            map_pos.z % 4 == 0)
         {
-            if(num_gen() % 6 == 5)
+            if((map_pos.x % 8 == 0  ||
+                map_pos.y % 8 == 0) &&
+                map_pos.z % 4 != 0 && num_gen() % 3 == 2)
             {
                 chunk.tiles.emplace_back(*config.db->tile_types.at("void"));
             }

@@ -26,14 +26,6 @@ class PhysicsEngine
     btSequentialImpulseConstraintSolver solver;
     btDiscreteDynamicsWorld             world;
 
-    btBoxShape    block_shape;
-    btEmptyShape  empty_shape;
-    btSphereShape sphere_shape;
-
-    btDefaultMotionState motion_state;
-    btRigidBody::btRigidBodyConstructionInfo block_ci;
-    btRigidBody::btRigidBodyConstructionInfo empty_ci;
-    btRigidBody::btRigidBodyConstructionInfo sphere_ci;
-
+    btCapsuleShapeZ entity_shape;
     btVector3 inertia;
 };

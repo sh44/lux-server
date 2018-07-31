@@ -22,5 +22,5 @@ void Entity::update()
 
 void Entity::move(entity::Vec const &by)
 {
-    body->setLinearVelocity({by.x * 20.f, by.y * 20.f, by.z + 0.1f});
+    body->setLinearVelocity({by.x * 20.f, by.y * 20.f, by.z});
 }
