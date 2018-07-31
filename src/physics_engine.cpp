@@ -17,25 +17,21 @@ PhysicsEngine::PhysicsEngine() :
 
 btRigidBody *PhysicsEngine::add_entity(entity::Pos const &pos)
 {
+    motion_states.emplace_back(btTransform({0, 0, 0, 1}, {pos.x, pos.y, pos.z}));
+    sphere_ci.m_motionState = &motion_states.back();
     bodies.emplace_back(sphere_ci);
     world.addRigidBody(&bodies.back());
-    bodies.back().translate(btVector3(pos.x, pos.y, pos.z));
     return &bodies.back();
 }
 
-btRigidBody *PhysicsEngine::add_block(map::Pos const &pos)
+btRigidBody *PhysicsEngine::add_shape(map::Pos const &pos, btCollisionShape *shape)
 {
-    bodies.emplace_back(block_ci);
+    motion_states.emplace_back(btTransform({0, 0, 0, 1},
+        {(F32)pos.x, (F32)pos.y, (F32)pos.z}));
+    btRigidBody::btRigidBodyConstructionInfo ci(0, &motion_states.back(),
+                                                shape, btVector3(0, 0, 0));
+    bodies.emplace_back(ci);
     world.addRigidBody(&bodies.back());
-    bodies.back().translate(btVector3(pos.x, pos.y, pos.z));
-    return &bodies.back();
-}
-
-btRigidBody *PhysicsEngine::add_empty(map::Pos const &pos)
-{
-    bodies.emplace_back(empty_ci);
-    world.addRigidBody(&bodies.back());
-    bodies.back().translate(btVector3(pos.x, pos.y, pos.z));
     return &bodies.back();
 }
 

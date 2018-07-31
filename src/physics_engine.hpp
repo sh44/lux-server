@@ -13,12 +13,12 @@ class PhysicsEngine
     PhysicsEngine();
 
     btRigidBody *add_entity(entity::Pos const &pos);
-    btRigidBody *add_block(map::Pos const &pos);
-    btRigidBody *add_empty(map::Pos const &pos);
+    btRigidBody *add_shape(map::Pos const &pos, btCollisionShape *shape);
 
     void update();
     private:
     std::list<btRigidBody> bodies;
+    std::list<btDefaultMotionState> motion_states;
 
     btDbvtBroadphase                    broadphase;
     btDefaultCollisionConfiguration     collision_conf;

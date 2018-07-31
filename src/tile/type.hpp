@@ -1,7 +1,7 @@
 #pragma once
 
 #include <lux/alias/scalar.hpp>
-#include <lux/alias/c_string.hpp>
+#include <lux/alias/string.hpp>
 
 namespace tile
 {
@@ -15,8 +15,8 @@ struct Type
         WALL
     };
 
-    CString id;
-    CString name;
+    String id;
+    String name;
     Shape shape;
 };
 
