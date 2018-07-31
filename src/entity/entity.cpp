@@ -22,5 +22,5 @@ void Entity::update()
 
 void Entity::move(entity::Vec const &by)
 {
-    body->applyCentralForce({by.x * 10, by.y * 10, by.z * 10});
+    body->setLinearVelocity({by.x * 20.f, by.y * 20.f, by.z + 0.1f});
 }
