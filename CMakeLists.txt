@@ -7,12 +7,13 @@ set(LUX_SERVER_VERSION_MINOR 0)
 set(LUX_SERVER_VERSION_PATCH 0)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
 configure_file("${PROJECT_SOURCE_DIR}/config.h.in"
                "${PROJECT_BINARY_DIR}/include/config.h")
 
-include_directories("include" "deps/lux-shared/include"
-                    "src" "${PROJECT_BINARY_DIR}/include")
+include_directories(SYSTEM "include" "deps/lux-shared/include"
+                    SYSTEM "src" "${PROJECT_BINARY_DIR}/include")
 add_subdirectory("deps/lux-shared")
 
 file(GLOB_RECURSE SOURCES "src/*.cpp")
@@ -31,5 +32,5 @@ target_link_libraries(lux-server "${ENET_LIB}")
 target_link_libraries(lux-server "${BULLET_DYNAMICS_LIB}")
 target_link_libraries(lux-server "${BULLET_COLLISION_LIB}")
 target_link_libraries(lux-server "${BULLET_LINEAR_LIB}")
-target_include_directories(lux-server PUBLIC "${BULLET_INC}/bullet")
+target_include_directories(lux-server SYSTEM PUBLIC "${BULLET_INC}/bullet")
 
