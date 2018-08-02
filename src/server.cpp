@@ -7,9 +7,9 @@
 #include "server.hpp"
 
 Server::Server(net::Port port) :
-    config(default_config),
     enet_address({ENET_HOST_ANY, port}),
     enet_server(enet_host_create(&enet_address, MAX_CLIENTS, 1, 0, 0)),
+    config(default_config),
     tick_clock(util::TickClock::Duration(1.0 / config.tick_rate)),
     world(config),
     should_close(false)
