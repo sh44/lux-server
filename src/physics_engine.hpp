@@ -18,7 +18,7 @@ class PhysicsEngine
     void update();
     private:
     std::list<btRigidBody> bodies;
-    std::list<btDefaultMotionState> motion_states;
+    std::list<btDefaultMotionState> motion_states; //TODO is this needed?
 
     btDbvtBroadphase                    broadphase;
     btDefaultCollisionConfiguration     collision_conf;
@@ -27,5 +27,5 @@ class PhysicsEngine
     btDiscreteDynamicsWorld             world;
 
     btCapsuleShapeZ entity_shape;
-    btVector3 inertia;
+    btVector3 inertia; //TODO is this needed?
 };
