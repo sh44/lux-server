@@ -15,11 +15,10 @@ btRigidBody *PhysicsEngine::add_entity(entity::Pos const &pos)
     motion_states.emplace_back(btTransform({0, 0, 0, 1}, {pos.x, pos.y, pos.z}));
     btRigidBody::btRigidBodyConstructionInfo ci(1, &motion_states.back(),
                                                 &entity_shape, btVector3(0, 0, 0));
+    ci.m_friction = 2.0;
     bodies.emplace_back(ci);
-    auto *body = &bodies.back();
-    world.addRigidBody(body);
-    body->setFriction(2.0);
-    return body;
+    world.addRigidBody(&bodies.back());
+    return &bodies.back();
 }
 
 btRigidBody *PhysicsEngine::add_shape(map::Pos const &pos, btCollisionShape *shape)
