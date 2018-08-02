@@ -21,6 +21,7 @@ Player::Player(data::Config const &conf, ENetPeer *peer, Entity &entity) :
 
 void Player::receive(ENetPacket *packet)
 {
+    cd.chunk_requests.clear();
     deserializer.set_slice(packet->data, packet->data + packet->dataLength);
     deserializer >> cd;
     auto h_dir = 0.2f * cd.character_dir;
@@ -34,11 +35,11 @@ void Player::send() const
     for(SizeT i = 0; i < cd.chunk_requests.size(); ++i)
     {
         sd.chunks[i].pos = cd.chunk_requests[i];
+        auto const &chunk = entity->world[sd.chunks[i].pos];
         for(SizeT j = 0; j < chunk::TILE_SIZE; ++j)
         {
-            map::Pos map_pos = chunk::to_map_pos(sd.chunks[i].pos, j);
             sd.chunks[i].tiles[j].db_hash =
-                std::hash<String>()(entity->world[map_pos].type->id);
+                std::hash<String>()(chunk.tiles[j].type->id);
         }
     }
     entity->world.get_entities_positions(sd.entities);

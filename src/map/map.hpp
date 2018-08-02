@@ -19,14 +19,15 @@ class Map
     Map &operator=(Map const &that) = delete;
     ~Map();
 
-    Tile       &operator[](map::Pos const &pos);
-    Tile const &operator[](map::Pos const &pos) const;
-    // TODO a chunk-based read is also needed, it will be much faster when
-    // processing tiles in batches
+    Tile        &operator[](map::Pos const &pos);
+    Tile  const &operator[](map::Pos const &pos) const;
+    Chunk       &operator[](chunk::Pos const &pos);
+    Chunk const &operator[](chunk::Pos const &pos) const;
+
+    void guarantee_chunk(chunk::Pos const &pos) const;
     private:
     Chunk &load_chunk(chunk::Pos const &pos) const;
     ChunkIterator unload_chunk(ChunkIterator const &iter) const;
-    Chunk &get_chunk(chunk::Pos const &pos)  const;
 
     mutable HashMap<chunk::Pos, Chunk> chunks;
     mutable Generator generator;

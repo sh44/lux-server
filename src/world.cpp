@@ -4,21 +4,11 @@
 #include <entity/type.hpp>
 #include "world.hpp"
 
-World::World(data::Config const &config) :
-    config(config),
-    map(physics_engine, config)
+World::World(data::Config const &_config) :
+    Map(physics_engine, _config),
+    config(_config)
 {
 
-}
-
-Tile &World::operator[](map::Pos const &pos)
-{
-    return map[pos];
-}
-
-Tile const &World::operator[](map::Pos const &pos) const
-{
-    return map[pos];
 }
 
 void World::update()

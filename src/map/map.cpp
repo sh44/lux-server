@@ -21,16 +21,29 @@ Map::~Map()
 
 Tile &Map::operator[](map::Pos const &pos)
 {
-    chunk::Pos   chunk_pos = chunk::to_pos(pos);
-    chunk::Index idx       = chunk::to_index(pos);
-    return get_chunk(chunk_pos).tiles[idx];
+    return this->operator[](chunk::to_pos(pos)).tiles[chunk::to_index(pos)];
 }
 
 Tile const &Map::operator[](map::Pos const &pos) const
 {
-    chunk::Pos   chunk_pos = chunk::to_pos(pos);
-    chunk::Index idx       = chunk::to_index(pos);
-    return get_chunk(chunk_pos).tiles[idx];
+    return this->operator[](chunk::to_pos(pos)).tiles[chunk::to_index(pos)];
+}
+
+Chunk &Map::operator[](chunk::Pos const &pos)
+{
+    if(chunks.count(pos) == 0) return load_chunk(pos);
+    else return chunks.at(pos); //TODO code repetition
+}
+
+Chunk const &Map::operator[](chunk::Pos const &pos) const
+{
+    if(chunks.count(pos) == 0) return load_chunk(pos);
+    else return chunks.at(pos);
+}
+
+void Map::guarantee_chunk(chunk::Pos const &pos) const
+{
+    this->operator[](pos);
 }
 
 Chunk &Map::load_chunk(chunk::Pos const &pos) const
@@ -45,16 +58,4 @@ Chunk &Map::load_chunk(chunk::Pos const &pos) const
 Map::ChunkIterator Map::unload_chunk(Map::ChunkIterator const &iter) const
 {
     return chunks.erase(iter);
-}
-
-Chunk &Map::get_chunk(chunk::Pos const &pos) const
-{
-    if(chunks.count(pos) == 0)
-    {
-        return load_chunk(pos);
-    }
-    else
-    {
-        return chunks.at(pos);
-    }
 }

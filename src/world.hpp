@@ -11,15 +11,14 @@
 #include <entity/type.hpp>
 #include <map/map.hpp>
 
-class World
+class World : public Map
 {
 public:
     World(data::Config const &config);
     World(World const &that) = delete;
     World &operator=(World const &that) = delete;
 
-    Tile       &operator[](map::Pos const &pos);
-    Tile const &operator[](map::Pos const &pos) const;
+    using Map::operator[];
 
     void get_entities_positions(Vector<entity::Pos> &out) const;
     Entity &create_player();
@@ -32,7 +31,6 @@ private:
     data::Config const &config;
 
     PhysicsEngine physics_engine;
-    Map map;
 };
 
 template<typename... Args>

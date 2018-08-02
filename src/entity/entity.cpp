@@ -17,7 +17,7 @@ entity::Pos Entity::get_pos() const
 
 void Entity::update()
 {
-    world[get_pos()]; //TODO nasty trick to load the chunk
+    world.guarantee_chunk(chunk::to_pos(get_pos()));
 }
 
 void Entity::move(entity::Vec const &by)
