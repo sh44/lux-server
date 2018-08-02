@@ -57,8 +57,8 @@ void Server::run()
         auto delta = tick_clock.synchronize();
         if(delta < util::TickClock::Duration::zero())
         {
-            util::log("SERVER", util::WARN, "main loop overhead of %f seconds",
-                      std::abs(delta.count()));
+            util::log("SERVER", util::WARN, "tick overhead of %.2f ticks",
+                      std::abs(delta / tick_clock.get_tick_len()));
         }
     }
 }
