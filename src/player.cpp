@@ -47,7 +47,7 @@ void Player::send() const
     serializer.reserve(serial::get_size(sd));
     serializer << sd;
     ENetPacket *packet = enet_packet_create(serializer.get(),
-        serializer.get_size(), 0);
+        serializer.get_used(), 0);
     enet_peer_send(peer, 0, packet);
 }
 
@@ -60,7 +60,7 @@ void Player::init_to_client(F64 tick_rate, String const &server_name)
     serializer.reserve(serial::get_size(sid));
     serializer << sid;
     ENetPacket *packet = enet_packet_create(serializer.get(),
-        serializer.get_size(), ENET_PACKET_FLAG_RELIABLE);
+        serializer.get_used(), ENET_PACKET_FLAG_RELIABLE);
     enet_peer_send(peer, 0, packet);
 }
 
