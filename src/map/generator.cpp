@@ -18,18 +18,19 @@ Generator::Generator(PhysicsEngine &physics_engine, data::Config const &config) 
 
 void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
 {
-    num_gen.seed(std::hash<chunk::Pos>()(pos));
     chunk.tiles.reserve(chunk::TILE_SIZE);
     for(SizeT i = 0; i < chunk::TILE_SIZE; ++i)
     {
         map::Pos map_pos = chunk::to_map_pos(pos, i);
+        auto const &hash = std::hash<map::Pos>()(map_pos);
         if(map_pos.x % 8 == 0 ||
            map_pos.y % 8 == 0 ||
            map_pos.z % 4 == 0)
         {
             if((map_pos.x % 8 == 0  ||
                 map_pos.y % 8 == 0) &&
-                map_pos.z % 4 != 0 && num_gen() % 3 == 2)
+               (map_pos.z % 4 == 1 ||
+                map_pos.z % 4 == 2) && hash % 10 >= 3)
             {
                 chunk.tiles.emplace_back(*config.db->tile_types.at("void"));
             }
@@ -121,6 +122,8 @@ void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
                                                          (F32 *)chunk.vertices.data(),
                                                          sizeof(linear::Vec3<F32>));
         chunk.mesh = new btBvhTriangleMeshShape(chunk.triangles, true);
+        //TODO consider disabling compression for mesh (the bool), it should
+        //improve performance, with the cost of memory usage
         physics_engine.add_shape(chunk::to_map_pos(pos, 0), chunk.mesh);
     }
 
