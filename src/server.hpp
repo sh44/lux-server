@@ -28,12 +28,14 @@ public:
 private:
     const SizeT MAX_CLIENTS = 16;
 
+
     void run();
     void tick();
     void handle_input();
     void handle_output();
-    void disconnect_player(net::Ip ip);
+    void erase_player(net::Ip ip);
     void add_player(ENetPeer *peer);
+    void kick_all();
 
     std::thread        thread;
     ENetAddress        enet_address;

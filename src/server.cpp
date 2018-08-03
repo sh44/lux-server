@@ -39,12 +39,21 @@ void Server::kick_player(net::Ip ip, String const &reason)
              (ip >> 24) & 0xFF,
              reason);
     ENetPeer *peer = players.at(ip).peer;
-    enet_peer_disconnect(peer, (U32)(SizeT)("KICKED FOR: " + reason).c_str());
-    /* uint32_t is smaller than a pointer, so it's probably a bad idea,
-     * but that's how ENet does it, unless I misunderstood something,
-     * and the uint32_t value shouldn't really be a pointer
-     */
+    enet_peer_disconnect(peer, 0);
+    enet_host_flush(enet_server);
+    //TODO kick message?
     enet_peer_reset(peer);
+    erase_player(ip);
+}
+
+void Server::kick_all()
+{
+    auto iter = players.begin();
+    while(iter != players.end())
+    {
+        kick_player(iter->first, "server stopping");
+        iter = players.begin();
+    }
 }
 
 void Server::run()
@@ -61,6 +70,7 @@ void Server::run()
                       std::abs(delta / tick_clock.get_tick_len()));
         }
     }
+    kick_all();
 }
 
 void Server::tick()
@@ -90,7 +100,7 @@ void Server::handle_input()
                 break;
 
             case ENET_EVENT_TYPE_DISCONNECT:
-                disconnect_player(event.peer->address.host);
+                erase_player(event.peer->address.host);
                 break;
         }
     }
@@ -104,7 +114,7 @@ void Server::handle_output()
     }
 }
 
-void Server::disconnect_player(net::Ip ip)
+void Server::erase_player(net::Ip ip)
 {
     players.erase(ip);
     util::log("SERVER", util::INFO, "player %u.%u.%u.%u disconnected",
