@@ -73,7 +73,8 @@ void Server::tick()
 void Server::handle_input()
 {
     ENetEvent event;
-    while(enet_host_service(enet_server, &event, 0) > 0)
+    while(enet_host_service(enet_server, &event,
+                            tick_clock.get_tick_len().count() / 1000.f) > 0)
     {
         switch(event.type)
         {
