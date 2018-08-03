@@ -116,6 +116,7 @@ void Server::handle_output()
 
 void Server::erase_player(net::Ip ip)
 {
+    players.at(ip).get_entity().deletion_mark = true;
     players.erase(ip);
     util::log("SERVER", util::INFO, "player %u.%u.%u.%u disconnected",
               ip & 0xFF,

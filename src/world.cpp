@@ -13,9 +13,19 @@ World::World(data::Config const &_config) :
 
 void World::update()
 {
-    for(auto &entity : entity_storage)
+    auto iter = entity_storage.begin();
+    while(iter != entity_storage.end())
     {
-        entity.update();
+        if(iter->deletion_mark)
+        {
+            entity_storage.erase(iter);
+            iter = entity_storage.begin();
+        }
+        else
+        {
+            iter->update();
+            iter++;
+        }
     }
     physics_engine.update();
 }

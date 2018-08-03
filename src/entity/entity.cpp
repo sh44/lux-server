@@ -1,10 +1,12 @@
+#include <cmath>
 #include <world.hpp>
 #include "entity.hpp"
 
 Entity::Entity(World const &world, entity::Type const &type, btRigidBody *body) :
     world(world),
     type(type),
-    body(body)
+    body(body),
+    deletion_mark(false)
 {
     body->forceActivationState(DISABLE_DEACTIVATION);
 }

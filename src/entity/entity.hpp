@@ -22,6 +22,7 @@ public:
 
     World const &world;
     entity::Type const &type;
+    bool deletion_mark;
 private:
     btRigidBody *body;
 };

@@ -51,6 +51,11 @@ void Player::send() const
     enet_peer_send(peer, 0, packet);
 }
 
+Entity &Player::get_entity()
+{
+    return *entity;
+}
+
 void Player::init_to_client(F64 tick_rate, String const &server_name)
 {
     serial::ServerInitData sid;

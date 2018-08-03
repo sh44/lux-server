@@ -26,6 +26,7 @@ class Player
 
     void receive(ENetPacket *packet);
     void send() const;
+    Entity &get_entity();
     private:
     void init_to_client(F64 tick_rate, String const &server_name);
     linear::Vec2<U16> view_size; //in tiles
