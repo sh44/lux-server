@@ -117,15 +117,28 @@ void Server::disconnect_player(net::Ip ip)
 void Server::add_player(ENetPeer *peer)
 {
     net::Ip ip = peer->address.host;
-    util::log("SERVER", util::INFO, "player %u.%u.%u.%u connected",
-              ip & 0xFF,
-             (ip >>  8) & 0xFF,
-             (ip >> 16) & 0xFF,
-             (ip >> 24) & 0xFF);
-    players.emplace(std::piecewise_construct,
-                    std::forward_as_tuple(peer->address.host),
-                    std::forward_as_tuple(config, peer, world.create_player()));
-    // ^ why you so ugly C++?
-    enet_host_flush(enet_server);
-    // ^ so that init data is sent properly
+    if(players.count(ip) == 0)
+    {
+        util::log("SERVER", util::INFO, "player %u.%u.%u.%u connected",
+                  ip & 0xFF,
+                 (ip >>  8) & 0xFF,
+                 (ip >> 16) & 0xFF,
+                 (ip >> 24) & 0xFF);
+        players.emplace(std::piecewise_construct,
+                        std::forward_as_tuple(peer->address.host),
+                        std::forward_as_tuple(config, peer, world.create_player()));
+        // ^ why you so ugly C++?
+        enet_host_flush(enet_server);
+        // ^ so that init data is sent properly
+    }
+    else
+    {
+        kick_player(ip, "double join");
+        enet_peer_reset(peer);
+        util::log("SERVER", util::INFO, "player %u.%u.%u.%u rejected for double join",
+                  ip & 0xFF,
+                 (ip >>  8) & 0xFF,
+                 (ip >> 16) & 0xFF,
+                 (ip >> 24) & 0xFF);
+    }
 }
