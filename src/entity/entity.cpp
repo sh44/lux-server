@@ -6,7 +6,7 @@ Entity::Entity(World const &world, entity::Type const &type, btRigidBody *body) 
     type(type),
     body(body)
 {
-
+    body->forceActivationState(DISABLE_DEACTIVATION);
 }
 
 entity::Pos Entity::get_pos() const
