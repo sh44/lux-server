@@ -29,14 +29,24 @@ void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
         {
             if((map_pos.x % 8 == 0  ||
                 map_pos.y % 8 == 0) &&
-               (map_pos.z % 4 == 1 ||
-                map_pos.z % 4 == 2) && hash % 10 >= 3)
+               (std::abs(map_pos.z % 4) == 1 ||
+                std::abs(map_pos.z % 4) == 2) && hash % 10 >= 3)
             {
                 chunk.tiles.emplace_back(*config.db->tile_types.at("void"));
             }
             else
             {
-                chunk.tiles.emplace_back(*config.db->tile_types.at("stone_wall"));
+                if(std::abs(map_pos.x % 8) >= 2 &&
+                   std::abs(map_pos.x % 8) <= 6 &&
+                   std::abs(map_pos.y % 8) >= 2 &&
+                   std::abs(map_pos.y % 8) <= 6)
+                {
+                    chunk.tiles.emplace_back(*config.db->tile_types.at("void"));
+                }
+                else
+                {
+                    chunk.tiles.emplace_back(*config.db->tile_types.at("stone_wall"));
+                }
             }
         }
         else
