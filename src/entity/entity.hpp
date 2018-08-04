@@ -19,6 +19,7 @@ public:
 
     void update();
     void move(entity::Vec const &by);
+    void jump();
 
     World const &world;
     entity::Type const &type;

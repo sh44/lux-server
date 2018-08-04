@@ -19,10 +19,26 @@ entity::Pos Entity::get_pos() const
 
 void Entity::update()
 {
-    world.guarantee_chunk(chunk::to_pos(get_pos()));
+    chunk::Pos center = chunk::to_pos(get_pos());
+    chunk::Pos iter;
+    for(iter.z = center.z - 1; iter.z <= center.z + 1; ++iter.z)
+    {
+        for(iter.y = center.y - 1; iter.y <= center.y + 1; ++iter.y)
+        {
+            for(iter.x = center.x - 1; iter.x <= center.x + 1; ++iter.x)
+            {
+                world.guarantee_chunk(iter);
+            }
+        }
+    }
 }
 
 void Entity::move(entity::Vec const &by)
 {
     body->setLinearVelocity({by.x * 20.f, by.y * 20.f, by.z});
+}
+
+void Entity::jump()
+{
+    body->applyCentralImpulse({0.f, 0.f, 0.5f});
 }

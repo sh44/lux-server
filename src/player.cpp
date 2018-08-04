@@ -25,7 +25,8 @@ void Player::receive(ENetPacket *packet)
     deserializer.set_slice(packet->data, packet->data + packet->dataLength);
     deserializer >> cd;
     auto h_dir = 0.2f * cd.character_dir;
-    if(cd.is_moving) entity->move({h_dir.x, h_dir.y, 0.0});
+    if(cd.is_moving)  entity->move({h_dir.x, h_dir.y, 0.0});
+    if(cd.is_jumping) entity->jump();
 }
 
 void Player::send() const
