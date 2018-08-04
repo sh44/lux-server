@@ -5,8 +5,8 @@
 Entity::Entity(World const &world, entity::Type const &type, btRigidBody *body) :
     world(world),
     type(type),
-    body(body),
-    deletion_mark(false)
+    deletion_mark(false),
+    body(body)
 {
     body->forceActivationState(DISABLE_DEACTIVATION);
 }
