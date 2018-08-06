@@ -2,6 +2,7 @@
 #include <functional>
 //
 #include <lux/alias/scalar.hpp>
+#include <lux/alias/vec_3.hpp>
 //
 #include <data/database.hpp>
 #include <data/config.hpp>
@@ -110,7 +111,7 @@ void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
                 {
                     for(unsigned j = 0; j < 4; ++j)
                     {
-                        chunk.vertices.emplace_back((linear::Vec3<F32>)map_pos +
+                        chunk.vertices.emplace_back((Vec3<F32>)map_pos +
                                                     quads[side][j]);
                     }
                     for(auto const &idx : {0, 1, 2, 2, 3, 0})
@@ -130,7 +131,7 @@ void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
                                                          sizeof(U32) * 3,
                                                          chunk.vertices.size(),
                                                          (F32 *)chunk.vertices.data(),
-                                                         sizeof(linear::Vec3<F32>));
+                                                         sizeof(Vec3<F32>));
         chunk.mesh = new btBvhTriangleMeshShape(chunk.triangles, true);
         //TODO consider disabling compression for mesh (the bool), it should
         //improve performance, with the cost of memory usage

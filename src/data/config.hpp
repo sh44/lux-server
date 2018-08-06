@@ -1,7 +1,7 @@
 #pragma once
 
 #include <lux/alias/scalar.hpp>
-#include <lux/alias/c_string.hpp>
+#include <lux/alias/string.hpp>
 
 namespace entity { struct Type; }
 
@@ -14,7 +14,7 @@ struct Config
 {
     Database     const *db;
     entity::Type const *player_type;
-    CString             server_name;
+    String              server_name;
     F64                 tick_rate;
 };
 

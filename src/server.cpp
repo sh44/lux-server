@@ -8,7 +8,7 @@
 
 Server::Server(net::Port port) :
     enet_address({ENET_HOST_ANY, port}),
-    enet_server(enet_host_create(&enet_address, MAX_CLIENTS, 1, 0, 0)),
+    enet_server(enet_host_create(&enet_address, MAX_CLIENTS, 2, 0, 0)),
     config(default_config),
     tick_clock(util::TickClock::Duration(1.0 / config.tick_rate)),
     world(config),
@@ -46,12 +46,13 @@ void Server::kick_player(net::Ip ip, String const &reason)
     erase_player(ip);
 }
 
-void Server::kick_all()
+void Server::kick_all(String const &reason)
 {
+    util::log("SERVER", util::INFO, "kicking all, reason: %s", reason);
     auto iter = players.begin();
     while(iter != players.end())
     {
-        kick_player(iter->first, "server stopping");
+        kick_player(iter->first, reason);
         iter = players.begin();
     }
 }
@@ -70,7 +71,7 @@ void Server::run()
                       std::abs(delta / tick_clock.get_tick_len()));
         }
     }
-    kick_all();
+    kick_all("server stopping");
 }
 
 void Server::tick()
@@ -86,31 +87,36 @@ void Server::handle_input()
     while(enet_host_service(enet_server, &event,
                             tick_clock.get_tick_len().count() / 1000.f) > 0)
     {
-        switch(event.type)
+        if(event.type == ENET_EVENT_TYPE_CONNECT)
         {
-            case ENET_EVENT_TYPE_NONE: break;
-
-            case ENET_EVENT_TYPE_CONNECT:
-                add_player(event.peer);
-                break;
-
-            case ENET_EVENT_TYPE_RECEIVE:
-                players.at(event.peer->address.host).receive(event.packet);
-                enet_packet_destroy(event.packet);
-                break;
-
-            case ENET_EVENT_TYPE_DISCONNECT:
-                erase_player(event.peer->address.host);
-                break;
+            add_player(event.peer);
+        }
+        else if(event.type == ENET_EVENT_TYPE_RECEIVE)
+        {
+            auto *pack = event.packet;
+            deserializer.set_slice(pack->data, pack->data + pack->dataLength);
+            net::clear_buffer(cp);
+            deserializer >> cp;
+            players.at(event.peer->address.host).receive(cp);
+            enet_packet_destroy(pack);
+        }
+        else if(event.type == ENET_EVENT_TYPE_DISCONNECT)
+        {
+            erase_player(event.peer->address.host);
         }
     }
 }
 
 void Server::handle_output()
 {
-    for(auto const &player : players)
+    for(auto &player : players)
     {
-        player.second.send();
+        while(player.second.send_signal(sp))
+        {
+            send_server_packet(player, ENET_PACKET_FLAG_RELIABLE);
+        }
+        player.second.send_tick(sp);
+        send_server_packet(player, ENET_PACKET_FLAG_UNSEQUENCED);
     }
 }
 
@@ -138,9 +144,7 @@ void Server::add_player(ENetPeer *peer)
         players.emplace(std::piecewise_construct,
                         std::forward_as_tuple(peer->address.host),
                         std::forward_as_tuple(config, peer, world.create_player()));
-        // ^ why you so ugly C++?
-        enet_host_flush(enet_server);
-        // ^ so that init data is sent properly
+        /* why you so ugly C++? */
     }
     else
     {
@@ -153,3 +157,16 @@ void Server::add_player(ENetPeer *peer)
                  (ip >> 24) & 0xFF);
     }
 }
+
+void Server::send_server_packet(Player const &player, U32 flags)
+{
+    //TODO packet buffer with enet_packet_resize
+    serializer.reserve(net::get_size(sp));
+    serializer << sp;
+    ENetPacket *pack =
+        enet_packet_create(serializer.get(), serializer.get_used(), flags);
+    enet_peer_send(player.peer, 0, pack);
+    enet_host_flush(enet_server);
+    net::clear_buffer(sp);
+}
+
