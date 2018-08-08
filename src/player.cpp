@@ -4,6 +4,7 @@
 #include <lux/alias/string.hpp>
 #include <lux/util/log.hpp>
 #include <lux/common/entity.hpp>
+#include <lux/common/chunk.hpp>
 #include <lux/net/server/packet.hpp>
 #include <lux/net/client/packet.hpp>
 //
@@ -45,10 +46,9 @@ bool Player::send_signal(net::server::Packet &sp)
         util::log("PLAYER", util::INFO, "initializing to client");
         sp.type = net::server::Packet::INIT;
         sp.init.tick_rate = conf.tick_rate;
-        sp.init.tick_rate = conf.tick_rate;
-        sp.init.tick_rate = conf.tick_rate;
         std::copy(conf.server_name.begin(), conf.server_name.end(),
-                  std::back_inserter(sp.conf.server_name));
+                  std::back_inserter(sp.init.server_name));
+        sp.init.chunk_size = chunk::SIZE;
         sent_init = true;
         return true;
     }

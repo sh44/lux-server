@@ -113,10 +113,10 @@ void Server::handle_output()
     {
         while(player.second.send_signal(sp))
         {
-            send_server_packet(player, ENET_PACKET_FLAG_RELIABLE);
+            send_server_packet(player.second, ENET_PACKET_FLAG_RELIABLE);
         }
         player.second.send_tick(sp);
-        send_server_packet(player, ENET_PACKET_FLAG_UNSEQUENCED);
+        send_server_packet(player.second, ENET_PACKET_FLAG_UNSEQUENCED);
     }
 }
 
