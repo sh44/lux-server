@@ -22,38 +22,34 @@ void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
     chunk.tiles.reserve(chunk::TILE_SIZE);
     for(SizeT i = 0; i < chunk::TILE_SIZE; ++i)
     {
+        Vec3<U8> r_size = {8, 8, 4};
         map::Pos map_pos = chunk::to_map_pos(pos, i);
-        auto const &hash = std::hash<map::Pos>()(map_pos);
-        if(map_pos.x % 8 == 0 ||
-           map_pos.y % 8 == 0 ||
-           map_pos.z % 4 == 0)
+        auto hash = std::hash<map::Pos>()(map_pos);
+        auto const *tile_type = config.db->tile_types.at("void");
+        if(map_pos.z % r_size.z == 0)
         {
-            if((map_pos.x % 8 == 0  ||
-                map_pos.y % 8 == 0) &&
-               (std::abs(map_pos.z % 4) == 1 ||
-                std::abs(map_pos.z % 4) == 2) && hash % 10 >= 3)
+            if(std::abs(map_pos.x % r_size.x) < 3 ||
+               std::abs(map_pos.x % r_size.x) > 5 ||
+               std::abs(map_pos.y % r_size.y) < 3 ||
+               std::abs(map_pos.y % r_size.y) > 5)
             {
-                chunk.tiles.emplace_back(*config.db->tile_types.at("void"));
+                tile_type = config.db->tile_types.at("stone_floor");
+            }
+        }
+        else if(map_pos.x % r_size.x == 0 || map_pos.y % r_size.y == 0)
+        {
+            if((std::abs(map_pos.z % r_size.z) == 1 && hash % 6 == 0) ||
+               (std::abs(map_pos.z % r_size.z) == 2 &&
+                std::hash<map::Pos>()(map_pos - map::Pos(0, 0, 1)) % 6 == 0))
+            {
+                tile_type = config.db->tile_types.at("void");
             }
             else
             {
-                if(std::abs(map_pos.x % 8) >= 2 &&
-                   std::abs(map_pos.x % 8) <= 6 &&
-                   std::abs(map_pos.y % 8) >= 2 &&
-                   std::abs(map_pos.y % 8) <= 6)
-                {
-                    chunk.tiles.emplace_back(*config.db->tile_types.at("void"));
-                }
-                else
-                {
-                    chunk.tiles.emplace_back(*config.db->tile_types.at("stone_wall"));
-                }
+                tile_type = config.db->tile_types.at("stone_wall");
             }
         }
-        else
-        {
-            chunk.tiles.emplace_back(*config.db->tile_types.at("void"));
-        }
+        chunk.tiles.emplace_back(*tile_type);
     }
 
     /* MESHING BEGINS */
