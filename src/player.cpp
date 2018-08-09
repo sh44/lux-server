@@ -52,7 +52,45 @@ bool Player::send_signal(net::server::Packet &sp)
         sent_init = true;
         return true;
     }
+    else
+    {
+        chunk::Pos iter;
+        chunk::Pos center = chunk::to_pos(entity->get_pos()); //TODO entity::to_pos
+        for(iter.z = center.z - view_range.z;
+            iter.z <= center.z + view_range.z;
+            ++iter.z)
+        {
+            for(iter.y = center.y - view_range.y;
+                iter.y <= center.y + view_range.y;
+                ++iter.y)
+            {
+                for(iter.x = center.x - view_range.x;
+                    iter.x <= center.x + view_range.x;
+                    ++iter.x)
+                {
+                    if(loaded_chunks.count(iter) == 0)
+                    {
+                        send_chunk(sp, iter);
+                        loaded_chunks.insert(iter);
+                        return true;
+                    }
+                }
+            }
+        }
+    }
     return false;
+}
+
+void Player::send_chunk(net::server::Packet &sp, chunk::Pos const &pos)
+{
+    sp.type = net::server::Packet::MAP;
+    auto &chunk = sp.map.chunks.emplace_back();
+    auto const &world_chunk = entity->world[pos];
+    chunk.pos = pos;
+    for(chunk::Index i = 0; i < chunk::TILE_SIZE; ++i)
+    {
+        chunk.tiles[i].db_hash = std::hash<String>()(world_chunk.tiles[i].type->id);
+    }
 }
 
 Entity &Player::get_entity()
