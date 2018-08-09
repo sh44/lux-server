@@ -4,6 +4,7 @@
 
 Required libraries
   * enet
+  * bullet physics
 
 ```
 mkdir build
