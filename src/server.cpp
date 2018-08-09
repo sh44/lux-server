@@ -134,28 +134,19 @@ void Server::erase_player(net::Ip ip)
 void Server::add_player(ENetPeer *peer)
 {
     net::Ip ip = peer->address.host;
-    if(players.count(ip) == 0)
-    {
-        util::log("SERVER", util::INFO, "player %u.%u.%u.%u connected",
-                  ip & 0xFF,
-                 (ip >>  8) & 0xFF,
-                 (ip >> 16) & 0xFF,
-                 (ip >> 24) & 0xFF);
-        players.emplace(std::piecewise_construct,
-                        std::forward_as_tuple(peer->address.host),
-                        std::forward_as_tuple(config, peer, world.create_player()));
-        /* why you so ugly C++? */
-    }
-    else
+    if(players.count(ip) > 0)
     {
         kick_player(ip, "double join");
-        enet_peer_reset(peer);
-        util::log("SERVER", util::INFO, "player %u.%u.%u.%u rejected for double join",
-                  ip & 0xFF,
-                 (ip >>  8) & 0xFF,
-                 (ip >> 16) & 0xFF,
-                 (ip >> 24) & 0xFF);
     }
+    util::log("SERVER", util::INFO, "player %u.%u.%u.%u connected",
+              ip & 0xFF,
+             (ip >>  8) & 0xFF,
+             (ip >> 16) & 0xFF,
+             (ip >> 24) & 0xFF);
+    players.emplace(std::piecewise_construct,
+                    std::forward_as_tuple(peer->address.host),
+                    std::forward_as_tuple(config, peer, world.create_player()));
+    /* why you so ugly C++? */
 }
 
 void Server::send_server_packet(Player const &player, U32 flags)
