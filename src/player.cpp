@@ -17,14 +17,29 @@ Player::Player(data::Config const &conf, ENetPeer *peer, Entity &entity) :
     peer(peer),
     conf(conf),
     entity(&entity),
-    sent_init(false)
+    view_range(0, 0, 0),
+    sent_init(false),
+    received_init(false)
 {
 
 }
 
 void Player::receive(net::client::Packet const &cp)
 {
-    if(cp.type == net::client::Packet::TICK)
+    if(!received_init)
+    {
+        if(cp.type == net::client::Packet::INIT)
+        {
+            init_from_client(cp.init);
+            received_init = true;
+        }
+        else
+        {
+            throw std::runtime_error("client has not sent init data");
+            //TODO just kick him out
+        }
+    }
+    else if(cp.type == net::client::Packet::TICK)
     {
         auto h_dir = 0.2f * cp.tick.character_dir;
         if(cp.tick.is_moving)  entity->move({h_dir.x, h_dir.y, 0.0});
@@ -41,11 +56,11 @@ void Player::send_tick(net::server::Packet &sp) const
 
 bool Player::send_signal(net::server::Packet &sp)
 {
-    if(sent_init == false)
+    if(!sent_init)
     {
         util::log("PLAYER", util::INFO, "initializing to client");
         sp.type = net::server::Packet::INIT;
-        sp.init.tick_rate = conf.tick_rate;
+        sp.init.conf.tick_rate = conf.tick_rate; //TODO Player::prepare_conf?
         std::copy(conf.server_name.begin(), conf.server_name.end(),
                   std::back_inserter(sp.init.server_name));
         sp.init.chunk_size = chunk::SIZE;
@@ -91,6 +106,19 @@ void Player::send_chunk(net::server::Packet &sp, chunk::Pos const &pos)
     {
         chunk.tiles[i].db_hash = std::hash<String>()(world_chunk.tiles[i].type->id);
     }
+}
+
+void Player::init_from_client(net::client::Init const &ci)
+{
+    util::log("PLAYER", util::INFO, "received initialization data");
+    String client_name(ci.client_name.begin(), ci.client_name.end());
+    util::log("PLAYER", util::INFO, "client name: %s", client_name);
+    change_config(ci.conf);
+}
+
+void Player::change_config(net::client::Conf const &cc)
+{
+    view_range = cc.view_range;
 }
 
 Entity &Player::get_entity()

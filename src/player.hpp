@@ -8,7 +8,12 @@
 #include <lux/common/chunk.hpp>
 
 namespace data { struct Config; }
-namespace net::client { struct Packet; }
+namespace net::client
+{
+    struct Packet;
+    struct Init;
+    struct Conf;
+}
 namespace net::server { struct Packet; }
 
 class Entity;
@@ -28,11 +33,15 @@ class Player
 
     ENetPeer *peer;
     private:
+    void init_from_client(net::client::Init const &);
+    void change_config(net::client::Conf const &);
+
     data::Config const &conf;
 
     Set<chunk::Pos> loaded_chunks;
-    static constexpr Vec3<U16> view_range = {4, 4, 4}; //TODO get from client
-
     Entity *entity;
+    Vec3<U16> view_range;
+
     bool sent_init;
+    bool received_init;
 };
