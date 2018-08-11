@@ -13,20 +13,31 @@ int main()
     std::string input;
     while(true)
     {
-        std::cin >> input;
+        std::getline(std::cin, input);
         if(input == "stop") break;
         else if(input == "kick")
         {
-            std::cout << "hostname: ";
-            std::cin >> input;
+            std::cout << "hostname: " << std::endl;
+            std::getline(std::cin, input);
 
             ENetAddress addr;
             enet_address_set_host(&addr, input.c_str());
-            addr.port = 31337;
 
-            std::cout << "reason: ";
-            std::cin >> input;
+            std::cout << "reason: " << std::endl;
+            std::getline(std::cin, input);
             server.kick_player(addr.host, input);
+        }
+        else if(input == "msg")
+        {
+            std::cout << "hostname: ";
+            std::getline(std::cin, input);
+
+            ENetAddress addr;
+            enet_address_set_host(&addr, input.c_str());
+
+            std::cout << "msg: ";
+            std::getline(std::cin, input);
+            server.send_msg(addr.host, input);
         }
     }
     return 0;

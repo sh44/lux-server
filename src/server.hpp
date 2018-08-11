@@ -29,6 +29,7 @@ public:
     ~Server();
 
     void kick_player(net::Ip ip, String const &reason = "unknown");
+    void send_msg(net::Ip ip, String const &msg);
 private:
     const SizeT MAX_CLIENTS = 16;
 

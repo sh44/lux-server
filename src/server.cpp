@@ -46,6 +46,21 @@ void Server::kick_player(net::Ip ip, String const &reason)
     erase_player(ip);
 }
 
+void Server::send_msg(net::Ip ip, String const &msg)
+{
+    util::log("SERVER", util::INFO, "sending msg to player %u.%u.%u.%u",
+              ip & 0xFF,
+             (ip >>  8) & 0xFF,
+             (ip >> 16) & 0xFF,
+             (ip >> 24) & 0xFF);
+    util::log("SERVER", util::INFO, "msg: %s", msg);
+    sp.type = net::server::Packet::MSG;
+    sp.msg.log_level = util::INFO;
+    std::copy(msg.begin(), msg.end(), std::back_inserter(sp.msg.log_msg));
+    send_server_packet(players.at(ip), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_flush(enet_server);
+}
+
 void Server::kick_all(String const &reason)
 {
     util::log("SERVER", util::INFO, "kicking all, reason: %s", reason);
