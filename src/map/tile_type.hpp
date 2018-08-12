@@ -3,10 +3,10 @@
 #include <lux/alias/scalar.hpp>
 #include <lux/alias/string.hpp>
 
-namespace tile
+namespace map
 {
 
-struct Type
+struct TileType
 {
     enum Shape : U8
     {

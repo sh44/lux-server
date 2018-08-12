@@ -1,5 +1,5 @@
 #include <entity/type.hpp>
-#include <tile/type.hpp>
+#include <map/tile_type.hpp>
 #include <data/database.hpp>
 #include <data/config.hpp>
 
@@ -9,25 +9,25 @@ const entity::Type human =
     "Human"
 };
 
-const tile::Type void_tile =
+const map::TileType void_tile =
 {
     "void",
     "Void",
-    tile::Type::EMPTY
+    map::TileType::EMPTY
 };
 
-const tile::Type stone_floor =
+const map::TileType stone_floor =
 {
     "stone_floor",
     "Stone Floor",
-    tile::Type::FLOOR
+    map::TileType::FLOOR
 };
 
-const tile::Type stone_wall =
+const map::TileType stone_wall =
 {
     "stone_wall",
     "Stone Wall",
-    tile::Type::WALL
+    map::TileType::WALL
 };
 
 const data::Database default_db =

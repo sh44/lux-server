@@ -7,9 +7,9 @@
 #include <lux/util/log.hpp>
 //
 #include <data/config.hpp>
-#include <entity/entity.hpp>
 #include <entity/type.hpp>
-#include <map/map.hpp>
+#include <entity.hpp>
+#include <map.hpp>
 
 class World : public Map
 {

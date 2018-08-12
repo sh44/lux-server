@@ -9,8 +9,11 @@
 #include <data/database.hpp>
 #include <data/config.hpp>
 #include <map/chunk.hpp>
-#include <tile/type.hpp>
+#include <map/tile_type.hpp>
 #include "generator.hpp"
+
+namespace map
+{
 
 Generator::Generator(PhysicsEngine &physics_engine, data::Config const &config) :
     config(config),
@@ -21,8 +24,6 @@ Generator::Generator(PhysicsEngine &physics_engine, data::Config const &config) 
 
 void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
 {
-    chunk.tiles.reserve(CHK_VOLUME);
-
     for(SizeT i = 0; i < CHK_VOLUME; ++i)
     {
         Vec3<U8> r_size = {8, 8, 4};
@@ -58,7 +59,7 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
                 tile_type = config.db->tile_types.at("stone_wall");
             }
         }
-        chunk.tiles.emplace_back(*tile_type);
+        chunk.tiles[i] = tile_type;
     }
 
     /* MESHING BEGINS */
@@ -91,13 +92,13 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
     auto is_solid = [&](IdxPos const &idx_pos) -> bool
     {
         return to_chk_pos(idx_pos) != ChkPos(0, 0, 0) ||
-               chunk.tiles[to_chk_idx(idx_pos)].type->id != "void";
+               chunk.tiles[to_chk_idx(idx_pos)]->id != "void";
     };
 
     for(SizeT i = 0; i < CHK_VOLUME; ++i)
     {
         IdxPos idx_pos = to_idx_pos(i);
-        if(chunk.tiles[to_chk_idx(idx_pos)].type->id != "void")
+        if(chunk.tiles[to_chk_idx(idx_pos)]->id != "void")
         {
             for(SizeT side = 0; side < 6; ++side)
             {
@@ -129,9 +130,12 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
             chunk.vertices.size(),
             (F32 *)chunk.vertices.data(),
             sizeof(Vec3<F32>));
-        chunk.mesh = new btBvhTriangleMeshShape(chunk.triangles, false);
+        chunk.mesh = new btBvhTriangleMeshShape(chunk.triangles, false,
+                {0.0, 0.0, 0.0}, {CHK_SIZE.x, CHK_SIZE.y, CHK_SIZE.z});
         physics_engine.add_shape(to_map_pos(pos, 0), chunk.mesh);
     }
 
     /* MESHING ENDS */
+}
+
 }

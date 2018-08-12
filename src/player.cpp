@@ -10,8 +10,8 @@
 #include <lux/net/server/packet.hpp>
 #include <lux/net/client/packet.hpp>
 //
-#include <tile/type.hpp>
-#include <entity/entity.hpp>
+#include <map/tile_type.hpp>
+#include <entity.hpp>
 #include <world.hpp>
 #include "player.hpp"
 
@@ -106,7 +106,7 @@ void Player::send_chunk(net::server::Packet &sp, ChkPos const &pos)
     chunk.pos = pos;
     for(ChkIdx i = 0; i < CHK_VOLUME; ++i)
     {
-        chunk.tiles[i].db_hash = std::hash<String>()(world_chunk.tiles[i].type->id);
+        chunk.tiles[i].db_hash = std::hash<String>()(world_chunk.tiles[i]->id);
     }
 }
 

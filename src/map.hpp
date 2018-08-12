@@ -11,23 +11,23 @@ namespace data { struct Config; }
 
 class Map
 {
-    typedef HashMap<ChkPos, Chunk>::iterator ChunkIterator;
+    typedef HashMap<ChkPos, map::Chunk>::iterator ChunkIterator;
     public:
     Map(PhysicsEngine &physics_engine, data::Config const &config);
     Map(Map const &that) = delete;
     Map &operator=(Map const &that) = delete;
     ~Map();
 
-    Tile        &get_tile(MapPos const &pos);
-    Tile  const &get_tile(MapPos const &pos) const;
-    Chunk       &get_chunk(ChkPos const &pos);
-    Chunk const &get_chunk(ChkPos const &pos) const;
+    map::TileType const &get_tile(MapPos const &pos);
+    map::TileType const &get_tile(MapPos const &pos) const;
+    map::Chunk       &get_chunk(ChkPos const &pos);
+    map::Chunk const &get_chunk(ChkPos const &pos) const;
 
     void guarantee_chunk(ChkPos const &pos) const;
     private:
-    Chunk &load_chunk(ChkPos const &pos) const;
+    map::Chunk &load_chunk(ChkPos const &pos) const;
     ChunkIterator unload_chunk(ChunkIterator const &iter) const;
 
-    mutable HashMap<ChkPos, Chunk> chunks;
-    mutable Generator generator;
+    mutable HashMap<ChkPos, map::Chunk> chunks;
+    mutable map::Generator generator;
 };

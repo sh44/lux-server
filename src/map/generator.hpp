@@ -7,6 +7,9 @@
 
 namespace data { struct Config; }
 
+namespace map
+{
+
 struct Chunk;
 
 class Generator
@@ -21,3 +24,5 @@ class Generator
     util::NumGen num_gen;
     PhysicsEngine &physics_engine;
 };
+
+}
