@@ -1,5 +1,5 @@
 #include <lux/util/log.hpp>
-#include <lux/common/chunk.hpp>
+#include <lux/common/map.hpp>
 //
 #include <map/chunk.hpp>
 //
@@ -19,34 +19,34 @@ Map::~Map()
     }
 }
 
-Tile &Map::operator[](map::Pos const &pos)
+Tile &Map::get_tile(MapPos const &pos)
 {
-    return this->operator[](chunk::to_pos(pos)).tiles[chunk::to_index(pos)];
+    return get_chunk(to_chk_pos(pos)).tiles[to_chk_idx(pos)];
 }
 
-Tile const &Map::operator[](map::Pos const &pos) const
+Tile const &Map::get_tile(MapPos const &pos) const
 {
-    return this->operator[](chunk::to_pos(pos)).tiles[chunk::to_index(pos)];
+    return get_chunk(to_chk_pos(pos)).tiles[to_chk_idx(pos)];
 }
 
-Chunk &Map::operator[](chunk::Pos const &pos)
+Chunk &Map::get_chunk(ChkPos const &pos)
 {
     if(chunks.count(pos) == 0) return load_chunk(pos);
     else return chunks.at(pos); //TODO code repetition
 }
 
-Chunk const &Map::operator[](chunk::Pos const &pos) const
+Chunk const &Map::get_chunk(ChkPos const &pos) const
 {
     if(chunks.count(pos) == 0) return load_chunk(pos);
     else return chunks.at(pos);
 }
 
-void Map::guarantee_chunk(chunk::Pos const &pos) const
+void Map::guarantee_chunk(ChkPos const &pos) const
 {
-    this->operator[](pos);
+    get_chunk(pos);
 }
 
-Chunk &Map::load_chunk(chunk::Pos const &pos) const
+Chunk &Map::load_chunk(ChkPos const &pos) const
 {
     util::log("MAP", util::DEBUG, "loading chunk %zd, %zd, %zd", pos.x, pos.y, pos.z);
     chunks.emplace(pos, Chunk());

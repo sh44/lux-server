@@ -13,7 +13,7 @@ class PhysicsEngine
     PhysicsEngine();
 
     btRigidBody *add_entity(entity::Pos const &pos);
-    btRigidBody *add_shape(map::Pos const &pos, btCollisionShape *shape);
+    btRigidBody *add_shape(MapPos const &pos, btCollisionShape *shape);
 
     void update();
     private:

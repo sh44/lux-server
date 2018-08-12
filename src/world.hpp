@@ -18,8 +18,6 @@ public:
     World(World const &that) = delete;
     World &operator=(World const &that) = delete;
 
-    using Map::operator[];
-
     void get_entities_positions(Vector<entity::Pos> &out) const;
     Entity &create_player();
     void update();

@@ -1,10 +1,12 @@
 #include <algorithm>
 //
+#include <glm/glm.hpp>
+//
 #include <lux/alias/scalar.hpp>
 #include <lux/alias/string.hpp>
 #include <lux/util/log.hpp>
 #include <lux/common/entity.hpp>
-#include <lux/common/chunk.hpp>
+#include <lux/common/map.hpp>
 #include <lux/net/server/packet.hpp>
 #include <lux/net/client/packet.hpp>
 //
@@ -63,14 +65,14 @@ bool Player::send_signal(net::server::Packet &sp)
         sp.init.conf.tick_rate = conf.tick_rate; //TODO Player::prepare_conf?
         std::copy(conf.server_name.begin(), conf.server_name.end(),
                   std::back_inserter(sp.init.server_name));
-        sp.init.chunk_size = chunk::SIZE;
+        sp.init.chunk_size = CHK_SIZE;
         sent_init = true;
         return true;
     }
     else
     {
-        chunk::Pos iter;
-        chunk::Pos center = chunk::to_pos(entity->get_pos()); //TODO entity::to_pos
+        ChkPos iter;
+        ChkPos center = to_chk_pos(glm::round(entity->get_pos()));
         for(iter.z = center.z - view_range.z;
             iter.z <= center.z + view_range.z;
             ++iter.z)
@@ -96,13 +98,13 @@ bool Player::send_signal(net::server::Packet &sp)
     return false;
 }
 
-void Player::send_chunk(net::server::Packet &sp, chunk::Pos const &pos)
+void Player::send_chunk(net::server::Packet &sp, ChkPos const &pos)
 {
     sp.type = net::server::Packet::MAP;
     auto &chunk = sp.map.chunks.emplace_back();
-    auto const &world_chunk = entity->world[pos];
+    auto const &world_chunk = entity->world.get_chunk(pos);
     chunk.pos = pos;
-    for(chunk::Index i = 0; i < chunk::TILE_SIZE; ++i)
+    for(ChkIdx i = 0; i < CHK_VOLUME; ++i)
     {
         chunk.tiles[i].db_hash = std::hash<String>()(world_chunk.tiles[i].type->id);
     }

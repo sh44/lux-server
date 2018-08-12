@@ -21,7 +21,7 @@ btRigidBody *PhysicsEngine::add_entity(entity::Pos const &pos)
     return &bodies.back();
 }
 
-btRigidBody *PhysicsEngine::add_shape(map::Pos const &pos, btCollisionShape *shape)
+btRigidBody *PhysicsEngine::add_shape(MapPos const &pos, btCollisionShape *shape)
 {
     motion_states.emplace_back(btTransform({0, 0, 0, 1},
         {(F32)pos.x, (F32)pos.y, (F32)pos.z}));

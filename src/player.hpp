@@ -5,7 +5,7 @@
 #include <lux/alias/set.hpp>
 #include <lux/alias/scalar.hpp>
 #include <lux/alias/string.hpp>
-#include <lux/common/chunk.hpp>
+#include <lux/common/map.hpp>
 
 namespace data { struct Config; }
 namespace net::client
@@ -28,7 +28,7 @@ class Player
     void receive(net::client::Packet const &);
     void send_tick(net::server::Packet &) const;
     bool send_signal(net::server::Packet &);
-    void send_chunk(net::server::Packet &, chunk::Pos const &pos);
+    void send_chunk(net::server::Packet &, ChkPos const &pos);
     Entity &get_entity();
 
     ENetPeer *peer;
@@ -38,7 +38,7 @@ class Player
 
     data::Config const &conf;
 
-    Set<chunk::Pos> loaded_chunks;
+    Set<ChkPos> loaded_chunks;
     Entity *entity;
     Vec3<U16> view_range;
 

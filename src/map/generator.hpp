@@ -1,7 +1,7 @@
 #pragma once
 
 #include <lux/util/num_gen.hpp>
-#include <lux/common/chunk.hpp>
+#include <lux/common/map.hpp>
 //
 #include <physics_engine.hpp>
 
@@ -15,7 +15,7 @@ class Generator
     Generator(PhysicsEngine &physics_engine, data::Config const &config);
     Generator &operator=(Generator const &that) = delete;
 
-    void generate_chunk(Chunk &chunk, chunk::Pos const &pos);
+    void generate_chunk(Chunk &chunk, ChkPos const &pos);
     private:
     data::Config const &config;
     util::NumGen num_gen;

@@ -19,19 +19,19 @@ Generator::Generator(PhysicsEngine &physics_engine, data::Config const &config) 
 
 }
 
-void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
+void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
 {
-    chunk.tiles.reserve(chunk::TILE_SIZE);
-    for(SizeT i = 0; i < chunk::TILE_SIZE; ++i)
+    chunk.tiles.reserve(CHK_VOLUME);
+    for(SizeT i = 0; i < CHK_VOLUME; ++i)
     {
         Vec3<U8> r_size = {8, 8, 4};
-        auto u_mod = [&](map::Coord c, U8 s) -> U8
+        auto u_mod = [&](MapCoord c, U8 s) -> U8
         {
             //TODO make more general functions from this and chunk:: functions
-            return (*(std::make_unsigned<map::Coord>::type *)(&c)) % s;
+            return (*(std::make_unsigned<MapCoord>::type *)(&c)) % s;
         };
-        map::Pos map_pos = chunk::to_map_pos(pos, i);
-        auto hash = std::hash<map::Pos>()(map_pos);
+        MapPos map_pos = to_map_pos(pos, i);
+        auto hash = std::hash<MapPos>()(map_pos);
         auto const *tile_type = config.db->tile_types.at("void");
         if(u_mod(map_pos.z, r_size.z) == 0)
         {
@@ -48,7 +48,7 @@ void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
         {
             if((u_mod(map_pos.z, r_size.z) == 1 && hash % 6 == 0) ||
                (u_mod(map_pos.z, r_size.z) == 2 &&
-                std::hash<map::Pos>()(map_pos - map::Pos(0, 0, 1)) % 6 == 0))
+                std::hash<MapPos>()(map_pos - MapPos(0, 0, 1)) % 6 == 0))
             {
                 tile_type = config.db->tile_types.at("void");
             }
@@ -63,10 +63,10 @@ void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
     /* MESHING BEGINS */
     //TODO merge this with client version
     
-    auto is_solid = [&](map::Pos const &map_pos) -> bool
+    auto is_solid = [&](MapPos const &map_pos) -> bool
     {
-        if(chunk::to_pos(map_pos) != chunk::Pos(0, 0, 0)) return false;
-        return chunk.tiles[chunk::to_index(map_pos)].type->id != "void";
+        if(to_chk_pos(map_pos) != ChkPos(0, 0, 0)) return false;
+        return chunk.tiles[to_chk_idx(map_pos)].type->id != "void";
     };
 
     I32 index_offset = 0;
@@ -98,12 +98,12 @@ void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
          {0.0, 1.0, 1.0}}
     };
 
-    for(SizeT i = 0; i < chunk::TILE_SIZE; ++i)
+    for(SizeT i = 0; i < CHK_VOLUME; ++i)
     {
-        map::Pos map_pos = chunk::to_map_pos({0, 0, 0}, i);
+        MapPos map_pos = to_map_pos({0, 0, 0}, i);
         if(is_solid(map_pos))
         {
-            const map::Pos offsets[6] = {{-1,  0,  0},
+            const MapPos offsets[6] = {{-1,  0,  0},
                                          { 1,  0,  0},
                                          { 0, -1,  0},
                                          { 0,  1,  0},
@@ -139,7 +139,7 @@ void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
         chunk.mesh = new btBvhTriangleMeshShape(chunk.triangles, true);
         //TODO consider disabling compression for mesh (the bool), it should
         //improve performance, with the cost of memory usage
-        physics_engine.add_shape(chunk::to_map_pos(pos, 0), chunk.mesh);
+        physics_engine.add_shape(to_map_pos(pos, 0), chunk.mesh);
     }
 
     /* MESHING ENDS */

@@ -1,4 +1,5 @@
-#include <cmath>
+#include <glm/glm.hpp>
+//
 #include <world.hpp>
 #include "entity.hpp"
 
@@ -19,8 +20,8 @@ entity::Pos Entity::get_pos() const
 
 void Entity::update()
 {
-    chunk::Pos center = chunk::to_pos(get_pos());
-    chunk::Pos iter;
+    ChkPos center = to_chk_pos(glm::round(get_pos()));
+    ChkPos iter;
     for(iter.z = center.z - 1; iter.z <= center.z + 1; ++iter.z)
     {
         for(iter.y = center.y - 1; iter.y <= center.y + 1; ++iter.y)
