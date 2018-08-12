@@ -1,5 +1,7 @@
-#include <iostream>
+#include <type_traits>
 #include <functional>
+//
+#include <glm/glm.hpp>
 //
 #include <lux/alias/scalar.hpp>
 #include <lux/alias/vec_3.hpp>
@@ -23,23 +25,29 @@ void Generator::generate_chunk(Chunk &chunk, chunk::Pos const &pos)
     for(SizeT i = 0; i < chunk::TILE_SIZE; ++i)
     {
         Vec3<U8> r_size = {8, 8, 4};
+        auto u_mod = [&](map::Coord c, U8 s) -> U8
+        {
+            //TODO make more general functions from this and chunk:: functions
+            return (*(std::make_unsigned<map::Coord>::type *)(&c)) % s;
+        };
         map::Pos map_pos = chunk::to_map_pos(pos, i);
         auto hash = std::hash<map::Pos>()(map_pos);
         auto const *tile_type = config.db->tile_types.at("void");
-        if(map_pos.z % r_size.z == 0)
+        if(u_mod(map_pos.z, r_size.z) == 0)
         {
-            if(std::abs(map_pos.x % r_size.x) < 3 ||
-               std::abs(map_pos.x % r_size.x) > 5 ||
-               std::abs(map_pos.y % r_size.y) < 3 ||
-               std::abs(map_pos.y % r_size.y) > 5)
+            if(u_mod(map_pos.x, r_size.x) < 3 ||
+               u_mod(map_pos.x, r_size.x) > 5 ||
+               u_mod(map_pos.y, r_size.y) < 3 ||
+               u_mod(map_pos.y, r_size.y) > 5)
             {
                 tile_type = config.db->tile_types.at("stone_floor");
             }
         }
-        else if(map_pos.x % r_size.x == 0 || map_pos.y % r_size.y == 0)
+        else if(u_mod(map_pos.x, r_size.x) == 0 ||
+                u_mod(map_pos.y, r_size.y) == 0)
         {
-            if((std::abs(map_pos.z % r_size.z) == 1 && hash % 6 == 0) ||
-               (std::abs(map_pos.z % r_size.z) == 2 &&
+            if((u_mod(map_pos.z, r_size.z) == 1 && hash % 6 == 0) ||
+               (u_mod(map_pos.z, r_size.z) == 2 &&
                 std::hash<map::Pos>()(map_pos - map::Pos(0, 0, 1)) % 6 == 0))
             {
                 tile_type = config.db->tile_types.at("void");
