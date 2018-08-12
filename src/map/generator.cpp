@@ -22,6 +22,7 @@ Generator::Generator(PhysicsEngine &physics_engine, data::Config const &config) 
 void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
 {
     chunk.tiles.reserve(CHK_VOLUME);
+
     for(SizeT i = 0; i < CHK_VOLUME; ++i)
     {
         Vec3<U8> r_size = {8, 8, 4};
@@ -62,60 +63,49 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
 
     /* MESHING BEGINS */
     //TODO merge this with client version
+    {
+        SizeT worst_case_len = CHK_VOLUME / 2 +
+            (CHK_VOLUME % 2 == 0 ? 0 : 1);
+        /* this is the size of a checkerboard pattern, the worst case for this
+         * algorithm.
+         */
+        chunk.vertices.reserve(worst_case_len * 6 * 4); //TODO magic numbers
+        chunk.indices.reserve(worst_case_len * 6 * 6);  //
+    }
     
-    auto is_solid = [&](MapPos const &map_pos) -> bool
-    {
-        if(to_chk_pos(map_pos) != ChkPos(0, 0, 0)) return false;
-        return chunk.tiles[to_chk_idx(map_pos)].type->id != "void";
-    };
-
     I32 index_offset = 0;
-    const glm::vec3 quads[6][4] =
+    constexpr glm::vec3 quads[6][4] =
     {
-        {{0.0, 0.0, 0.0},
-         {0.0, 1.0, 0.0},
-         {0.0, 1.0, 1.0},
-         {0.0, 0.0, 1.0}},
-        {{1.0, 0.0, 0.0},
-         {1.0, 1.0, 0.0},
-         {1.0, 1.0, 1.0},
-         {1.0, 0.0, 1.0}},
-        {{0.0, 0.0, 0.0},
-         {1.0, 0.0, 0.0},
-         {1.0, 0.0, 1.0},
-         {0.0, 0.0, 1.0}},
-        {{0.0, 1.0, 0.0},
-         {1.0, 1.0, 0.0},
-         {1.0, 1.0, 1.0},
-         {0.0, 1.0, 1.0}},
-        {{0.0, 0.0, 0.0},
-         {1.0, 0.0, 0.0},
-         {1.0, 1.0, 0.0},
-         {0.0, 1.0, 0.0}},
-        {{0.0, 0.0, 1.0},
-         {1.0, 0.0, 1.0},
-         {1.0, 1.0, 1.0},
-         {0.0, 1.0, 1.0}}
+        {{0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 1.0, 1.0}, {0.0, 0.0, 1.0}},
+        {{1.0, 0.0, 0.0}, {1.0, 1.0, 0.0}, {1.0, 1.0, 1.0}, {1.0, 0.0, 1.0}},
+        {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {1.0, 0.0, 1.0}, {0.0, 0.0, 1.0}},
+        {{0.0, 1.0, 0.0}, {1.0, 1.0, 0.0}, {1.0, 1.0, 1.0}, {0.0, 1.0, 1.0}},
+        {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {1.0, 1.0, 0.0}, {0.0, 1.0, 0.0}},
+        {{0.0, 0.0, 1.0}, {1.0, 0.0, 1.0}, {1.0, 1.0, 1.0}, {0.0, 1.0, 1.0}}
+    };
+    constexpr MapPos offsets[6] =
+        {{-1,  0,  0}, { 1,  0,  0},
+         { 0, -1,  0}, { 0,  1,  0},
+         { 0,  0, -1}, { 0,  0,  1}};
+
+    auto is_solid = [&](IdxPos const &idx_pos) -> bool
+    {
+        return to_chk_pos(idx_pos) != ChkPos(0, 0, 0) ||
+               chunk.tiles[to_chk_idx(idx_pos)].type->id != "void";
     };
 
     for(SizeT i = 0; i < CHK_VOLUME; ++i)
     {
-        MapPos map_pos = to_map_pos({0, 0, 0}, i);
-        if(is_solid(map_pos))
+        IdxPos idx_pos = to_idx_pos(i);
+        if(chunk.tiles[to_chk_idx(idx_pos)].type->id != "void")
         {
-            const MapPos offsets[6] = {{-1,  0,  0},
-                                         { 1,  0,  0},
-                                         { 0, -1,  0},
-                                         { 0,  1,  0},
-                                         { 0,  0, -1},
-                                         { 0,  0,  1}};
             for(SizeT side = 0; side < 6; ++side)
             {
-                if(!is_solid(map_pos + offsets[side]))
+                if(!is_solid((MapPos)idx_pos + offsets[side]))
                 {
                     for(unsigned j = 0; j < 4; ++j)
                     {
-                        chunk.vertices.emplace_back((Vec3<F32>)map_pos +
+                        chunk.vertices.emplace_back((Vec3<F32>)idx_pos +
                                                     quads[side][j]);
                     }
                     for(auto const &idx : {0, 1, 2, 2, 3, 0})
@@ -127,18 +117,19 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
             }
         }
     }
+    chunk.vertices.shrink_to_fit();
+    chunk.indices.shrink_to_fit();
 
     if(chunk.vertices.size() != 0)
     {
-        chunk.triangles = new btTriangleIndexVertexArray(chunk.indices.size() / 3,
-                                                         chunk.indices.data(),
-                                                         sizeof(U32) * 3,
-                                                         chunk.vertices.size(),
-                                                         (F32 *)chunk.vertices.data(),
-                                                         sizeof(Vec3<F32>));
-        chunk.mesh = new btBvhTriangleMeshShape(chunk.triangles, true);
-        //TODO consider disabling compression for mesh (the bool), it should
-        //improve performance, with the cost of memory usage
+        chunk.triangles = new btTriangleIndexVertexArray(
+            chunk.indices.size() / 3,
+            chunk.indices.data(),
+            sizeof(U32) * 3,
+            chunk.vertices.size(),
+            (F32 *)chunk.vertices.data(),
+            sizeof(Vec3<F32>));
+        chunk.mesh = new btBvhTriangleMeshShape(chunk.triangles, false);
         physics_engine.add_shape(to_map_pos(pos, 0), chunk.mesh);
     }
 
