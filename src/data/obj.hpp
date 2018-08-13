@@ -30,6 +30,27 @@ const map::TileType stone_wall =
     map::TileType::WALL
 };
 
+const map::TileType raw_stone =
+{
+    "raw_stone",
+    "Raw Stone",
+    map::TileType::WALL
+};
+
+const map::TileType dirt =
+{
+    "dirt",
+    "Dirt",
+    map::TileType::WALL
+};
+
+const map::TileType grass =
+{
+    "grass",
+    "Grass",
+    map::TileType::WALL
+};
+
 const data::Database default_db =
 {
     {
@@ -38,7 +59,10 @@ const data::Database default_db =
     {
         {void_tile.id,  &void_tile},
         {stone_floor.id, &stone_floor},
-        {stone_wall.id, &stone_wall}
+        {stone_wall.id, &stone_wall},
+        {raw_stone.id, &raw_stone},
+        {dirt.id, &dirt},
+        {grass.id, &grass}
     },
 };
 
