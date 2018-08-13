@@ -40,7 +40,7 @@ class Player
 
     Set<ChkPos> loaded_chunks;
     Entity *entity;
-    Vec3<U16> view_range;
+    F32 load_range;
 
     bool sent_init;
     bool received_init;

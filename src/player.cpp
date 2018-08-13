@@ -19,7 +19,7 @@ Player::Player(data::Config const &conf, ENetPeer *peer, Entity &entity) :
     peer(peer),
     conf(conf),
     entity(&entity),
-    view_range(0, 0, 0),
+    load_range(1.f),
     sent_init(false),
     received_init(false)
 {
@@ -73,23 +73,27 @@ bool Player::send_signal(net::server::Packet &sp)
     {
         ChkPos iter;
         ChkPos center = to_chk_pos(glm::round(entity->get_pos()));
-        for(iter.z = center.z - view_range.z;
-            iter.z <= center.z + view_range.z;
+        for(iter.z = center.z - load_range;
+            iter.z <= center.z + load_range;
             ++iter.z)
         {
-            for(iter.y = center.y - view_range.y;
-                iter.y <= center.y + view_range.y;
+            for(iter.y = center.y - load_range;
+                iter.y <= center.y + load_range;
                 ++iter.y)
             {
-                for(iter.x = center.x - view_range.x;
-                    iter.x <= center.x + view_range.x;
+                for(iter.x = center.x - load_range;
+                    iter.x <= center.x + load_range;
                     ++iter.x)
                 {
                     if(loaded_chunks.count(iter) == 0)
                     {
-                        send_chunk(sp, iter);
-                        loaded_chunks.insert(iter);
-                        return true;
+                        if(glm::distance((Vec3<F32>)iter, (Vec3<F32>)center)
+                               <= load_range)
+                        {
+                            send_chunk(sp, iter);
+                            loaded_chunks.insert(iter);
+                            return true;
+                        }
                     }
                 }
             }
@@ -120,7 +124,7 @@ void Player::init_from_client(net::client::Init const &ci)
 
 void Player::change_config(net::client::Conf const &cc)
 {
-    view_range = cc.view_range;
+    load_range = cc.load_range;
 }
 
 Entity &Player::get_entity()
