@@ -1,6 +1,5 @@
 #pragma once
 
-#include <lux/util/num_gen.hpp>
 #include <lux/common/map.hpp>
 //
 #include <physics_engine.hpp>
@@ -14,14 +13,16 @@ struct Chunk;
 
 class Generator
 {
-    public:
+public:
     Generator(PhysicsEngine &physics_engine, data::Config const &config);
+    Generator(Generator const &that) = delete;
     Generator &operator=(Generator const &that) = delete;
 
     void generate_chunk(Chunk &chunk, ChkPos const &pos);
-    private:
+private:
+    void create_mesh(Chunk &chunk, ChkPos const &pos);
+
     data::Config const &config;
-    util::NumGen num_gen;
     PhysicsEngine &physics_engine;
 };
 

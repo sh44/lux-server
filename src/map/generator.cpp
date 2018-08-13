@@ -2,8 +2,10 @@
 #include <functional>
 //
 #include <glm/glm.hpp>
+#include <glm/gtc/noise.hpp>
 //
 #include <lux/alias/scalar.hpp>
+#include <lux/alias/vec_2.hpp>
 #include <lux/alias/vec_3.hpp>
 //
 #include <data/database.hpp>
@@ -59,10 +61,41 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
                 tile_type = config.db->tile_types.at("stone_wall");
             }
         }
+        F32 h1 = (glm::simplex((Vec2<F32>)map_pos * 0.01f) * 10.f) - 25.f;
+        F32 h2 = std::pow(glm::simplex((Vec2<F32>)map_pos * 0.005f), 2);
+        if(map_pos.z > h1 && map_pos.z < h1 + 20.f)
+        {
+            if(map_pos.z > h1 + 13.f)
+            {
+                if(map_pos.z > h1 + 19.f)
+                {
+                    tile_type = config.db->tile_types.at("grass");
+                }
+                else
+                {
+                    tile_type = config.db->tile_types.at("dirt");
+                }
+            }
+            else
+            {
+                tile_type = config.db->tile_types.at("raw_stone");
+            }
+        }
+        else if(map_pos.z >= h1 + 20.f)
+        {
+            tile_type = config.db->tile_types.at("void");
+        }
+        if(h2 > 0.92f && map_pos.z > h1 - 20.f)
+        {
+            tile_type = config.db->tile_types.at("void");
+        }
         chunk.tiles[i] = tile_type;
     }
+    create_mesh(chunk, pos);
+}
 
-    /* MESHING BEGINS */
+void Generator::create_mesh(Chunk &chunk, ChkPos const &pos)
+{
     //TODO merge this with client version
     {
         SizeT worst_case_len = CHK_VOLUME / 2 +
@@ -135,7 +168,6 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
         physics_engine.add_shape(to_map_pos(pos, 0), chunk.mesh);
     }
 
-    /* MESHING ENDS */
 }
 
 }
