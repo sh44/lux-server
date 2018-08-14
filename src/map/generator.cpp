@@ -17,9 +17,8 @@
 namespace map
 {
 
-Generator::Generator(PhysicsEngine &physics_engine, data::Config const &config) :
-    config(config),
-    physics_engine(physics_engine)
+Generator::Generator(data::Config const &config) :
+    config(config)
 {
 
 }
@@ -88,84 +87,6 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
         }
         chunk.tiles[i] = tile_type;
     }
-    create_mesh(chunk, pos);
-}
-
-void Generator::create_mesh(Chunk &chunk, ChkPos const &pos)
-{
-    //TODO merge this with client version
-    {
-        SizeT worst_case_len = CHK_VOLUME / 2 +
-            (CHK_VOLUME % 2 == 0 ? 0 : 1);
-        /* this is the size of a checkerboard pattern, the worst case for this
-         * algorithm.
-         */
-        chunk.vertices.reserve(worst_case_len * 6 * 4); //TODO magic numbers
-        chunk.indices.reserve(worst_case_len * 6 * 6);  //
-    }
-    
-    I32 index_offset = 0;
-    constexpr glm::vec3 quads[6][4] =
-    {
-        {{0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 1.0, 1.0}, {0.0, 0.0, 1.0}},
-        {{1.0, 0.0, 0.0}, {1.0, 1.0, 0.0}, {1.0, 1.0, 1.0}, {1.0, 0.0, 1.0}},
-        {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {1.0, 0.0, 1.0}, {0.0, 0.0, 1.0}},
-        {{0.0, 1.0, 0.0}, {1.0, 1.0, 0.0}, {1.0, 1.0, 1.0}, {0.0, 1.0, 1.0}},
-        {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {1.0, 1.0, 0.0}, {0.0, 1.0, 0.0}},
-        {{0.0, 0.0, 1.0}, {1.0, 0.0, 1.0}, {1.0, 1.0, 1.0}, {0.0, 1.0, 1.0}}
-    };
-    constexpr MapPos offsets[6] =
-        {{-1,  0,  0}, { 1,  0,  0},
-         { 0, -1,  0}, { 0,  1,  0},
-         { 0,  0, -1}, { 0,  0,  1}};
-
-    tile::Id void_id = config.db->get_tile_id("void");
-    auto is_solid = [&](IdxPos const &idx_pos) -> bool
-    {
-        return to_chk_pos(idx_pos) == ChkPos(0, 0, 0) &&
-               chunk.tiles[to_chk_idx(idx_pos)]->id != void_id;
-    };
-
-    for(SizeT i = 0; i < CHK_VOLUME; ++i)
-    {
-        IdxPos idx_pos = to_idx_pos(i);
-        if(chunk.tiles[to_chk_idx(idx_pos)]->id != void_id)
-        {
-            for(SizeT side = 0; side < 6; ++side)
-            {
-                if(!is_solid((MapPos)idx_pos + offsets[side]))
-                {
-                    for(unsigned j = 0; j < 4; ++j)
-                    {
-                        chunk.vertices.emplace_back((Vec3<F32>)idx_pos +
-                                                    quads[side][j]);
-                    }
-                    for(auto const &idx : {0, 1, 2, 2, 3, 0})
-                    {
-                        chunk.indices.emplace_back(idx + index_offset);
-                    }
-                    index_offset += 4;
-                }
-            }
-        }
-    }
-    chunk.vertices.shrink_to_fit();
-    chunk.indices.shrink_to_fit();
-
-    if(chunk.vertices.size() != 0)
-    {
-        chunk.triangles = new btTriangleIndexVertexArray(
-            chunk.indices.size() / 3,
-            chunk.indices.data(),
-            sizeof(U32) * 3,
-            chunk.vertices.size(),
-            (F32 *)chunk.vertices.data(),
-            sizeof(Vec3<F32>));
-        chunk.mesh = new btBvhTriangleMeshShape(chunk.triangles, false,
-                {0.0, 0.0, 0.0}, {CHK_SIZE.x, CHK_SIZE.y, CHK_SIZE.z});
-        physics_engine.add_shape(to_map_pos(pos, 0), chunk.mesh);
-    }
-
 }
 
 }

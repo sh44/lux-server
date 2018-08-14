@@ -7,7 +7,7 @@
 #include <map/generator.hpp>
 #include <physics_engine.hpp>
 
-namespace data { struct Config; }
+namespace data { struct Config; class Database; }
 
 class Map
 {
@@ -25,9 +25,13 @@ class Map
 
     void guarantee_chunk(ChkPos const &pos) const;
     private:
+    void try_mesh(ChkPos const &pos) const;
     map::Chunk &load_chunk(ChkPos const &pos) const;
     ChunkIterator unload_chunk(ChunkIterator const &iter) const;
 
     mutable HashMap<ChkPos, map::Chunk> chunks;
     mutable map::Generator generator;
+
+    data::Database const &db;
+    PhysicsEngine &physics_engine;
 };

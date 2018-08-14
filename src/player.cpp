@@ -110,7 +110,7 @@ void Player::send_chunk(net::server::Packet &sp, ChkPos const &pos)
     chunk.pos = pos;
     for(ChkIdx i = 0; i < CHK_VOLUME; ++i)
     {
-        chunk.tiles[i].id = world_chunk.tiles[i]->id;
+        chunk.tile_ids[i] = world_chunk.tiles[i]->id;
     }
 }
 
