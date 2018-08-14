@@ -127,7 +127,7 @@ void Generator::create_mesh(Chunk &chunk, ChkPos const &pos)
 
     auto is_solid = [&](IdxPos const &idx_pos) -> bool
     {
-        return to_chk_pos(idx_pos) != ChkPos(0, 0, 0) ||
+        return to_chk_pos(idx_pos) == ChkPos(0, 0, 0) &&
                chunk.tiles[to_chk_idx(idx_pos)]->id != "void";
     };
 
