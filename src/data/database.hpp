@@ -6,6 +6,9 @@
 #include <lux/alias/string.hpp>
 #include <lux/common/tile.hpp>
 #include <lux/common/entity.hpp>
+//
+#include <map/tile_type.hpp>
+#include <entity/type.hpp>
 
 namespace entity { struct Type; }
 namespace map    { struct TileType; }
