@@ -3,9 +3,9 @@
 ## Building
 
 Required libraries
-  * enet
-  * bullet physics
-
+  * ENet
+  * Bullet Physics
+  * GLM
 ```
 mkdir build
 cd build
