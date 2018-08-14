@@ -61,8 +61,11 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
                 tile_type = config.db->tile_types.at("stone_wall");
             }
         }
-        F32 h1 = (glm::simplex((Vec2<F32>)map_pos * 0.01f) * 10.f) - 25.f;
-        F32 h2 = std::pow(glm::simplex((Vec2<F32>)map_pos * 0.005f), 2);
+        Vec2<F32> centered_pos = (Vec2<F32>)map_pos + Vec2<F32>(0.5, 0.5);
+        Vec2<F32> h1_seed = centered_pos + Vec2<F32>(0, 0);
+        Vec2<F32> h2_seed = centered_pos + Vec2<F32>(1203.f, -102.f);
+        F32 h1 = (glm::simplex(h1_seed * 0.01f) * 10.f) - 25.f;
+        F32 h2 = std::pow(glm::simplex(h2_seed * 0.005f), 2);
         if(map_pos.z > h1 && map_pos.z < h1 + 20.f)
         {
             if(map_pos.z > h1 + 13.f)
