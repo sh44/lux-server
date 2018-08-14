@@ -82,7 +82,7 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
         {
             tile_type = &config.db->get_tile("void");
         }
-        if(h2 > 0.92f && map_pos.z > h1 - 20.f)
+        if(h2 > 0.85f && map_pos.z > h1 - 20.f)
         {
             tile_type = &config.db->get_tile("void");
         }
