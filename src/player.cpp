@@ -110,7 +110,7 @@ void Player::send_chunk(net::server::Packet &sp, ChkPos const &pos)
     chunk.pos = pos;
     for(ChkIdx i = 0; i < CHK_VOLUME; ++i)
     {
-        chunk.tiles[i].db_hash = std::hash<String>()(world_chunk.tiles[i]->id);
+        chunk.tiles[i].id = world_chunk.tiles[i]->id;
     }
 }
 

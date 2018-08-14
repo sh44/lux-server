@@ -16,6 +16,7 @@
 #include <lux/net/server/packet.hpp>
 #include <lux/net/client/packet.hpp>
 //
+#include <data/database.hpp>
 #include <data/config.hpp>
 #include <player.hpp>
 #include <world.hpp>
@@ -45,6 +46,7 @@ private:
     std::thread        thread;
     ENetAddress        enet_address;
     ENetHost          *enet_server;
+    data::Database     db;
     data::Config       config;
     util::TickClock    tick_clock;
     World              world;

@@ -36,16 +36,10 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
         };
         MapPos map_pos = to_map_pos(pos, i);
         auto hash = std::hash<MapPos>()(map_pos);
-        auto const *tile_type = config.db->tile_types.at("void");
+        auto const *tile_type = &config.db->get_tile("void");
         if(u_mod(map_pos.z, r_size.z) == 0)
         {
-            if(u_mod(map_pos.x, r_size.x) < 3 ||
-               u_mod(map_pos.x, r_size.x) > 5 ||
-               u_mod(map_pos.y, r_size.y) < 3 ||
-               u_mod(map_pos.y, r_size.y) > 5)
-            {
-                tile_type = config.db->tile_types.at("stone_floor");
-            }
+            tile_type = &config.db->get_tile("stone_floor");
         }
         else if(u_mod(map_pos.x, r_size.x) == 0 ||
                 u_mod(map_pos.y, r_size.y) == 0)
@@ -54,11 +48,11 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
                (u_mod(map_pos.z, r_size.z) == 2 &&
                 std::hash<MapPos>()(map_pos - MapPos(0, 0, 1)) % 6 == 0))
             {
-                tile_type = config.db->tile_types.at("void");
+                tile_type = &config.db->get_tile("void");
             }
             else
             {
-                tile_type = config.db->tile_types.at("stone_wall");
+                tile_type = &config.db->get_tile("stone_wall");
             }
         }
         Vec2<F32> centered_pos = (Vec2<F32>)map_pos + Vec2<F32>(0.5, 0.5);
@@ -72,25 +66,25 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
             {
                 if(map_pos.z > h1 + 19.f)
                 {
-                    tile_type = config.db->tile_types.at("grass");
+                    tile_type = &config.db->get_tile("grass");
                 }
                 else
                 {
-                    tile_type = config.db->tile_types.at("dirt");
+                    tile_type = &config.db->get_tile("dirt");
                 }
             }
             else
             {
-                tile_type = config.db->tile_types.at("raw_stone");
+                tile_type = &config.db->get_tile("raw_stone");
             }
         }
         else if(map_pos.z >= h1 + 20.f)
         {
-            tile_type = config.db->tile_types.at("void");
+            tile_type = &config.db->get_tile("void");
         }
         if(h2 > 0.92f && map_pos.z > h1 - 20.f)
         {
-            tile_type = config.db->tile_types.at("void");
+            tile_type = &config.db->get_tile("void");
         }
         chunk.tiles[i] = tile_type;
     }
@@ -125,16 +119,17 @@ void Generator::create_mesh(Chunk &chunk, ChkPos const &pos)
          { 0, -1,  0}, { 0,  1,  0},
          { 0,  0, -1}, { 0,  0,  1}};
 
+    tile::Id void_id = config.db->get_tile_id("void");
     auto is_solid = [&](IdxPos const &idx_pos) -> bool
     {
         return to_chk_pos(idx_pos) == ChkPos(0, 0, 0) &&
-               chunk.tiles[to_chk_idx(idx_pos)]->id != "void";
+               chunk.tiles[to_chk_idx(idx_pos)]->id != void_id;
     };
 
     for(SizeT i = 0; i < CHK_VOLUME; ++i)
     {
         IdxPos idx_pos = to_idx_pos(i);
-        if(chunk.tiles[to_chk_idx(idx_pos)]->id != "void")
+        if(chunk.tiles[to_chk_idx(idx_pos)]->id != void_id)
         {
             for(SizeT side = 0; side < 6; ++side)
             {
