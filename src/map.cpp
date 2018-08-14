@@ -141,12 +141,15 @@ map::Chunk &Map::load_chunk(ChkPos const &pos) const
     chunks.emplace(pos, map::Chunk());
     map::Chunk &chunk = chunks.at(pos);
     generator.generate_chunk(chunk, pos);
-    try_mesh(pos + ChkPos(-1,  0,  0)); //TODO loop
-    try_mesh(pos + ChkPos( 1,  0,  0));
-    try_mesh(pos + ChkPos( 0, -1,  0));
-    try_mesh(pos + ChkPos( 0,  1,  0));
-    try_mesh(pos + ChkPos( 0,  0, -1));
-    try_mesh(pos + ChkPos( 0,  0,  1));
+    constexpr ChkPos offsets[6] =
+        {{-1,  0,  0}, { 1,  0,  0},
+         { 0, -1,  0}, { 0,  1,  0},
+         { 0,  0, -1}, { 0,  0,  1}};
+
+    for(SizeT side = 0; side < 6; ++side)
+    {
+        try_mesh(pos + offsets[side]);
+    }
     return chunk;
 }
 
