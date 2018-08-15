@@ -15,6 +15,7 @@ namespace net::client
     struct Conf;
 }
 namespace net::server { struct Packet; }
+namespace map { struct Chunk; }
 
 class Entity;
 
@@ -28,7 +29,8 @@ class Player
     void receive(net::client::Packet const &);
     void send_tick(net::server::Packet &) const;
     bool send_signal(net::server::Packet &);
-    void send_chunk(net::server::Packet &, ChkPos const &pos);
+    bool send_chunks(net::server::Packet &);
+    void send_chunk(net::server::Packet &, map::Chunk const &, ChkPos const &pos);
     Entity &get_entity();
 
     ENetPeer *peer;

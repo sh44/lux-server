@@ -71,42 +71,51 @@ bool Player::send_signal(net::server::Packet &sp)
     }
     else
     {
-        ChkPos iter;
-        ChkPos center = to_chk_pos(glm::round(entity->get_pos()));
-        for(iter.z = center.z - load_range;
-            iter.z <= center.z + load_range;
-            ++iter.z)
+        if(send_chunks(sp)) return true;
+    }
+    return false;
+}
+
+bool Player::send_chunks(net::server::Packet &sp)
+{
+    bool is_sending = false;
+    ChkPos iter;
+    ChkPos center = to_chk_pos(glm::round(entity->get_pos()));
+    for(iter.z = center.z - load_range;
+        iter.z <= center.z + load_range;
+        ++iter.z)
+    {
+        for(iter.y = center.y - load_range;
+            iter.y <= center.y + load_range;
+            ++iter.y)
         {
-            for(iter.y = center.y - load_range;
-                iter.y <= center.y + load_range;
-                ++iter.y)
+            for(iter.x = center.x - load_range;
+                iter.x <= center.x + load_range;
+                ++iter.x)
             {
-                for(iter.x = center.x - load_range;
-                    iter.x <= center.x + load_range;
-                    ++iter.x)
+                if(loaded_chunks.count(iter) == 0)
                 {
-                    if(loaded_chunks.count(iter) == 0)
+                    if(glm::distance((Vec3<F32>)iter, (Vec3<F32>)center)
+                           <= load_range)
                     {
-                        if(glm::distance((Vec3<F32>)iter, (Vec3<F32>)center)
-                               <= load_range)
-                        {
-                            send_chunk(sp, iter);
-                            loaded_chunks.insert(iter);
-                            return true;
-                        }
+                        auto const &chunk =
+                            entity->world.get_chunk(iter);
+                        send_chunk(sp, chunk, iter);
+                        loaded_chunks.insert(iter);
+                        is_sending = true;
                     }
                 }
             }
         }
     }
-    return false;
+    return is_sending;
 }
 
-void Player::send_chunk(net::server::Packet &sp, ChkPos const &pos)
+void Player::send_chunk(net::server::Packet &sp, map::Chunk const &world_chunk,
+                        ChkPos const &pos)
 {
     sp.type = net::server::Packet::MAP;
     auto &chunk = sp.map.chunks.emplace_back();
-    auto const &world_chunk = entity->world.get_chunk(pos);
     chunk.pos = pos;
     for(ChkIdx i = 0; i < CHK_VOLUME; ++i)
     {
