@@ -67,6 +67,7 @@ void Map::try_mesh(ChkPos const &pos) const
          { 0, -1,  0}, { 0,  1,  0},
          { 0,  0, -1}, { 0,  0,  1}};
 
+    if(chunks.count(pos) == 0) return;
     for(SizeT side = 0; side < 6; ++side)
     {
         if(chunks.count(pos + (ChkPos)offsets[side]) == 0) return;
