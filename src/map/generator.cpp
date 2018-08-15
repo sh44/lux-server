@@ -25,63 +25,50 @@ Generator::Generator(data::Config const &config) :
 
 void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
 {
+    Vec2<ChkCoord> h_pos = Vec2<ChkCoord>(pos);
+    if(height_map.count(h_pos) == 0)
+    {
+        height_map[h_pos];
+        for(SizeT i = 0; i < CHK_VOLUME; ++i)
+        {
+            MapPos map_pos = to_map_pos(pos, i);
+            Vec2<F32> c_pos = (Vec2<F32>)map_pos + Vec2<F32>(0.5f, 0.5f);
+            F32 o1 = glm::simplex(c_pos * 0.01f);
+            F32 o2 = glm::simplex(c_pos * 0.04f);
+            F32 o3 = glm::simplex(c_pos * 0.08f);
+            height_map[pos][i] =
+                std::pow((o1 + o2 * 0.5f + o3 * 0.25f) / 1.75f, 3.f)
+                * 40.f - 25.f;
+        }
+    }
     for(SizeT i = 0; i < CHK_VOLUME; ++i)
     {
-        Vec3<U8> r_size = {8, 8, 4};
-        auto u_mod = [&](MapCoord c, U8 s) -> U8
-        {
-            //TODO make more general functions from this and chunk:: functions
-            return (*(std::make_unsigned<MapCoord>::type *)(&c)) % s;
-        };
         MapPos map_pos = to_map_pos(pos, i);
-        auto hash = std::hash<MapPos>()(map_pos);
         auto const *tile_type = &config.db->get_tile("void");
-        if(u_mod(map_pos.z, r_size.z) == 0)
+        F32 h = height_map[pos][i];
+        if(map_pos.z <= h)
         {
-            tile_type = &config.db->get_tile("stone_floor");
-        }
-        else if(u_mod(map_pos.x, r_size.x) == 0 ||
-                u_mod(map_pos.y, r_size.y) == 0)
-        {
-            if((u_mod(map_pos.z, r_size.z) == 1 && hash % 6 == 0) ||
-               (u_mod(map_pos.z, r_size.z) == 2 &&
-                std::hash<MapPos>()(map_pos - MapPos(0, 0, 1)) % 6 == 0))
-            {
-                tile_type = &config.db->get_tile("void");
-            }
-            else
-            {
-                tile_type = &config.db->get_tile("stone_wall");
-            }
-        }
-        Vec2<F32> centered_pos = (Vec2<F32>)map_pos + Vec2<F32>(0.5, 0.5);
-        Vec2<F32> h1_seed = centered_pos + Vec2<F32>(0, 0);
-        Vec2<F32> h2_seed = centered_pos + Vec2<F32>(1203.f, -102.f);
-        F32 h1 = (glm::simplex(h1_seed * 0.01f) * 10.f) - 25.f;
-        F32 h2 = std::pow(glm::simplex(h2_seed * 0.005f), 2);
-        if(map_pos.z > h1 && map_pos.z < h1 + 20.f)
-        {
-            if(map_pos.z > h1 + 13.f)
-            {
-                if(map_pos.z > h1 + 19.f)
-                {
-                    tile_type = &config.db->get_tile("grass");
-                }
-                else
-                {
-                    tile_type = &config.db->get_tile("dirt");
-                }
-            }
-            else
+            if(map_pos.z < h - 5.f)
             {
                 tile_type = &config.db->get_tile("raw_stone");
             }
+            else
+            {
+                if(std::hash<F32>()(h) % 32 == 0)
+                {
+                    tile_type = &config.db->get_tile("dirt");
+                }
+                else if(std::hash<F32>()(h) % 8 == 0)
+                {
+                    tile_type = &config.db->get_tile("gravel");
+                }
+                else
+                {
+                    tile_type = &config.db->get_tile("raw_stone");
+                }
+            }
         }
-        else if(map_pos.z >= h1 + 20.f)
-        {
-            tile_type = &config.db->get_tile("void");
-        }
-        if(h2 > 0.85f && map_pos.z > h1 - 20.f)
+        else
         {
             tile_type = &config.db->get_tile("void");
         }

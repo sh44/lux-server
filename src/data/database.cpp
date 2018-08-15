@@ -13,6 +13,7 @@ Database::Database()
     add_tile("stone_wall", "Stone Wall", map::TileType::WALL);
     add_tile("raw_stone", "Raw Stone", map::TileType::WALL);
     add_tile("dirt", "Dirt", map::TileType::WALL);
+    add_tile("gravel", "Gravel", map::TileType::WALL);
     add_tile("grass", "Grass", map::TileType::WALL);
 }
 
