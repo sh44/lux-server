@@ -68,12 +68,14 @@ void Map::try_mesh(ChkPos const &pos) const
          { 0,  0, -1}, { 0,  0,  1}};
 
     if(chunks.count(pos) == 0) return;
+    map::Chunk &chunk = chunks.at(pos);
+    if(chunk.mesh != nullptr) return;
     for(SizeT side = 0; side < 6; ++side)
     {
         if(chunks.count(pos + (ChkPos)offsets[side]) == 0) return;
         /* surrounding chunks need to be loaded to mesh */
     }
-    map::Chunk &chunk = chunks.at(pos);
+
     chunk.mesh = new map::Mesh();
     map::Mesh &mesh = *chunk.mesh;
     {
@@ -133,7 +135,9 @@ void Map::try_mesh(ChkPos const &pos) const
         mesh.bt_mesh = new btBvhTriangleMeshShape(mesh.bt_trigs, false,
                 {0.0, 0.0, 0.0}, {CHK_SIZE.x, CHK_SIZE.y, CHK_SIZE.z});
         physics_engine.add_shape(to_map_pos(pos, 0), mesh.bt_mesh);
+        chunk.has_mesh = true;
     }
+    else chunk.has_mesh = false;
 }
 
 map::Chunk &Map::load_chunk(ChkPos const &pos) const

@@ -15,11 +15,12 @@ struct Chunk
     Array<TileType const *, CHK_VOLUME> tiles;
 
     Mesh *mesh;
+    bool has_mesh;
 
-    Chunk() : mesh(nullptr) { }
+    Chunk() : mesh(nullptr), has_mesh(false) { }
     ~Chunk()
     {
-        if(mesh      != nullptr) delete mesh;
+        if(mesh != nullptr) delete mesh;
     }
 };
 
