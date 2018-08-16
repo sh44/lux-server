@@ -51,6 +51,11 @@ void Map::guarantee_chunk(ChkPos const &pos) const
     get_chunk(pos);
 }
 
+void Map::guarantee_mesh(ChkPos const &pos) const
+{
+    try_mesh(pos);
+}
+
 void Map::try_mesh(ChkPos const &pos) const
 {
     constexpr glm::vec3 quads[6][4] =
@@ -151,10 +156,6 @@ map::Chunk &Map::load_chunk(ChkPos const &pos) const
          { 0, -1,  0}, { 0,  1,  0},
          { 0,  0, -1}, { 0,  0,  1}};
 
-    for(SizeT side = 0; side < 6; ++side)
-    {
-        try_mesh(pos + offsets[side]);
-    }
     return chunk;
 }
 

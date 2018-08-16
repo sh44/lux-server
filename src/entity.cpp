@@ -29,6 +29,7 @@ void Entity::update()
             for(iter.x = center.x - 1; iter.x <= center.x + 1; ++iter.x)
             {
                 world.guarantee_chunk(iter);
+                world.guarantee_mesh(iter);
             }
         }
     }
