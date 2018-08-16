@@ -1,6 +1,6 @@
 #pragma once
 
-#include <lux/alias/hash_map.hpp>
+#include <lux/alias/pos_map.hpp>
 #include <lux/common/map.hpp>
 //
 #include <map/chunk.hpp>
@@ -11,7 +11,7 @@ namespace data { struct Config; class Database; }
 
 class Map
 {
-    typedef HashMap<ChkPos, map::Chunk>::iterator ChunkIterator;
+    typedef PosMap<ChkPos, map::Chunk>::iterator ChunkIterator;
     public:
     Map(PhysicsEngine &physics_engine, data::Config const &config);
     Map(Map const &that) = delete;
@@ -30,7 +30,7 @@ class Map
     map::Chunk &load_chunk(ChkPos const &pos) const;
     ChunkIterator unload_chunk(ChunkIterator const &iter) const;
 
-    mutable HashMap<ChkPos, map::Chunk> chunks;
+    mutable PosMap<ChkPos, map::Chunk> chunks;
     mutable map::Generator generator;
 
     data::Database const &db;
