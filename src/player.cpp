@@ -47,6 +47,10 @@ void Player::receive(net::client::Packet const &cp)
         if(cp.tick.is_moving)  entity->move({h_dir.x, h_dir.y, 0.0});
         if(cp.tick.is_jumping) entity->jump();
     }
+    else if(cp.type == net::client::Packet::CONF)
+    {
+        change_config(cp.conf);
+    }
 }
 
 void Player::send_tick(net::server::Packet &sp) const
@@ -133,6 +137,8 @@ void Player::init_from_client(net::client::Init const &ci)
 
 void Player::change_config(net::client::Conf const &cc)
 {
+    util::log("PLAYER", util::INFO, "changing config");
+    util::log("PLAYER", util::INFO, "load range: %.2f", cc.load_range);
     load_range = cc.load_range;
 }
 
