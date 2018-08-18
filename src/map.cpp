@@ -151,11 +151,6 @@ map::Chunk &Map::load_chunk(ChkPos const &pos) const
     chunks.emplace(pos, map::Chunk());
     map::Chunk &chunk = chunks.at(pos);
     generator.generate_chunk(chunk, pos);
-    constexpr ChkPos offsets[6] =
-        {{-1,  0,  0}, { 1,  0,  0},
-         { 0, -1,  0}, { 0,  1,  0},
-         { 0,  0, -1}, { 0,  0,  1}};
-
     return chunk;
 }
 
