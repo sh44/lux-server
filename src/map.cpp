@@ -58,24 +58,12 @@ void Map::guarantee_mesh(ChkPos const &pos) const
 
 void Map::try_mesh(ChkPos const &pos) const
 {
-    constexpr glm::vec3 quads[6][4] =
-    {
-        {{0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 1.0, 1.0}, {0.0, 0.0, 1.0}},
-        {{1.0, 0.0, 0.0}, {1.0, 1.0, 0.0}, {1.0, 1.0, 1.0}, {1.0, 0.0, 1.0}},
-        {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {1.0, 0.0, 1.0}, {0.0, 0.0, 1.0}},
-        {{0.0, 1.0, 0.0}, {1.0, 1.0, 0.0}, {1.0, 1.0, 1.0}, {0.0, 1.0, 1.0}},
-        {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {1.0, 1.0, 0.0}, {0.0, 1.0, 0.0}},
-        {{0.0, 0.0, 1.0}, {1.0, 0.0, 1.0}, {1.0, 1.0, 1.0}, {0.0, 1.0, 1.0}}
-    };
-    constexpr MapPos offsets[6] =
-        {{-1,  0,  0}, { 1,  0,  0},
-         { 0, -1,  0}, { 0,  1,  0},
-         { 0,  0, -1}, { 0,  0,  1}};
+    constexpr MapPos offsets[6] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
 
     if(chunks.count(pos) == 0) return;
     map::Chunk &chunk = chunks.at(pos);
     if(chunk.mesh != nullptr) return;
-    for(SizeT side = 0; side < 6; ++side)
+    for(SizeT side = 0; side < 3; ++side)
     {
         if(chunks.count(pos + (ChkPos)offsets[side]) == 0) return;
         /* surrounding chunks need to be loaded to mesh */
@@ -84,8 +72,7 @@ void Map::try_mesh(ChkPos const &pos) const
     chunk.mesh = new map::Mesh();
     map::Mesh &mesh = *chunk.mesh;
     {
-        SizeT worst_case_len = CHK_VOLUME / 2 +
-            (CHK_VOLUME % 2 == 0 ? 0 : 1);
+        SizeT worst_case_len = CHK_VOLUME / 2;
         /* this is the size of a checkerboard pattern, the worst case for this
          * algorithm.
          */
@@ -96,35 +83,33 @@ void Map::try_mesh(ChkPos const &pos) const
     I32 index_offset = 0;
     tile::Id void_id = db.get_tile_id("void");
 
-    auto is_solid = [&] (MapPos const &pos)
+    MapPos base_pos = to_map_pos(pos, 0);
+    auto has_face = [&] (MapPos const &a, MapPos const &b) -> bool
     {
-        return chunks[to_chk_pos(pos)].tiles[to_chk_idx(pos)]->id != void_id;
+        //TODO use current chunk to reduce to_chk_* calls, and chunks access
+        return (chunks[to_chk_pos(a)].tiles[to_chk_idx(a)]->id == void_id) !=
+               (chunks[to_chk_pos(b)].tiles[to_chk_idx(b)]->id == void_id);
+    };
+    auto add_quad = [&] (Vec3<U32> const &base, U32 plane, ChkIdx chk_idx,
+                         Vec3<U32> const &f_side, Vec3<U32> const &s_side)
+    {
+        (void)plane;
+        (void)chk_idx;
+        for(U32 vert_i = 0; vert_i <= 0b11; ++vert_i) {
+            Vec2<U32> offset = {vert_i & 0b01, (vert_i & 0b10) >> 1};
+            mesh.vertices.emplace_back(
+                (glm::vec3)(base + (offset.x * f_side) + (offset.y * s_side)));
+        }
+
+        for(auto const &r_idx : {2, 1, 0, 3, 1, 2})
+        {
+            mesh.indices.emplace_back(r_idx + index_offset);
+        }
+        index_offset += 4;
     };
 
-    for(SizeT i = 0; i < CHK_VOLUME; ++i)
-    {
-        MapPos map_pos = to_map_pos(pos, i);
-        if(is_solid(map_pos))
-        {
-            IdxPos idx_pos = to_idx_pos(i);
-            for(SizeT side = 0; side < 6; ++side)
-            {
-                if(!is_solid(map_pos + offsets[side]))
-                {
-                    for(unsigned j = 0; j < 4; ++j)
-                    {
-                        mesh.vertices.emplace_back((Vec3<F32>)idx_pos +
-                                                   quads[side][j]);
-                    }
-                    for(auto const &idx : {0, 1, 2, 2, 3, 0})
-                    {
-                        mesh.indices.emplace_back(idx + index_offset);
-                    }
-                    index_offset += 4;
-                }
-            }
-        }
-    }
+    build_chunk_mesh(pos, has_face, add_quad);
+
     mesh.vertices.shrink_to_fit();
     mesh.indices.shrink_to_fit();
 
@@ -139,7 +124,7 @@ void Map::try_mesh(ChkPos const &pos) const
             sizeof(Vec3<F32>));
         mesh.bt_mesh = new btBvhTriangleMeshShape(mesh.bt_trigs, false,
                 {0.0, 0.0, 0.0}, {CHK_SIZE.x, CHK_SIZE.y, CHK_SIZE.z});
-        physics_engine.add_shape(to_map_pos(pos, 0), mesh.bt_mesh);
+        physics_engine.add_shape(base_pos, mesh.bt_mesh);
         chunk.has_mesh = true;
     }
     else chunk.has_mesh = false;
