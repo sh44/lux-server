@@ -53,32 +53,36 @@ void Map::guarantee_chunk(ChkPos const &pos) const
 
 void Map::guarantee_mesh(ChkPos const &pos) const
 {
+    //TODO do checks here
     try_mesh(pos);
 }
 
 void Map::try_mesh(ChkPos const &pos) const
 {
-    constexpr MapPos offsets[6] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+    //TODO template constant?
+    constexpr MapPos offsets[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
 
     if(chunks.count(pos) == 0) return;
     map::Chunk &chunk = chunks.at(pos);
     if(chunk.mesh != nullptr) return;
-    for(SizeT side = 0; side < 3; ++side)
-    {
-        if(chunks.count(pos + (ChkPos)offsets[side]) == 0) return;
-        /* surrounding chunks need to be loaded to mesh */
+    for(SizeT a = 0; a < 3; ++a) {
+        /* surrounding chunks need to be loaded to mesh, contrary to the
+         * client's version, we want to load the physics mesh ASAP, so we don't
+         * care about asymmetry */
+        if(chunks.count(pos + (ChkPos)offsets[a]) == 0) return;
     }
 
     chunk.mesh = new map::Mesh();
+    build_mesh(chunk, pos);
+}
+
+void Map::build_mesh(map::Chunk &chunk, ChkPos const &pos) const
+{
+    constexpr MapPos offsets[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
     map::Mesh &mesh = *chunk.mesh;
-    {
-        SizeT worst_case_len = CHK_VOLUME / 2;
-        /* this is the size of a checkerboard pattern, the worst case for this
-         * algorithm.
-         */
-        mesh.vertices.reserve(worst_case_len * 6 * 4); //TODO magic numbers
-        mesh.indices.reserve(worst_case_len * 6 * 6);  //
-    }
+    /* this is the size of a checkerboard pattern, worst case */
+    mesh.vertices.reserve(CHK_VOLUME * 3 * 4);
+    mesh.indices.reserve(CHK_VOLUME * 3 * 6);
 
     I32 index_offset = 0;
     tile::Id void_id = db.get_tile_id("void");
@@ -90,31 +94,96 @@ void Map::try_mesh(ChkPos const &pos) const
         return (chunks[to_chk_pos(a)].tiles[to_chk_idx(a)]->id == void_id) !=
                (chunks[to_chk_pos(b)].tiles[to_chk_idx(b)]->id == void_id);
     };
-    auto add_quad = [&] (Vec3<U32> const &base, U32 plane, ChkIdx chk_idx,
-                         Vec3<U32> const &f_side, Vec3<U32> const &s_side)
-    {
-        (void)plane;
-        (void)chk_idx;
-        for(U32 vert_i = 0; vert_i <= 0b11; ++vert_i) {
-            Vec2<U32> offset = {vert_i & 0b01, (vert_i & 0b10) >> 1};
-            mesh.vertices.emplace_back(
-                (glm::vec3)(base + (offset.x * f_side) + (offset.y * s_side)));
+
+    bool face_map[3][CHK_VOLUME];
+    for(U32 a = 0; a < 3; ++a) {
+        for(U32 i = 0; i < CHK_VOLUME; ++i) {
+            IdxPos i_pos = to_idx_pos(i);
+            MapPos m_pos = base_pos + (MapPos)i_pos;
+            face_map[a][i] = has_face(m_pos, m_pos + offsets[a]);
         }
+    }
+    constexpr Vec3<U32> idx_offsets = {1, CHK_SIZE.x, CHK_SIZE.x * CHK_SIZE.y};
+    for(U32 a = 0; a < 3; ++a) {
+        /* two axes we use to scan the plane for quads (x - 0, y - 1, z - 2)*/
+        U32 f_axis = a == 2 ? 0 : a == 0 ? 1 : 2;
+        U32 s_axis = a == 1 ? 0 : a == 2 ? 1 : 2;
 
-        for(auto const &r_idx : {2, 1, 0, 3, 1, 2})
-        {
-            mesh.indices.emplace_back(r_idx + index_offset);
+        /* used to quickly increment chunk index by one on respective axis */
+        U32 f_idx_side = idx_offsets[f_axis];
+        U32 s_idx_side = idx_offsets[s_axis];
+
+        /* max sizes for axes */
+        U32 f_size = CHK_SIZE[f_axis];
+        U32 s_size = CHK_SIZE[s_axis];
+        for(U32 i = 0; i < CHK_VOLUME; ++i) {
+            IdxPos i_pos = to_idx_pos(i);
+
+            if(face_map[a][i]) {
+                /* starting coords for scan */
+                U32 f_co = i_pos[f_axis];
+                U32 s_co = i_pos[s_axis];
+
+                /* get first axis length scan until block without a face is hit
+                 * or we exceed axis size */
+                U32 f_d_i = 0;
+                for(; f_co + f_d_i < f_size; ++f_d_i) {
+                    if(!face_map[a][i + f_d_i * f_idx_side]) break;
+                }
+
+                /* those will be the resulting quad's sides
+                 * second axis is set to illegal value, because it has to be
+                 * overriden using min() */
+                U32 f_d = f_d_i;
+                U32 s_d = s_size;
+
+                /* we find length of the second axis */
+                for(U32 f_i = 0; f_i < f_d; ++f_i) {
+                    U32 s_d_i = 0;
+                    for(; s_co + s_d_i < s_size; ++s_d_i) {
+                        if(!face_map[a][i + f_i   * f_idx_side +
+                                            s_d_i * s_idx_side]) break;
+                    }
+                    /* we cannot exceed the smallest side length so far,
+                     * otherwise we won't get a rectangle */
+                    s_d = std::min(s_d, s_d_i);
+                }
+
+                /* now that we have the quad's sides, we set the faces to false,
+                 * so that they won't be used to create another quad,
+                 * that would result in overlapping quads */
+                for(U32 f_i = 0; f_i < f_d; ++f_i) {
+                    for(U32 s_i = 0; s_i < s_d; ++s_i) {
+                        face_map[a][i + f_i * f_idx_side +
+                                        s_i * s_idx_side] = false;
+                    }
+                }
+
+                Vec3<U32> f_side_vec(0);
+                Vec3<U32> s_side_vec(0);
+                f_side_vec[f_axis] = f_d;
+                s_side_vec[s_axis] = s_d;
+
+                constexpr glm::vec2 quad[4] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+                for(U32 j = 0; j < 4; ++j) {
+                    mesh.vertices.emplace_back(
+                        (glm::vec3)i_pos + (glm::vec3)offsets[a] +
+                            quad[j].x * (glm::vec3)f_side_vec +
+                            quad[j].y * (glm::vec3)s_side_vec);
+                }
+
+                for(auto const &idx : {2, 1, 0, 3, 1, 2}) {
+                    mesh.indices.emplace_back(idx + index_offset);
+                }
+                index_offset += 4;
+            }
         }
-        index_offset += 4;
-    };
-
-    build_chunk_mesh(pos, has_face, add_quad);
-
+    }
+ 
     mesh.vertices.shrink_to_fit();
     mesh.indices.shrink_to_fit();
 
-    if(mesh.vertices.size() != 0)
-    {
+    if(mesh.vertices.size() != 0) {
         mesh.bt_trigs = new btTriangleIndexVertexArray(
             mesh.indices.size() / 3,
             mesh.indices.data(),
