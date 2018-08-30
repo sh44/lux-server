@@ -37,11 +37,11 @@ void Entity::update()
 
 void Entity::move(entity::Vec const &by)
 {
-    body->setLinearVelocity({by.x * 80.f, by.y * 80.f,
+    body->setLinearVelocity({by.x * 30.f, by.y * 30.f,
                              body->getLinearVelocity().z()});
 }
 
 void Entity::jump()
 {
-    body->applyCentralImpulse({0.f, 0.f, 1.0f});
+    body->applyCentralImpulse({0.f, 0.f, 0.3f});
 }
