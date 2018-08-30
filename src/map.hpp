@@ -26,7 +26,6 @@ class Map
     void guarantee_chunk(ChkPos const &pos) const;
     void guarantee_mesh(ChkPos const &pos) const;
     private:
-    void try_mesh(ChkPos const &pos) const;
     void build_mesh(map::Chunk &chunk, ChkPos const &pos) const;
 
     map::Chunk &load_chunk(ChkPos const &pos) const;

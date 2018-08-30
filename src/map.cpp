@@ -53,36 +53,31 @@ void Map::guarantee_chunk(ChkPos const &pos) const
 
 void Map::guarantee_mesh(ChkPos const &pos) const
 {
-    //TODO do checks here
-    try_mesh(pos);
-}
+    constexpr ChkPos offsets[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
 
-void Map::try_mesh(ChkPos const &pos) const
-{
-    //TODO template constant?
-    constexpr MapPos offsets[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-
-    if(chunks.count(pos) == 0) return;
+    guarantee_chunk(pos);
     map::Chunk &chunk = chunks.at(pos);
-    if(chunk.mesh != nullptr) return;
-    for(SizeT a = 0; a < 3; ++a) {
-        /* surrounding chunks need to be loaded to mesh, contrary to the
-         * client's version, we want to load the physics mesh ASAP, so we don't
-         * care about asymmetry */
-        if(chunks.count(pos + (ChkPos)offsets[a]) == 0) return;
+    if(!chunk.is_mesh_generated) {
+        for(SizeT a = 0; a < 3; ++a) {
+            /* surrounding chunks need to be loaded to mesh, contrary to the
+             * client's version, we want to load the physics mesh ASAP,
+             * so we don't care about asymmetry */
+            guarantee_chunk(pos + offsets[a]);
+        }
+        build_mesh(chunk, pos);
     }
-
-    chunk.mesh = new map::Mesh();
-    build_mesh(chunk, pos);
 }
 
 void Map::build_mesh(map::Chunk &chunk, ChkPos const &pos) const
 {
     constexpr MapPos offsets[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-    map::Mesh &mesh = *chunk.mesh;
+
+    Vector<Vec3<F32>> vertices;
+    Vector<I32>       indices;
+
     /* this is the size of a checkerboard pattern, worst case */
-    mesh.vertices.reserve(CHK_VOLUME * 3 * 4);
-    mesh.indices.reserve(CHK_VOLUME * 3 * 6);
+    vertices.reserve(CHK_VOLUME * 3 * 4);
+    indices.reserve(CHK_VOLUME * 3 * 6);
 
     I32 index_offset = 0;
     tile::Id void_id = db.get_tile_id("void");
@@ -166,24 +161,28 @@ void Map::build_mesh(map::Chunk &chunk, ChkPos const &pos) const
 
                 constexpr glm::vec2 quad[4] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
                 for(U32 j = 0; j < 4; ++j) {
-                    mesh.vertices.emplace_back(
-                        (glm::vec3)i_pos + (glm::vec3)offsets[a] +
-                            quad[j].x * (glm::vec3)f_side_vec +
-                            quad[j].y * (glm::vec3)s_side_vec);
+                    vertices.emplace_back(
+                        (Vec3<F32>)i_pos + (glm::vec3)offsets[a] +
+                            quad[j].x * (Vec3<F32>)f_side_vec +
+                            quad[j].y * (Vec3<F32>)s_side_vec);
                 }
 
                 for(auto const &idx : {0, 1, 2, 2, 3, 0}) {
-                    mesh.indices.emplace_back(idx + index_offset);
+                    indices.emplace_back(idx + index_offset);
                 }
                 index_offset += 4;
             }
         }
     }
  
-    mesh.vertices.shrink_to_fit();
-    mesh.indices.shrink_to_fit();
+    vertices.shrink_to_fit();
+    indices.shrink_to_fit();
 
-    if(mesh.vertices.size() != 0) {
+    if(vertices.size() > 0) {
+        chunk.mesh      = new map::Mesh();
+        map::Mesh &mesh = *chunk.mesh;
+        vertices.swap(mesh.vertices);
+        indices.swap(mesh.indices);
         mesh.bt_trigs = new btTriangleIndexVertexArray(
             mesh.indices.size() / 3,
             mesh.indices.data(),
@@ -194,9 +193,8 @@ void Map::build_mesh(map::Chunk &chunk, ChkPos const &pos) const
         mesh.bt_mesh = new btBvhTriangleMeshShape(mesh.bt_trigs, false,
                 {0.0, 0.0, 0.0}, {CHK_SIZE.x, CHK_SIZE.y, CHK_SIZE.z});
         physics_engine.add_shape(base_pos, mesh.bt_mesh);
-        chunk.has_mesh = true;
     }
-    else chunk.has_mesh = false;
+    chunk.is_mesh_generated = true;
 }
 
 map::Chunk &Map::load_chunk(ChkPos const &pos) const
@@ -210,5 +208,6 @@ map::Chunk &Map::load_chunk(ChkPos const &pos) const
 
 Map::ChunkIterator Map::unload_chunk(Map::ChunkIterator const &iter) const
 {
+    if(iter->second.mesh != nullptr) delete iter->second.mesh;
     return chunks.erase(iter);
 }
