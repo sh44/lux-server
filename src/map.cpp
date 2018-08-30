@@ -96,10 +96,10 @@ void Map::build_mesh(map::Chunk &chunk, ChkPos const &pos) const
     };
 
     bool face_map[3][CHK_VOLUME];
-    for(U32 a = 0; a < 3; ++a) {
-        for(U32 i = 0; i < CHK_VOLUME; ++i) {
-            IdxPos i_pos = to_idx_pos(i);
-            MapPos m_pos = base_pos + (MapPos)i_pos;
+    for(U32 i = 0; i < CHK_VOLUME; ++i) {
+        IdxPos i_pos = to_idx_pos(i);
+        MapPos m_pos = base_pos + (MapPos)i_pos;
+        for(U32 a = 0; a < 3; ++a) {
             face_map[a][i] = has_face(m_pos, m_pos + offsets[a]);
         }
     }
@@ -172,7 +172,7 @@ void Map::build_mesh(map::Chunk &chunk, ChkPos const &pos) const
                             quad[j].y * (glm::vec3)s_side_vec);
                 }
 
-                for(auto const &idx : {2, 1, 0, 3, 1, 2}) {
+                for(auto const &idx : {0, 1, 2, 2, 3, 0}) {
                     mesh.indices.emplace_back(idx + index_offset);
                 }
                 index_offset += 4;
