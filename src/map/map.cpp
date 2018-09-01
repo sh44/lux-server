@@ -24,34 +24,23 @@ Map::~Map()
     }
 }
 
-VoxelId const &Map::get_voxel(MapPos const &pos)
-{
-    return get_chunk(to_chk_pos(pos)).voxels[to_chk_idx(pos)];
-}
-
-VoxelId const &Map::get_voxel(MapPos const &pos) const
+VoxelId &Map::get_voxel(MapPos const &pos)
 {
     return get_chunk(to_chk_pos(pos)).voxels[to_chk_idx(pos)];
 }
 
 Chunk &Map::get_chunk(ChkPos const &pos)
 {
-    if(chunks.count(pos) == 0) return load_chunk(pos);
-    else return chunks.at(pos); //TODO code repetition
+    guarantee_chunk(pos);
+    return chunks.at(pos);
 }
 
-Chunk const &Map::get_chunk(ChkPos const &pos) const
+void Map::guarantee_chunk(ChkPos const &pos)
 {
-    if(chunks.count(pos) == 0) return load_chunk(pos);
-    else return chunks.at(pos);
+    if(chunks.count(pos) == 0) load_chunk(pos);
 }
 
-void Map::guarantee_chunk(ChkPos const &pos) const
-{
-    get_chunk(pos);
-}
-
-void Map::guarantee_mesh(ChkPos const &pos) const
+void Map::guarantee_mesh(ChkPos const &pos)
 {
     constexpr ChkPos offsets[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
 
@@ -68,7 +57,7 @@ void Map::guarantee_mesh(ChkPos const &pos) const
     }
 }
 
-void Map::build_mesh(Chunk &chunk, ChkPos const &pos) const
+void Map::build_mesh(Chunk &chunk, ChkPos const &pos)
 {
     constexpr MapPos offsets[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
 
@@ -197,7 +186,12 @@ void Map::build_mesh(Chunk &chunk, ChkPos const &pos) const
     chunk.is_mesh_generated = true;
 }
 
-Chunk &Map::load_chunk(ChkPos const &pos) const
+void update_lightning(Chunk &chunk, ChkPos const &pos)
+{
+    
+}
+
+Chunk &Map::load_chunk(ChkPos const &pos)
 {
     util::log("MAP", util::DEBUG, "loading chunk %zd, %zd, %zd", pos.x, pos.y, pos.z);
     chunks.emplace(pos, Chunk());
@@ -206,7 +200,7 @@ Chunk &Map::load_chunk(ChkPos const &pos) const
     return chunk;
 }
 
-Map::ChunkIterator Map::unload_chunk(Map::ChunkIterator const &iter) const
+Map::ChunkIterator Map::unload_chunk(Map::ChunkIterator const &iter)
 {
     if(iter->second.mesh != nullptr) delete iter->second.mesh;
     return chunks.erase(iter);

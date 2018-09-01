@@ -18,22 +18,20 @@ class Map
     Map &operator=(Map const &that) = delete;
     ~Map();
 
-    VoxelId const &get_voxel(MapPos const &pos);
-    VoxelId const &get_voxel(MapPos const &pos) const;
-    Chunk       &get_chunk(ChkPos const &pos);
-    Chunk const &get_chunk(ChkPos const &pos) const;
+    VoxelId &get_voxel(MapPos const &pos);
+    Chunk &get_chunk(ChkPos const &pos);
 
-    void guarantee_chunk(ChkPos const &pos) const;
-    void guarantee_mesh(ChkPos const &pos) const;
+    void guarantee_chunk(ChkPos const &pos);
+    void guarantee_mesh(ChkPos const &pos);
     private:
-    void build_mesh(Chunk &chunk, ChkPos const &pos) const;
-    void update_lightning(Chunk &chunk, ChkPos const &pos) const;
+    void build_mesh(Chunk &chunk, ChkPos const &pos);
+    void update_lightning(Chunk &chunk, ChkPos const &pos);
 
-    Chunk &load_chunk(ChkPos const &pos) const;
-    ChunkIterator unload_chunk(ChunkIterator const &iter) const;
+    Chunk &load_chunk(ChkPos const &pos);
+    ChunkIterator unload_chunk(ChunkIterator const &iter);
 
-    mutable PosMap<ChkPos, Chunk> chunks;
-    mutable Generator generator;
+    PosMap<ChkPos, Chunk> chunks;
+    Generator generator;
 
     data::Database const &db;
     PhysicsEngine &physics_engine;

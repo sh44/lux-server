@@ -3,7 +3,7 @@
 #include <world.hpp>
 #include "entity.hpp"
 
-Entity::Entity(World const &world, EntityType const &type, btRigidBody *body) :
+Entity::Entity(World &world, EntityType const &type, btRigidBody *body) :
     world(world),
     type(type),
     deletion_mark(false),

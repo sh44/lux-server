@@ -11,7 +11,7 @@ struct EntityType;
 class Entity
 {
 public:
-    Entity(World const &world, EntityType const &type, btRigidBody *body);
+    Entity(World &world, EntityType const &type, btRigidBody *body);
     Entity(Entity const &that) = delete;
     Entity &operator=(Entity const &that) = delete;
 
@@ -21,7 +21,7 @@ public:
     void move(EntityVec const &by);
     void jump();
 
-    World const &world;
+    World &world;
     EntityType const &type;
     bool deletion_mark;
 private:
