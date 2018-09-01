@@ -10,7 +10,7 @@ PhysicsEngine::PhysicsEngine() :
     entity_shape.calculateLocalInertia(1, inertia);
 }
 
-btRigidBody *PhysicsEngine::add_entity(entity::Pos const &pos)
+btRigidBody *PhysicsEngine::add_entity(EntityPos const &pos)
 {
     motion_states.emplace_back(btTransform({0, 0, 0, 1}, {pos.x, pos.y, pos.z}));
     btRigidBody::btRigidBodyConstructionInfo ci(1, &motion_states.back(),

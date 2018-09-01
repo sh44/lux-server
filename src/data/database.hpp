@@ -4,14 +4,11 @@
 #include <lux/alias/vector.hpp>
 #include <lux/alias/hash_map.hpp>
 #include <lux/alias/string.hpp>
-#include <lux/common/tile.hpp>
+#include <lux/common/voxel.hpp>
 #include <lux/common/entity.hpp>
 //
-#include <map/tile_type.hpp>
-#include <entity/type.hpp>
-
-namespace entity { struct Type; }
-namespace map    { struct TileType; }
+#include <map/voxel_type.hpp>
+#include <entity/entity_type.hpp>
 
 namespace data
 {
@@ -24,33 +21,31 @@ public:
     template<typename... Args>
     void add_entity(Args const &...args);
     template<typename... Args>
-    void add_tile(Args const &...args);
+    void add_voxel(Args const &...args);
 
-    entity::Type  const &get_entity(String const &str_id) const;
-    map::TileType const &get_tile(String const &str_id) const;
-    entity::Id const &get_entity_id(String const &str_id) const;
-    tile::Id   const &get_tile_id(String const &str_id) const;
-private:
-    Vector< entity::Type> entities;
-    Vector<map::TileType> tiles;
-    HashMap<String, entity::Id> entities_lookup;
-    HashMap<String,   tile::Id> tiles_lookup;
+    EntityType const &get_entity(String const &str_id) const;
+    VoxelType  const &get_voxel(String const &str_id) const;
+    EntityId   const &get_entity_id(String const &str_id) const;
+    VoxelId    const &get_voxel_id(String const &str_id) const;
+
+    Vector<EntityType> entities;
+    Vector<VoxelType>  voxels;
+    HashMap<String, EntityId> entities_lookup;
+    HashMap<String,  VoxelId> voxels_lookup;
 };
 
 template<typename... Args>
 void Database::add_entity(Args const &...args)
 {
-    auto &entity = entities.emplace_back(args...);
-    entity.id = entities.size() - 1;
-    entities_lookup[entity.str_id] = entity.id;
+    auto const &entity = entities.emplace_back(args...);
+    entities_lookup[entity.str_id] = entities.size() - 1;
 }
 
 template<typename... Args>
-void Database::add_tile(Args const &...args)
+void Database::add_voxel(Args const &...args)
 {
-    auto &tile = tiles.emplace_back(args...);
-    tile.id = tiles.size() - 1;
-    tiles_lookup[tile.str_id] = tile.id;
+    auto const &vox = voxels.emplace_back(args...);
+    voxels_lookup[vox.str_id] = voxels.size() - 1;
 }
 
 }

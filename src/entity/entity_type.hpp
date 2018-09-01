@@ -4,20 +4,15 @@
 #include <lux/alias/string.hpp>
 #include <lux/common/entity.hpp>
 
-namespace entity
+struct EntityType
 {
-
-struct Type
-{
-    Type(String const &_str_id, String const &_name) :
+    EntityType(String const &_str_id, String const &_name) :
         str_id(_str_id), name(_name)
     {
 
     }
 
-    entity::Id id;
+    EntityId id;
     String str_id;
     String name;
 };
-
-}

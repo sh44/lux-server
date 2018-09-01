@@ -1,5 +1,5 @@
-#include <entity/type.hpp>
-#include <map/tile_type.hpp>
+#include <entity/entity_type.hpp>
+#include <map/voxel_type.hpp>
 #include "database.hpp"
 
 namespace data
@@ -8,33 +8,33 @@ namespace data
 Database::Database()
 {
     add_entity("human", "Human");
-    add_tile("void", "Void", map::TileType::EMPTY);
-    add_tile("stone_floor", "Stone Floor", map::TileType::WALL);
-    add_tile("stone_wall", "Stone Wall", map::TileType::WALL);
-    add_tile("raw_stone", "Raw Stone", map::TileType::WALL);
-    add_tile("dirt", "Dirt", map::TileType::WALL);
-    add_tile("gravel", "Gravel", map::TileType::WALL);
-    add_tile("grass", "Grass", map::TileType::WALL);
+    add_voxel("void", "Void", VoxelType::EMPTY);
+    add_voxel("stone_floor", "Stone Floor", VoxelType::WALL);
+    add_voxel("stone_wall", "Stone Wall", VoxelType::WALL);
+    add_voxel("raw_stone", "Raw Stone", VoxelType::WALL);
+    add_voxel("dirt", "Dirt", VoxelType::WALL);
+    add_voxel("gravel", "Gravel", VoxelType::WALL);
+    add_voxel("grass", "Grass", VoxelType::WALL);
 }
 
-entity::Type const &Database::get_entity(String const &str_id) const
+EntityType const &Database::get_entity(String const &str_id) const
 {
     return entities[get_entity_id(str_id)];
 }
 
-map::TileType const &Database::get_tile(String const &str_id) const
+VoxelType const &Database::get_voxel(String const &str_id) const
 {
-    return tiles[get_tile_id(str_id)];
+    return voxels[get_voxel_id(str_id)];
 }
 
-entity::Id const &Database::get_entity_id(String const &str_id) const
+EntityId const &Database::get_entity_id(String const &str_id) const
 {
     return entities_lookup.at(str_id);
 }
 
-tile::Id const &Database::get_tile_id(String const &str_id) const
+VoxelId const &Database::get_voxel_id(String const &str_id) const
 {
-    return tiles_lookup.at(str_id);
+    return voxels_lookup.at(str_id);
 }
 
 }

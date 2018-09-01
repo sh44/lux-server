@@ -6,23 +6,23 @@
 
 class World;
 
-namespace entity { struct Type; }
+struct EntityType;
 
 class Entity
 {
 public:
-    Entity(World const &world, entity::Type const &type, btRigidBody *body);
+    Entity(World const &world, EntityType const &type, btRigidBody *body);
     Entity(Entity const &that) = delete;
     Entity &operator=(Entity const &that) = delete;
 
-    entity::Pos get_pos() const;
+    EntityPos get_pos() const;
 
     void update();
-    void move(entity::Vec const &by);
+    void move(EntityVec const &by);
     void jump();
 
     World const &world;
-    entity::Type const &type;
+    EntityType const &type;
     bool deletion_mark;
 private:
     btRigidBody *body;

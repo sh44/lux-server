@@ -7,7 +7,6 @@
 //
 #include <lux/alias/string.hpp>
 #include <lux/alias/hash_map.hpp>
-#include <lux/alias/ref.hpp>
 #include <lux/util/tick_clock.hpp>
 #include <lux/net/ip.hpp>
 #include <lux/net/port.hpp>

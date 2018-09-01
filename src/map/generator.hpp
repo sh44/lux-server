@@ -7,9 +7,6 @@
 
 namespace data { struct Config; }
 
-namespace map
-{
-
 struct Chunk;
 
 class Generator
@@ -25,5 +22,3 @@ private:
 
     data::Config const &config;
 };
-
-}

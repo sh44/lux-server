@@ -2,12 +2,9 @@
 
 #include <lux/alias/scalar.hpp>
 #include <lux/alias/string.hpp>
-#include <lux/common/tile.hpp>
+#include <lux/common/voxel.hpp>
 
-namespace map
-{
-
-struct TileType
+struct VoxelType
 {
     enum Shape : U8
     {
@@ -16,16 +13,13 @@ struct TileType
         WALL
     };
 
-    TileType(String const &_str_id, String const &_name, Shape _shape) :
+    VoxelType(String const &_str_id, String const &_name, Shape _shape) :
         str_id(_str_id), name(_name), shape(_shape)
     {
 
     }
 
-    tile::Id   id;
     String str_id;
     String name;
     Shape shape;
 };
-
-}

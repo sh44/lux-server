@@ -1,12 +1,13 @@
-#include <lux/alias/ref.hpp>
 #include <lux/common/entity.hpp>
 //
-#include <entity/type.hpp>
+#include <data/database.hpp>
+#include <entity/entity_type.hpp>
 #include "world.hpp"
 
 World::World(data::Config const &_config) :
     Map(physics_engine, _config),
-    config(_config)
+    config(_config),
+    db(*config.db)
 {
 
 }
@@ -37,7 +38,7 @@ Entity &World::create_player()
         physics_engine.add_entity({2, 2, 6.5}));
 }
 
-void World::get_entities_positions(Vector<entity::Pos> &out) const
+void World::get_entities_positions(Vector<EntityPos> &out) const
 {
     out.reserve(entity_storage.size());
     for(auto &entity : entity_storage)

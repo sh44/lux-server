@@ -11,11 +11,8 @@
 #include <data/database.hpp>
 #include <data/config.hpp>
 #include <map/chunk.hpp>
-#include <map/tile_type.hpp>
+#include <map/voxel_type.hpp>
 #include "generator.hpp"
-
-namespace map
-{
 
 Generator::Generator(data::Config const &config) :
     config(config)
@@ -44,36 +41,58 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
     for(SizeT i = 0; i < CHK_VOLUME; ++i)
     {
         MapPos map_pos = to_map_pos(pos, i);
-        auto const *tile_type = &config.db->get_tile("void");
+        VoxelId voxel_id = config.db->get_voxel_id("void");
         F32 h = height_map[pos][i];
-        if(map_pos.z <= h)
+        auto hash = std::hash<MapPos>()(map_pos);
+        if(map_pos.z <= h)// && map_pos.z > h - 20)
         {
             if(map_pos.z < h - 5.f)
             {
-                tile_type = &config.db->get_tile("raw_stone");
+                voxel_id = config.db->get_voxel_id("raw_stone");
             }
             else
             {
                 if(std::hash<F32>()(h) % 32 == 0)
                 {
-                    tile_type = &config.db->get_tile("dirt");
+                    voxel_id = config.db->get_voxel_id("dirt");
                 }
                 else if(std::hash<F32>()(h) % 8 == 0)
                 {
-                    tile_type = &config.db->get_tile("gravel");
+                    voxel_id = config.db->get_voxel_id("gravel");
                 }
                 else
                 {
-                    tile_type = &config.db->get_tile("raw_stone");
+                    voxel_id = config.db->get_voxel_id("raw_stone");
                 }
             }
         }
         else
         {
-            tile_type = &config.db->get_tile("void");
+            voxel_id = config.db->get_voxel_id("void");
+            /*
+            if(map_pos.z % 4 == 0)
+            {
+                voxel_type = config.db->get_voxel("stone_floor");
+            }
+            else if(map_pos.x % 8 == 0 ||
+                    map_pos.y % 8 == 0)
+            {
+                if((map_pos.z % 8 == 1 && hash % 6 == 0) ||
+                   (map_pos.z % 8 == 2 &&
+                    std::hash<MapPos>()(map_pos - MapPos(0, 0, 1)) % 6 == 0))
+                {
+                    voxel_type = config.db->get_voxel("void");
+                }
+                else
+                {
+                    voxel_type = config.db->get_voxel("stone_wall");
+                }
+            }
+            else
+            {
+                voxel_type = config.db->get_voxel("void");
+            }*/
         }
-        chunk.tiles[i] = tile_type;
+        chunk.voxels[i] = voxel_id;
     }
-}
-
 }

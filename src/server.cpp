@@ -8,7 +8,7 @@
 Server::Server(net::Port port) :
     enet_address({ENET_HOST_ANY, port}),
     enet_server(enet_host_create(&enet_address, MAX_CLIENTS, 2, 0, 0)),
-    config({&db, &db.get_entity("human"), "lux-server", 64.0}),
+    config({&db, db.get_entity_id("human"), "lux-server", 64.0}),
     tick_clock(util::TickClock::Duration(1.0 / config.tick_rate)),
     world(config),
     should_close(false)

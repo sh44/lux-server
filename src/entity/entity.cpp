@@ -3,7 +3,7 @@
 #include <world.hpp>
 #include "entity.hpp"
 
-Entity::Entity(World const &world, entity::Type const &type, btRigidBody *body) :
+Entity::Entity(World const &world, EntityType const &type, btRigidBody *body) :
     world(world),
     type(type),
     deletion_mark(false),
@@ -12,10 +12,10 @@ Entity::Entity(World const &world, entity::Type const &type, btRigidBody *body) 
     body->forceActivationState(DISABLE_DEACTIVATION);
 }
 
-entity::Pos Entity::get_pos() const
+EntityPos Entity::get_pos() const
 {
     auto pos = body->getCenterOfMassPosition();
-    return entity::Pos(pos.x(), pos.y(), pos.z());
+    return EntityPos(pos.x(), pos.y(), pos.z());
 }
 
 void Entity::update()
@@ -35,7 +35,7 @@ void Entity::update()
     }
 }
 
-void Entity::move(entity::Vec const &by)
+void Entity::move(EntityVec const &by)
 {
     body->setLinearVelocity({by.x * 30.f, by.y * 30.f,
                              body->getLinearVelocity().z()});

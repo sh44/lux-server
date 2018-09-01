@@ -1,10 +1,10 @@
 #include <lux/util/log.hpp>
 #include <lux/common/map.hpp>
-#include <lux/common/tile.hpp>
+#include <lux/common/voxel.hpp>
 //
 #include <data/database.hpp>
 #include <data/config.hpp>
-#include <map/tile_type.hpp>
+#include <map/voxel_type.hpp>
 #include <map/chunk.hpp>
 #include "map.hpp"
 
@@ -24,23 +24,23 @@ Map::~Map()
     }
 }
 
-map::TileType const &Map::get_tile(MapPos const &pos)
+VoxelId const &Map::get_voxel(MapPos const &pos)
 {
-    return *get_chunk(to_chk_pos(pos)).tiles[to_chk_idx(pos)];
+    return get_chunk(to_chk_pos(pos)).voxels[to_chk_idx(pos)];
 }
 
-map::TileType const &Map::get_tile(MapPos const &pos) const
+VoxelId const &Map::get_voxel(MapPos const &pos) const
 {
-    return *get_chunk(to_chk_pos(pos)).tiles[to_chk_idx(pos)];
+    return get_chunk(to_chk_pos(pos)).voxels[to_chk_idx(pos)];
 }
 
-map::Chunk &Map::get_chunk(ChkPos const &pos)
+Chunk &Map::get_chunk(ChkPos const &pos)
 {
     if(chunks.count(pos) == 0) return load_chunk(pos);
     else return chunks.at(pos); //TODO code repetition
 }
 
-map::Chunk const &Map::get_chunk(ChkPos const &pos) const
+Chunk const &Map::get_chunk(ChkPos const &pos) const
 {
     if(chunks.count(pos) == 0) return load_chunk(pos);
     else return chunks.at(pos);
@@ -56,7 +56,7 @@ void Map::guarantee_mesh(ChkPos const &pos) const
     constexpr ChkPos offsets[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
 
     guarantee_chunk(pos);
-    map::Chunk &chunk = chunks.at(pos);
+    Chunk &chunk = chunks.at(pos);
     if(!chunk.is_mesh_generated) {
         for(SizeT a = 0; a < 3; ++a) {
             /* surrounding chunks need to be loaded to mesh, contrary to the
@@ -68,7 +68,7 @@ void Map::guarantee_mesh(ChkPos const &pos) const
     }
 }
 
-void Map::build_mesh(map::Chunk &chunk, ChkPos const &pos) const
+void Map::build_mesh(Chunk &chunk, ChkPos const &pos) const
 {
     constexpr MapPos offsets[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
 
@@ -80,14 +80,14 @@ void Map::build_mesh(map::Chunk &chunk, ChkPos const &pos) const
     indices.reserve(CHK_VOLUME * 3 * 6);
 
     I32 index_offset = 0;
-    tile::Id void_id = db.get_tile_id("void");
+    VoxelId void_id = db.get_voxel_id("void");
 
     MapPos base_pos = to_map_pos(pos, 0);
     auto has_face = [&] (MapPos const &a, MapPos const &b) -> bool
     {
         //TODO use current chunk to reduce to_chk_* calls, and chunks access
-        return (chunks[to_chk_pos(a)].tiles[to_chk_idx(a)]->id == void_id) !=
-               (chunks[to_chk_pos(b)].tiles[to_chk_idx(b)]->id == void_id);
+        return (chunks[to_chk_pos(a)].voxels[to_chk_idx(a)] == void_id) !=
+               (chunks[to_chk_pos(b)].voxels[to_chk_idx(b)] == void_id);
     };
 
     bool face_map[3][CHK_VOLUME];
@@ -179,8 +179,8 @@ void Map::build_mesh(map::Chunk &chunk, ChkPos const &pos) const
     indices.shrink_to_fit();
 
     if(vertices.size() > 0) {
-        chunk.mesh      = new map::Mesh();
-        map::Mesh &mesh = *chunk.mesh;
+        chunk.mesh      = new Mesh();
+        Mesh &mesh = *chunk.mesh;
         vertices.swap(mesh.vertices);
         indices.swap(mesh.indices);
         mesh.bt_trigs = new btTriangleIndexVertexArray(
@@ -197,11 +197,11 @@ void Map::build_mesh(map::Chunk &chunk, ChkPos const &pos) const
     chunk.is_mesh_generated = true;
 }
 
-map::Chunk &Map::load_chunk(ChkPos const &pos) const
+Chunk &Map::load_chunk(ChkPos const &pos) const
 {
     util::log("MAP", util::DEBUG, "loading chunk %zd, %zd, %zd", pos.x, pos.y, pos.z);
-    chunks.emplace(pos, map::Chunk());
-    map::Chunk &chunk = chunks.at(pos);
+    chunks.emplace(pos, Chunk());
+    Chunk &chunk = chunks.at(pos);
     generator.generate_chunk(chunk, pos);
     return chunk;
 }

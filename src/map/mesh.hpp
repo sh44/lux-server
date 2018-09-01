@@ -6,9 +6,6 @@
 #include <lux/alias/vec_3.hpp>
 #include <lux/alias/vector.hpp>
 
-namespace map
-{
-
 struct Mesh
 {
     Vector<Vec3<F32>> vertices;
@@ -24,5 +21,3 @@ struct Mesh
         if(bt_trigs != nullptr) delete bt_trigs;
     }
 };
-
-}

@@ -10,8 +10,8 @@
 #include <lux/net/server/packet.hpp>
 #include <lux/net/client/packet.hpp>
 //
-#include <map/tile_type.hpp>
-#include <entity.hpp>
+#include <map/voxel_type.hpp>
+#include <entity/entity.hpp>
 #include <world.hpp>
 #include "player.hpp"
 
@@ -115,16 +115,14 @@ bool Player::send_chunks(net::server::Packet &sp)
     return is_sending;
 }
 
-void Player::send_chunk(net::server::Packet &sp, map::Chunk const &world_chunk,
+void Player::send_chunk(net::server::Packet &sp, Chunk const &world_chunk,
                         ChkPos const &pos)
 {
     sp.type = net::server::Packet::MAP;
     auto &chunk = sp.map.chunks.emplace_back();
     chunk.pos = pos;
-    for(ChkIdx i = 0; i < CHK_VOLUME; ++i)
-    {
-        chunk.tile_ids[i] = world_chunk.tiles[i]->id;
-    }
+    std::copy(world_chunk.voxels.cbegin(), world_chunk.voxels.cend(),
+              chunk.voxels.begin());
 }
 
 void Player::init_from_client(net::client::Init const &ci)
