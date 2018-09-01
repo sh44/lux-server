@@ -165,11 +165,10 @@ void Server::add_player(ENetPeer *peer)
 
 void Server::send_server_packet(Player const &player, U32 flags)
 {
-    //TODO packet buffer with enet_packet_resize
     serializer.reserve(net::get_size(sp));
     serializer << sp;
-    ENetPacket *pack =
-        enet_packet_create(serializer.get(), serializer.get_used(), flags);
+    ENetPacket *pack = enet_packet_create(serializer.get(),
+            serializer.get_used(), flags | ENET_PACKET_FLAG_NO_ALLOCATE);
     enet_peer_send(player.peer, 0, pack);
     enet_host_flush(enet_server);
     net::clear_buffer(sp);
