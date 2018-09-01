@@ -67,7 +67,7 @@ bool Player::send_signal(net::server::Packet &sp)
         util::log("PLAYER", util::INFO, "initializing to client");
         sp.type = net::server::Packet::INIT;
         sp.init.conf.tick_rate = conf.tick_rate; //TODO Player::prepare_conf?
-        std::copy(conf.server_name.begin(), conf.server_name.end(),
+        std::copy(conf.server_name.cbegin(), conf.server_name.cend(),
                   std::back_inserter(sp.init.server_name));
         sp.init.chunk_size = CHK_SIZE;
         sent_init = true;
