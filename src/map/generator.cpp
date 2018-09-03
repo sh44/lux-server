@@ -44,7 +44,7 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
         VoxelId voxel_id = config.db->get_voxel_id("void");
         F32 h = height_map[pos][i];
         auto hash = std::hash<MapPos>()(map_pos);
-        if(map_pos.z <= h && map_pos.z > h - 20)
+        if(map_pos.z <= h && map_pos.z > h - 20.f)
         {
             if(map_pos.z < h - 5.f)
             {
@@ -66,7 +66,7 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
                 }
             }
         }
-        else
+        else if(map_pos.z <= h - 20.f)
         {
             if(map_pos.z % 4 == 0)
             {

@@ -194,7 +194,15 @@ Chunk &Map::load_chunk(ChkPos const &pos)
     Chunk &chunk = chunks.at(pos);
     generator.generate_chunk(chunk, pos);
     chunk.light_lvls[to_chk_idx(IdxPos(8, 8, 2))] = 0xF000;
+    chunk.light_lvls[to_chk_idx(IdxPos(10, 4, 2))] = 0x0800;
+    chunk.light_lvls[to_chk_idx(IdxPos(4, 10, 2))] = 0x00F0;
+    chunk.light_lvls[to_chk_idx(IdxPos(4, 4, 2))] = 0x0F80;
+    chunk.light_lvls[to_chk_idx(IdxPos(10, 10, 2))] = 0x8F00;
     lightning_system.add_node(to_map_pos(pos, IdxPos(8, 8, 2)));
+    lightning_system.add_node(to_map_pos(pos, IdxPos(10, 4, 2)));
+    lightning_system.add_node(to_map_pos(pos, IdxPos(4, 10, 2)));
+    lightning_system.add_node(to_map_pos(pos, IdxPos(4, 4, 2)));
+    lightning_system.add_node(to_map_pos(pos, IdxPos(10, 10, 2)));
     lightning_system.update(chunk, pos);
     return chunk;
 }
