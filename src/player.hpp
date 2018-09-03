@@ -29,12 +29,13 @@ class Player
     void receive(net::client::Packet const &);
     void send_tick(net::server::Packet &) const;
     bool send_signal(net::server::Packet &);
-    bool send_chunks(net::server::Packet &);
-    void send_chunk(net::server::Packet &, Chunk const &, ChkPos const &pos);
     Entity &get_entity();
 
     ENetPeer *peer;
     private:
+    bool send_chunks(net::server::Packet &);
+    void send_chunk(net::server::Packet &, Chunk const &, ChkPos const &pos);
+
     void init_from_client(net::client::Init const &);
     void change_config(net::client::Conf const &);
 

@@ -107,6 +107,7 @@ void Server::handle_input()
         }
         else if(event.type == ENET_EVENT_TYPE_RECEIVE)
         {
+            //TODO this can be moved to Player, using enet_peer_receive
             auto *pack = event.packet;
             deserializer.set_slice(pack->data, pack->data + pack->dataLength);
             net::clear_buffer(cp);
