@@ -37,7 +37,7 @@ Entity &World::create_player()
 {
     util::log("WORLD", util::DEBUG, "created player");
     return create_entity(db.entities[config.player_type],
-        physics_engine.add_entity({2, 2, 6.5}));
+        physics_engine.add_entity({2, 2, -60.5}));
 }
 
 void World::get_entities_positions(Vector<EntityPos> &out) const

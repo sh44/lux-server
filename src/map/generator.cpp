@@ -75,7 +75,7 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
             else if(map_pos.x % 8 == 0 ||
                     map_pos.y % 8 == 0)
             {
-                if((map_pos.z % 4 == -1 && hash % 6 == 0) ||
+                if((map_pos.z % 4 == -1 && hash % 4 == 0) ||
                    (map_pos.z % 4 == -2 &&
                     std::hash<MapPos>()(map_pos - MapPos(0, 0, 1)) % 6 == 0))
                 {
