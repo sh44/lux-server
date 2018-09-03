@@ -167,9 +167,13 @@ void Server::send_server_packet(Player const &player, U32 flags)
 {
     serializer.reserve(net::get_size(sp));
     serializer << sp;
+    //TODO for some reason data is not transferred correctly when
+    //ENET_PACKET_FLAG_NO_ALLOCATE is set
     ENetPacket *pack = enet_packet_create(serializer.get(),
-            serializer.get_used(), flags | ENET_PACKET_FLAG_NO_ALLOCATE);
-    enet_peer_send(player.peer, 0, pack);
+            serializer.get_used(), flags);
+    if(enet_peer_send(player.peer, 0, pack) < 0) {
+        util::log("SERVER", util::WARN, "failed to send packet");
+    }
     enet_host_flush(enet_server);
     net::clear_buffer(sp);
 }

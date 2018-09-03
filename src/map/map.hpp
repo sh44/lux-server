@@ -1,10 +1,12 @@
 #pragma once
 
 #include <lux/alias/pos_map.hpp>
+#include <lux/alias/queue.hpp>
 #include <lux/common/map.hpp>
 //
 #include <map/chunk.hpp>
 #include <map/generator.hpp>
+#include <map/lightning_system.hpp>
 #include <physics_engine.hpp>
 
 namespace data { struct Config; class Database; }
@@ -25,13 +27,13 @@ class Map
     void guarantee_mesh(ChkPos const &pos);
     private:
     void build_mesh(Chunk &chunk, ChkPos const &pos);
-    void update_lightning(Chunk &chunk, ChkPos const &pos);
 
     Chunk &load_chunk(ChkPos const &pos);
     ChunkIterator unload_chunk(ChunkIterator const &iter);
 
     PosMap<ChkPos, Chunk> chunks;
     Generator generator;
+    LightningSystem lightning_system;
 
     data::Database const &db;
     PhysicsEngine &physics_engine;

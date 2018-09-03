@@ -1,6 +1,5 @@
 #include <lux/util/log.hpp>
 #include <lux/common/map.hpp>
-#include <lux/common/voxel.hpp>
 //
 #include <data/database.hpp>
 #include <data/config.hpp>
@@ -29,6 +28,8 @@ VoxelId &Map::get_voxel(MapPos const &pos)
     return get_chunk(to_chk_pos(pos)).voxels[to_chk_idx(pos)];
 }
 
+//TODO we will need to update meshes etc. on change, so this will need a const
+//version
 Chunk &Map::get_chunk(ChkPos const &pos)
 {
     guarantee_chunk(pos);
@@ -163,7 +164,7 @@ void Map::build_mesh(Chunk &chunk, ChkPos const &pos)
             }
         }
     }
- 
+
     vertices.shrink_to_fit();
     indices.shrink_to_fit();
 
@@ -186,17 +187,13 @@ void Map::build_mesh(Chunk &chunk, ChkPos const &pos)
     chunk.is_mesh_generated = true;
 }
 
-void update_lightning(Chunk &chunk, ChkPos const &pos)
-{
-    
-}
-
 Chunk &Map::load_chunk(ChkPos const &pos)
 {
     util::log("MAP", util::DEBUG, "loading chunk %zd, %zd, %zd", pos.x, pos.y, pos.z);
     chunks.emplace(pos, Chunk());
     Chunk &chunk = chunks.at(pos);
     generator.generate_chunk(chunk, pos);
+    lightning_system.update(chunk, pos);
     return chunk;
 }
 

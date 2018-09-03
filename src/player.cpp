@@ -121,8 +121,11 @@ void Player::send_chunk(net::server::Packet &sp, Chunk const &world_chunk,
     sp.type = net::server::Packet::MAP;
     auto &chunk = sp.map.chunks.emplace_back();
     chunk.pos = pos;
+    //TODO prevent copying?
     std::copy(world_chunk.voxels.cbegin(), world_chunk.voxels.cend(),
               chunk.voxels.begin());
+    std::copy(world_chunk.light_lvls.cbegin(), world_chunk.light_lvls.cend(),
+              chunk.light_lvls.begin());
 }
 
 void Player::init_from_client(net::client::Init const &ci)

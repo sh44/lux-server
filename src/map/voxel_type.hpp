@@ -2,7 +2,6 @@
 
 #include <lux/alias/scalar.hpp>
 #include <lux/alias/string.hpp>
-#include <lux/common/voxel.hpp>
 
 struct VoxelType
 {
