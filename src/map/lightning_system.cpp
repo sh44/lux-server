@@ -30,11 +30,10 @@ void LightningSystem::update(Chunk &chunk, ChkPos const &pos)
                     ChkIdx idx = to_chk_idx(map_pos);
                     //TODO void_id
                     LightLvl side_lvl = (chunk.light_lvls[idx] & 0xF000) >> 12;
-                    if( chunk.light_lvls[idx] != 0 &&
-                       ((I32)side_lvl <= (I32)((light_lvl & 0xF000) >> 12) - 2)) {
+                    if(side_lvl <= ((light_lvl & 0xF000) >> 12) - 2) {
                         chunk.light_lvls[idx] &= 0x0FFF;
-                        chunk.light_lvls[idx] |= light_lvl - 1;
-                        nodes.emplace(to_chk_pos(map_pos));
+                        chunk.light_lvls[idx] |= (light_lvl & 0xF000) - 0x1000;
+                        nodes.emplace(to_idx_pos(map_pos));
                     }
                 }
             }

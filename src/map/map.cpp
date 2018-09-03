@@ -193,6 +193,8 @@ Chunk &Map::load_chunk(ChkPos const &pos)
     chunks.emplace(pos, Chunk());
     Chunk &chunk = chunks.at(pos);
     generator.generate_chunk(chunk, pos);
+    chunk.light_lvls[to_chk_idx(IdxPos(8, 8, 2))] = 0xF000;
+    lightning_system.add_node(to_map_pos(pos, IdxPos(8, 8, 2)));
     lightning_system.update(chunk, pos);
     return chunk;
 }

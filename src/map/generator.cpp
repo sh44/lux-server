@@ -44,7 +44,7 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
         VoxelId voxel_id = config.db->get_voxel_id("void");
         F32 h = height_map[pos][i];
         auto hash = std::hash<MapPos>()(map_pos);
-        if(map_pos.z <= h)// && map_pos.z > h - 20)
+        if(map_pos.z <= h && map_pos.z > h - 20)
         {
             if(map_pos.z < h - 5.f)
             {
@@ -68,30 +68,28 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
         }
         else
         {
-            voxel_id = config.db->get_voxel_id("void");
-            /*
             if(map_pos.z % 4 == 0)
             {
-                voxel_type = config.db->get_voxel("stone_floor");
+                voxel_id = config.db->get_voxel_id("stone_floor");
             }
             else if(map_pos.x % 8 == 0 ||
                     map_pos.y % 8 == 0)
             {
-                if((map_pos.z % 8 == 1 && hash % 6 == 0) ||
-                   (map_pos.z % 8 == 2 &&
+                if((map_pos.z % 4 == -1 && hash % 6 == 0) ||
+                   (map_pos.z % 4 == -2 &&
                     std::hash<MapPos>()(map_pos - MapPos(0, 0, 1)) % 6 == 0))
                 {
-                    voxel_type = config.db->get_voxel("void");
+                    voxel_id = config.db->get_voxel_id("void");
                 }
                 else
                 {
-                    voxel_type = config.db->get_voxel("stone_wall");
+                    voxel_id = config.db->get_voxel_id("stone_wall");
                 }
             }
             else
             {
-                voxel_type = config.db->get_voxel("void");
-            }*/
+                voxel_id = config.db->get_voxel_id("void");
+            }
         }
         chunk.voxels[i] = voxel_id;
     }
