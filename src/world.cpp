@@ -14,6 +14,8 @@ World::World(data::Config const &_config) :
 
 void World::update()
 {
+    //TODO rename update to tick
+    Map::tick();
     auto iter = entity_storage.begin();
     while(iter != entity_storage.end())
     {

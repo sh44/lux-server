@@ -25,8 +25,11 @@ class Map
 
     void guarantee_chunk(ChkPos const &pos);
     void guarantee_mesh(ChkPos const &pos);
+
+    void tick();
     private:
     void build_mesh(Chunk &chunk, ChkPos const &pos);
+    void lightning_tick();
 
     Chunk &load_chunk(ChkPos const &pos);
     ChunkIterator unload_chunk(ChunkIterator const &iter);

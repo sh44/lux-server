@@ -58,6 +58,11 @@ void Map::guarantee_mesh(ChkPos const &pos)
     }
 }
 
+void Map::tick()
+{
+    lightning_tick();
+}
+
 void Map::build_mesh(Chunk &chunk, ChkPos const &pos)
 {
     constexpr MapPos offsets[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
@@ -187,23 +192,35 @@ void Map::build_mesh(Chunk &chunk, ChkPos const &pos)
     chunk.is_mesh_generated = true;
 }
 
+void Map::lightning_tick()
+{
+    //TODO this list could get out of hand in a long gameplay
+    Set<ChkPos> &update_set = lightning_system.update_set;
+    for(auto it = update_set.begin(); it != update_set.end();) {
+        //TODO add is_loaded
+        ChkPos pos = *it;
+        if(chunks.count(pos) > 0) {
+            lightning_system.update(chunks.at(pos), pos);
+            it = update_set.erase(it);
+        } else ++it;
+    }
+}
+
 Chunk &Map::load_chunk(ChkPos const &pos)
 {
     util::log("MAP", util::DEBUG, "loading chunk %zd, %zd, %zd", pos.x, pos.y, pos.z);
     chunks.emplace(pos, Chunk());
     Chunk &chunk = chunks.at(pos);
     generator.generate_chunk(chunk, pos);
-    chunk.light_lvls[to_chk_idx(IdxPos(8, 8, 2))] = 0xF000;
-    chunk.light_lvls[to_chk_idx(IdxPos(10, 4, 2))] = 0x0800;
-    chunk.light_lvls[to_chk_idx(IdxPos(4, 10, 2))] = 0x00F0;
-    chunk.light_lvls[to_chk_idx(IdxPos(4, 4, 2))] = 0x0F80;
-    chunk.light_lvls[to_chk_idx(IdxPos(10, 10, 2))] = 0x8F00;
-    lightning_system.add_node(to_map_pos(pos, IdxPos(8, 8, 2)));
-    lightning_system.add_node(to_map_pos(pos, IdxPos(10, 4, 2)));
-    lightning_system.add_node(to_map_pos(pos, IdxPos(4, 10, 2)));
-    lightning_system.add_node(to_map_pos(pos, IdxPos(4, 4, 2)));
-    lightning_system.add_node(to_map_pos(pos, IdxPos(10, 10, 2)));
-    lightning_system.update(chunk, pos);
+    if(pos.x % 2 && pos.y % 2) {
+    lightning_system.add_node(to_map_pos(pos, IdxPos(8, 8, 2)),
+        {0xF, 0x0, 0x0});
+    lightning_system.add_node(to_map_pos(pos, IdxPos(8, 10, 2)),
+        {0x0, 0x0, 0xF});
+    lightning_system.add_node(to_map_pos(pos, IdxPos(12, 8, 2)),
+        {0x0, 0xF, 0x0});
+    }
+
     return chunk;
 }
 
