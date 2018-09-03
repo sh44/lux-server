@@ -67,7 +67,7 @@ void Map::build_mesh(Chunk &chunk, ChkPos const &pos)
 {
     constexpr MapPos offsets[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
 
-    Vector<Vec3<F32>> vertices;
+    Vector<Vec3F> vertices;
     Vector<I32>       indices;
 
     /* this is the size of a checkerboard pattern, worst case */
@@ -93,7 +93,7 @@ void Map::build_mesh(Chunk &chunk, ChkPos const &pos)
             face_map[a][i] = has_face(m_pos, m_pos + offsets[a]);
         }
     }
-    constexpr Vec3<U32> idx_offsets = {1, CHK_SIZE.x, CHK_SIZE.x * CHK_SIZE.y};
+    constexpr Vec3UI idx_offsets = {1, CHK_SIZE.x, CHK_SIZE.x * CHK_SIZE.y};
     for(U32 a = 0; a < 3; ++a) {
         /* two axes we use to scan the plane for quads (x - 0, y - 1, z - 2)*/
         U32 f_axis = a == 2 ? 0 : a == 0 ? 1 : 2;
@@ -149,17 +149,17 @@ void Map::build_mesh(Chunk &chunk, ChkPos const &pos)
                     }
                 }
 
-                Vec3<U32> f_side_vec(0);
-                Vec3<U32> s_side_vec(0);
+                Vec3UI f_side_vec(0);
+                Vec3UI s_side_vec(0);
                 f_side_vec[f_axis] = f_d;
                 s_side_vec[s_axis] = s_d;
 
-                constexpr glm::vec2 quad[4] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+                constexpr Vec2F quad[4] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
                 for(U32 j = 0; j < 4; ++j) {
                     vertices.emplace_back(
-                        (Vec3<F32>)i_pos + (glm::vec3)offsets[a] +
-                            quad[j].x * (Vec3<F32>)f_side_vec +
-                            quad[j].y * (Vec3<F32>)s_side_vec);
+                        (Vec3F)i_pos + (Vec3F)offsets[a] +
+                            quad[j].x * (Vec3F)f_side_vec +
+                            quad[j].y * (Vec3F)s_side_vec);
                 }
 
                 for(auto const &idx : {0, 1, 2, 2, 3, 0}) {
@@ -184,7 +184,7 @@ void Map::build_mesh(Chunk &chunk, ChkPos const &pos)
             sizeof(U32) * 3,
             mesh.vertices.size(),
             (F32 *)mesh.vertices.data(),
-            sizeof(Vec3<F32>));
+            sizeof(Vec3F));
         mesh.bt_mesh = new btBvhTriangleMeshShape(mesh.bt_trigs, false,
                 {0.0, 0.0, 0.0}, {CHK_SIZE.x, CHK_SIZE.y, CHK_SIZE.z});
         physics_engine.add_shape(base_pos, mesh.bt_mesh);

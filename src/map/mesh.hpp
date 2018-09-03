@@ -8,7 +8,7 @@
 
 struct Mesh
 {
-    Vector<Vec3<F32>> vertices;
+    Vector<Vec3F> vertices;
     Vector<I32>       indices;
 
     btBvhTriangleMeshShape     *bt_mesh;

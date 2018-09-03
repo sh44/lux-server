@@ -29,7 +29,7 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
         for(SizeT i = 0; i < CHK_VOLUME; ++i)
         {
             MapPos map_pos = to_map_pos(pos, i);
-            Vec2<F32> c_pos = (Vec2<F32>)map_pos + Vec2<F32>(0.5f, 0.5f);
+            Vec2F c_pos = (Vec2F)map_pos + Vec2F(0.5f, 0.5f);
             F32 o1 = glm::simplex(c_pos * 0.01f);
             F32 o2 = glm::simplex(c_pos * 0.04f);
             F32 o3 = glm::simplex(c_pos * 0.08f);

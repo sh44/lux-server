@@ -99,7 +99,7 @@ bool Player::send_chunks(net::server::Packet &sp)
             {
                 if(loaded_chunks.count(iter) == 0)
                 {
-                    if(glm::distance((Vec3<F32>)iter, (Vec3<F32>)center)
+                    if(glm::distance((Vec3F)iter, (Vec3F)center)
                            <= load_range)
                     {
                         auto const &chunk =
