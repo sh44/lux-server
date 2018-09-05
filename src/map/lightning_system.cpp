@@ -9,7 +9,7 @@ void LightningSystem::add_node(MapPos const &pos, Vec3UI const &col)
 {
     //TODO check for collisions?
     ChkPos chk_pos = to_chk_pos(pos);
-    chunk_nodes[chk_pos].emplace(to_idx_pos(pos), col);
+    chunk_nodes[chk_pos].emplace(to_chk_idx(pos), col);
     queue_update(chk_pos);
 }
 
@@ -21,9 +21,9 @@ void LightningSystem::update(Chunk &chunk, ChkPos const &pos)
     while(!nodes.empty()) {
         LightNode node = nodes.front();
         nodes.pop();
-        ChkIdx node_idx = to_chk_idx(node.pos);
-        if(chunk.voxels[node_idx] != 0) {
-            chunk.light_lvls[node_idx] = 0x0000;
+        //TODO void_id
+        if(chunk.voxels[node.idx] != 0) {
+            chunk.light_lvls[node.idx] = 0x0000;
             continue;
         }
 
@@ -32,10 +32,10 @@ void LightningSystem::update(Chunk &chunk, ChkPos const &pos)
              { 0, -1,  0}, { 0,  1,  0},
              { 0,  0, -1}, { 0,  0,  1}};
 
-        MapPos base_pos = to_map_pos(pos, node.pos);
+        MapPos base_pos = to_map_pos(pos, node.idx);
         //TODO bit-level parallelism
 
-        LightLvl map_lvl = chunk.light_lvls[node_idx];
+        LightLvl map_lvl = chunk.light_lvls[node.idx];
         Vec3UI map_color = {(map_lvl & 0xF000) >> 12,
                             (map_lvl & 0x0F00) >>  8,
                             (map_lvl & 0x00F0) >>  4};
@@ -45,7 +45,7 @@ void LightningSystem::update(Chunk &chunk, ChkPos const &pos)
             /* node.col is guaranteed to be non-zero when is_less is true */
             Vec3UI new_color = node.col * (Vec3UI)is_less +
                                map_color * (Vec3UI)(glm::not_(is_less));
-            chunk.light_lvls[node_idx] = (new_color.r << 12) |
+            chunk.light_lvls[node.idx] = (new_color.r << 12) |
                                          (new_color.g <<  8) |
                                          (new_color.b <<  4);
             if(glm::any(atleast_two)) {
@@ -53,12 +53,11 @@ void LightningSystem::update(Chunk &chunk, ChkPos const &pos)
                 for(auto const &offset : offsets) {
                     MapPos map_pos = base_pos + offset;
                     ChkPos chk_pos = to_chk_pos(map_pos);
-                    IdxPos idx_pos = to_idx_pos(map_pos);
+                    ChkIdx idx     = to_chk_idx(map_pos);
                     if(chk_pos == pos) {
-                        //TODO void_id
-                        nodes.emplace(idx_pos, side_color);
+                        nodes.emplace(idx, side_color);
                     } else {
-                        chunk_nodes[chk_pos].emplace(idx_pos, side_color);
+                        chunk_nodes[chk_pos].emplace(idx, side_color);
                         queue_update(chk_pos);
                     }
                 }

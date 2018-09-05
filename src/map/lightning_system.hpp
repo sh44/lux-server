@@ -9,10 +9,10 @@ class LightningSystem
 {
     struct LightNode
     {
-        IdxPos pos;
+        ChkIdx idx;
         Vec3UI col;
-        LightNode(IdxPos const &pos, Vec3UI const &col) :
-            pos(pos), col(col) { }
+        LightNode(ChkIdx const &idx, Vec3UI const &col) :
+            idx(idx), col(col) { }
     };
     public:
     void add_node(MapPos const &pos, Vec3UI const &col);
