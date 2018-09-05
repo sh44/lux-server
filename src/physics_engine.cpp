@@ -32,7 +32,7 @@ btRigidBody *PhysicsEngine::add_shape(MapPos const &pos, btCollisionShape *shape
     return &bodies.back();
 }
 
-void PhysicsEngine::update()
+void PhysicsEngine::tick()
 {
     world.stepSimulation(1.0f/64.f, 1, 1.0f/60.f);
 }

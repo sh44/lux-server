@@ -15,7 +15,7 @@ class PhysicsEngine
     btRigidBody *add_entity(EntityPos const &pos);
     btRigidBody *add_shape(MapPos const &pos, btCollisionShape *shape);
 
-    void update();
+    void tick();
     private:
     std::list<btRigidBody> bodies;
     std::list<btDefaultMotionState> motion_states; //TODO is this needed?

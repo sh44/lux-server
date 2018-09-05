@@ -7,7 +7,6 @@
 
 void LightningSystem::add_node(MapPos const &pos, Vec3UI const &col)
 {
-    //TODO check for collisions?
     ChkPos chk_pos = to_chk_pos(pos);
     chunk_nodes[chk_pos].emplace(to_chk_idx(pos), col);
     queue_update(chk_pos);

@@ -19,7 +19,7 @@ public:
 
     void get_entities_positions(Vector<EntityPos> &out) const;
     Entity &create_player();
-    void update();
+    void tick();
 private:
     template<typename... Args>
     Entity &create_entity(Args &&...args);

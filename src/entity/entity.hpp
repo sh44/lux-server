@@ -17,7 +17,7 @@ public:
 
     EntityPos get_pos() const;
 
-    void update();
+    void tick();
     void move(EntityVec const &by);
     void jump();
 

@@ -18,7 +18,7 @@ EntityPos Entity::get_pos() const
     return EntityPos(pos.x(), pos.y(), pos.z());
 }
 
-void Entity::update()
+void Entity::tick()
 {
     ChkPos center = to_chk_pos(glm::round(get_pos()));
     ChkPos iter;
