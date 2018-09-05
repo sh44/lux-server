@@ -11,9 +11,8 @@ class LightningSystem
     {
         IdxPos pos;
         Vec3UI col;
-        Vec3I  src;
-        LightNode(IdxPos const &pos, Vec3UI const &col, Vec3I const &src) :
-            pos(pos), col(col), src(src) { }
+        LightNode(IdxPos const &pos, Vec3UI const &col) :
+            pos(pos), col(col) { }
     };
     public:
     void add_node(MapPos const &pos, Vec3UI const &col);

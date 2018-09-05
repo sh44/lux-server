@@ -9,7 +9,7 @@ void LightningSystem::add_node(MapPos const &pos, Vec3UI const &col)
 {
     //TODO check for collisions?
     ChkPos chk_pos = to_chk_pos(pos);
-    chunk_nodes[chk_pos].emplace(to_idx_pos(pos), col, Vec3I(0, 0, 0));
+    chunk_nodes[chk_pos].emplace(to_idx_pos(pos), col);
     queue_update(chk_pos);
 }
 
@@ -51,18 +51,15 @@ void LightningSystem::update(Chunk &chunk, ChkPos const &pos)
             if(glm::any(atleast_two)) {
                 Vec3UI side_color = node.col - 1u * (Vec3UI)atleast_two;
                 for(auto const &offset : offsets) {
-                    if(offset != -node.src) {
-                        MapPos map_pos = base_pos + offset;
-                        ChkPos chk_pos = to_chk_pos(map_pos);
-                        IdxPos idx_pos = to_idx_pos(map_pos);
-                        if(chk_pos == pos) {
-                            //TODO void_id
-                            nodes.emplace(idx_pos, side_color, Vec3I(0, 0, 0));
-                        } else {
-                            chunk_nodes[chk_pos].emplace(idx_pos,
-                                                         side_color, offset);
-                            queue_update(chk_pos);
-                        }
+                    MapPos map_pos = base_pos + offset;
+                    ChkPos chk_pos = to_chk_pos(map_pos);
+                    IdxPos idx_pos = to_idx_pos(map_pos);
+                    if(chk_pos == pos) {
+                        //TODO void_id
+                        nodes.emplace(idx_pos, side_color);
+                    } else {
+                        chunk_nodes[chk_pos].emplace(idx_pos, side_color);
+                        queue_update(chk_pos);
                     }
                 }
             }
