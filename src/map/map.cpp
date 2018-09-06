@@ -23,16 +23,10 @@ Map::~Map()
     }
 }
 
-VoxelId &Map::get_voxel(MapPos const &pos)
-{
-    return get_chunk(to_chk_pos(pos)).voxels[to_chk_idx(pos)];
-}
-
 //TODO we will need to update meshes etc. on change, so this will need a const
 //version
-Chunk &Map::get_chunk(ChkPos const &pos)
+Chunk const &Map::get_chunk(ChkPos const &pos)
 {
-    guarantee_chunk(pos);
     return chunks.at(pos);
 }
 

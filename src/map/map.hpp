@@ -20,8 +20,7 @@ class Map
     Map &operator=(Map const &that) = delete;
     ~Map();
 
-    VoxelId &get_voxel(MapPos const &pos);
-    Chunk &get_chunk(ChkPos const &pos);
+    Chunk const &get_chunk(ChkPos const &pos);
 
     void guarantee_chunk(ChkPos const &pos);
     void guarantee_mesh(ChkPos const &pos);

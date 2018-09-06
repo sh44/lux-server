@@ -102,6 +102,7 @@ bool Player::send_chunks(net::server::Packet &sp)
                     if(glm::distance((Vec3F)iter, (Vec3F)center)
                            <= load_range)
                     {
+                        entity->world.guarantee_chunk(iter);
                         auto const &chunk =
                             entity->world.get_chunk(iter);
                         send_chunk(sp, chunk, iter);
