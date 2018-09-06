@@ -1,3 +1,5 @@
+#include <cassert>
+//
 #include <lux/util/log.hpp>
 #include <lux/common/map.hpp>
 //
@@ -27,6 +29,7 @@ Map::~Map()
 //version
 Chunk const &Map::get_chunk(ChkPos const &pos)
 {
+    assert(chunks.count(pos) > 0);
     return chunks.at(pos);
 }
 
@@ -60,6 +63,11 @@ void Map::tick()
 void Map::build_mesh(Chunk &chunk, ChkPos const &pos)
 {
     constexpr MapPos offsets[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+
+    assert(!chunk.is_mesh_generated);
+    for(auto const &offset : offsets) {
+        assert(chunks.count(pos + (ChkPos)offset) > 0);
+    }
 
     Vector<Vec3F> vertices;
     Vector<I32>       indices;
@@ -202,6 +210,8 @@ void Map::lightning_tick()
 
 Chunk &Map::load_chunk(ChkPos const &pos)
 {
+    assert(chunks.count(pos) == 0);
+
     util::log("MAP", util::DEBUG, "loading chunk %zd, %zd, %zd", pos.x, pos.y, pos.z);
     chunks.emplace(pos, Chunk());
     Chunk &chunk = chunks.at(pos);

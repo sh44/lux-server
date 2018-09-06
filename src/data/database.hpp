@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cassert>
+//
 #include <lux/alias/scalar.hpp>
 #include <lux/alias/vector.hpp>
 #include <lux/alias/hash_map.hpp>
@@ -38,6 +40,7 @@ template<typename... Args>
 void Database::add_entity(Args const &...args)
 {
     auto const &entity = entities.emplace_back(args...);
+    assert(entities_lookup.count(entity.str_id) == 0);
     entities_lookup[entity.str_id] = entities.size() - 1;
 }
 
@@ -45,6 +48,7 @@ template<typename... Args>
 void Database::add_voxel(Args const &...args)
 {
     auto const &vox = voxels.emplace_back(args...);
+    assert(voxels_lookup.count(vox.str_id) == 0);
     voxels_lookup[vox.str_id] = voxels.size() - 1;
 }
 

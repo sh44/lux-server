@@ -1,3 +1,5 @@
+#include <cassert>
+//
 #include <entity/entity_type.hpp>
 #include <map/voxel_type.hpp>
 #include "database.hpp"
@@ -19,11 +21,13 @@ Database::Database()
 
 EntityType const &Database::get_entity(String const &str_id) const
 {
+    assert(get_entity_id(str_id) < entities.size());
     return entities[get_entity_id(str_id)];
 }
 
 VoxelType const &Database::get_voxel(String const &str_id) const
 {
+    assert(get_voxel_id(str_id) < voxels.size());
     return voxels[get_voxel_id(str_id)];
 }
 
