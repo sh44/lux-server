@@ -22,6 +22,10 @@ Generator::Generator(data::Config const &config) :
 
 void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
 {
+    auto u_mod = [&](I32 a, U32 b) -> U32 {
+        return *(U32 *)&a % b;
+    };
+
     Vec2<ChkCoord> h_pos = Vec2<ChkCoord>(pos);
     if(height_map.count(h_pos) == 0)
     {
@@ -68,16 +72,16 @@ void Generator::generate_chunk(Chunk &chunk, ChkPos const &pos)
         }
         else if(map_pos.z <= h - 20.f)
         {
-            if(map_pos.z % 4 == 0)
+            if(u_mod(map_pos.z, 4) == 0)
             {
                 voxel_id = config.db->get_voxel_id("stone_floor");
             }
-            else if(map_pos.x % 8 == 0 ||
-                    map_pos.y % 8 == 0)
+            else if(u_mod(map_pos.x, 8) == 0 ||
+                    u_mod(map_pos.y, 8) == 0)
             {
-                if((map_pos.z % 4 == -1 && hash % 4 == 0) ||
-                   (map_pos.z % 4 == -2 &&
-                    std::hash<MapPos>()(map_pos - MapPos(0, 0, 1)) % 6 == 0))
+                if((u_mod(map_pos.z, 4) == 1 && hash % 4 == 0) ||
+                   (u_mod(map_pos.z, 4) == 2 &&
+                    std::hash<MapPos>()(map_pos - MapPos(0, 0, 1)) % 4 == 0))
                 {
                     voxel_id = config.db->get_voxel_id("void");
                 }
