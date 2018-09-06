@@ -25,11 +25,11 @@ void World::tick()
         }
         else
         {
-            iter->update();
+            iter->tick();
             iter++;
         }
     }
-    physics_engine.update();
+    physics_engine.tick();
 }
 
 Entity &World::create_player()
