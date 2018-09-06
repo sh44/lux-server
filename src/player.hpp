@@ -5,7 +5,7 @@
 #include <lux/alias/set.hpp>
 #include <lux/alias/scalar.hpp>
 #include <lux/alias/string.hpp>
-#include <lux/common/map.hpp>
+#include <lux/world/map.hpp>
 
 namespace data { struct Config; }
 namespace net::client

@@ -4,8 +4,8 @@
 //
 #include <btBulletDynamicsCommon.h>
 //
-#include <lux/common/entity.hpp>
-#include <lux/common/map.hpp>
+#include <lux/world/entity.hpp>
+#include <lux/world/map.hpp>
 
 class PhysicsEngine
 {

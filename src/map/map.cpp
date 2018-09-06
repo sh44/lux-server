@@ -1,7 +1,7 @@
 #include <cassert>
 //
 #include <lux/util/log.hpp>
-#include <lux/common/map.hpp>
+#include <lux/world/map.hpp>
 //
 #include <data/database.hpp>
 #include <data/config.hpp>

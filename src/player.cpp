@@ -5,8 +5,9 @@
 #include <lux/alias/scalar.hpp>
 #include <lux/alias/string.hpp>
 #include <lux/util/log.hpp>
-#include <lux/common/entity.hpp>
-#include <lux/common/map.hpp>
+#include <lux/common.hpp>
+#include <lux/world/entity.hpp>
+#include <lux/world/map.hpp>
 #include <lux/net/server/packet.hpp>
 #include <lux/net/client/packet.hpp>
 //
@@ -37,7 +38,7 @@ void Player::receive(net::client::Packet const &cp)
         }
         else
         {
-            throw std::runtime_error("client has not sent init data");
+            lux::error("PLAYER", "client has not sent init data");
             //TODO just kick him out
         }
     }

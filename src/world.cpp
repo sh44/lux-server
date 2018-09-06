@@ -1,4 +1,4 @@
-#include <lux/common/entity.hpp>
+#include <lux/world/entity.hpp>
 //
 #include <data/database.hpp>
 #include <entity/entity_type.hpp>

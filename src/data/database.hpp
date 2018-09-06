@@ -6,8 +6,8 @@
 #include <lux/alias/vector.hpp>
 #include <lux/alias/hash_map.hpp>
 #include <lux/alias/string.hpp>
-#include <lux/common/map.hpp>
-#include <lux/common/entity.hpp>
+#include <lux/world/map.hpp>
+#include <lux/world/entity.hpp>
 //
 #include <map/voxel_type.hpp>
 #include <entity/entity_type.hpp>

@@ -2,7 +2,7 @@
 
 #include <btBulletDynamicsCommon.h>
 //
-#include <lux/common/entity.hpp>
+#include <lux/world/entity.hpp>
 
 class World;
 

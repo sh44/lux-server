@@ -1,6 +1,5 @@
-#include <stdexcept>
-//
 #include <lux/util/log.hpp>
+#include <lux/common.hpp>
 //
 #include <player.hpp>
 #include "server.hpp"
@@ -15,7 +14,7 @@ Server::Server(net::Port port) :
 {
     if(enet_server == nullptr)
     {
-        throw std::runtime_error("couldn't create ENet server host");
+        lux::error("SERVER", "couldn't create ENet server host");
     }
     util::log("SERVER", util::INFO, "starting server");
     thread = std::thread(&Server::run, this);

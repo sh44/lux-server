@@ -3,7 +3,7 @@
 #include <lux/alias/scalar.hpp>
 #include <lux/alias/pos_map.hpp>
 #include <lux/alias/vec_2.hpp>
-#include <lux/common/map.hpp>
+#include <lux/world/map.hpp>
 
 namespace data { struct Config; }
 

@@ -3,7 +3,7 @@
 #include <lux/alias/queue.hpp>
 #include <lux/alias/set.hpp>
 #include <lux/alias/pos_map.hpp>
-#include <lux/common/map.hpp>
+#include <lux/world/map.hpp>
 
 class LightningSystem
 {

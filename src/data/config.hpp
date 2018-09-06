@@ -3,7 +3,7 @@
 #include <lux/alias/scalar.hpp>
 #include <lux/alias/string.hpp>
 //
-#include <lux/common/entity.hpp>
+#include <lux/world/entity.hpp>
 
 namespace data
 {

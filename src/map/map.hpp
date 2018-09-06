@@ -2,7 +2,7 @@
 
 #include <lux/alias/pos_map.hpp>
 #include <lux/alias/queue.hpp>
-#include <lux/common/map.hpp>
+#include <lux/world/map.hpp>
 //
 #include <map/chunk.hpp>
 #include <map/generator.hpp>
