@@ -12,7 +12,6 @@ struct EntityType
 
     }
 
-    EntityId id;
     String str_id;
     String name;
 };

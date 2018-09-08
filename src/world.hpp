@@ -5,6 +5,7 @@
 #include <lux/alias/vector.hpp>
 #include <lux/util/log.hpp>
 //
+#include <data/database.hpp>
 #include <data/config.hpp>
 #include <entity/entity_type.hpp>
 #include <entity/entity.hpp>
@@ -38,6 +39,6 @@ Entity &World::create_entity(Args &&...args)
     Entity &result = entity_storage.back();
     auto pos = result.get_pos();
     util::log("WORLD", util::DEBUG, "created new entity, typeid: %s, pos: %.2f, %.2f, %.2f",
-              result.type.id, pos.x, pos.y, pos.z);
+              db.get_entity_id(result.type.str_id), pos.x, pos.y, pos.z);
     return result;
 }
