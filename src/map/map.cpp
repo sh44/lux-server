@@ -70,7 +70,7 @@ void Map::build_mesh(Chunk &chunk, ChkPos const &pos)
     }
 
     Vector<Vec3F> vertices;
-    Vector<I32>       indices;
+    Vector<I32>   indices;
 
     /* this is the size of a checkerboard pattern, worst case */
     vertices.reserve(CHK_VOLUME * 3 * 4);
@@ -197,6 +197,9 @@ void Map::build_mesh(Chunk &chunk, ChkPos const &pos)
 void Map::lightning_tick()
 {
     //TODO this list could get out of hand in a long gameplay
+    //TODO move this to LightningSystem?
+    //TODO rename LightningSystem to LightningEngine
+    //TODo rename Array to Arr, Vector to DynArr
     Set<ChkPos> &update_set = lightning_system.update_set;
     for(auto it = update_set.begin(); it != update_set.end();) {
         //TODO add is_loaded
