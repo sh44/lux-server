@@ -3,6 +3,7 @@
 #include <lux/alias/scalar.hpp>
 #include <lux/alias/pos_map.hpp>
 #include <lux/alias/vec_2.hpp>
+#include <lux/common.hpp>
 #include <lux/world/map.hpp>
 
 namespace data { struct Config; }
@@ -13,8 +14,7 @@ class Generator
 {
 public:
     Generator(data::Config const &config);
-    Generator(Generator const &that) = delete;
-    Generator &operator=(Generator const &that) = delete;
+    LUX_NO_COPY(Generator);
 
     void generate_chunk(Chunk &chunk, ChkPos const &pos);
 private:

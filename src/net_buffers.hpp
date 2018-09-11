@@ -15,8 +15,8 @@
 struct NetBuffers
 {
     NetBuffers();
-    ~NetBuffers();
     LUX_NO_COPY(NetBuffers);
+    ~NetBuffers();
 
     net::server::Tick   st;
     net::server::Signal ss;

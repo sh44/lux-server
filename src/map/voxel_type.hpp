@@ -2,9 +2,13 @@
 
 #include <lux/alias/scalar.hpp>
 #include <lux/alias/string.hpp>
+#include <lux/common.hpp>
 
 struct VoxelType
 {
+    LUX_NO_COPY(VoxelType);
+    LUX_MOVEABLE(VoxelType);
+
     enum Shape : U8
     {
         EMPTY,

@@ -2,6 +2,7 @@
 
 #include <lux/alias/pos_map.hpp>
 #include <lux/alias/queue.hpp>
+#include <lux/common.hpp>
 #include <lux/world/map.hpp>
 //
 #include <map/chunk.hpp>
@@ -16,8 +17,7 @@ class Map
     typedef PosMap<ChkPos, Chunk>::iterator ChunkIterator;
     public:
     Map(PhysicsEngine &physics_engine, data::Config const &config);
-    Map(Map const &that) = delete;
-    Map &operator=(Map const &that) = delete;
+    LUX_NO_COPY(Map);
     ~Map();
 
     Chunk const &get_chunk(ChkPos const &pos);

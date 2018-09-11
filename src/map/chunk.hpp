@@ -2,12 +2,17 @@
 
 #include <lux/alias/scalar.hpp>
 #include <lux/alias/array.hpp>
+#include <lux/common.hpp>
 #include <lux/world/map.hpp>
 //
 #include <map/mesh.hpp>
 
 struct Chunk
 {
+    Chunk() = default;
+    LUX_NO_COPY(Chunk);
+    LUX_MOVEABLE(Chunk);
+
     Array<VoxelId , CHK_VOLUME> voxels;
     Array<LightLvl, CHK_VOLUME> light_lvls = {0};
 

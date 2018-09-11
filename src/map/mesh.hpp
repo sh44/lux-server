@@ -5,9 +5,12 @@
 #include <lux/alias/scalar.hpp>
 #include <lux/alias/vec_3.hpp>
 #include <lux/alias/vector.hpp>
+#include <lux/common.hpp>
 
 struct Mesh
 {
+    LUX_NO_COPY(Mesh);
+
     Vector<Vec3F> vertices;
     Vector<I32>       indices;
 

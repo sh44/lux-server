@@ -15,8 +15,7 @@ class World : public Map
 {
 public:
     World(data::Config const &config);
-    World(World const &that) = delete;
-    World &operator=(World const &that) = delete;
+    LUX_NO_COPY(World);
 
     void get_entities_positions(Vector<EntityPos> &out) const;
     Entity &create_player();

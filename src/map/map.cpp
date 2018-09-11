@@ -219,7 +219,7 @@ Chunk &Map::load_chunk(ChkPos const &pos)
     chunks.emplace(pos, Chunk());
     Chunk &chunk = chunks.at(pos);
     generator.generate_chunk(chunk, pos);
-    if(pos.x % 2 && pos.y % 2) {
+    if(!(pos.x % 8) && !(pos.y % 8)) {
     lightning_system.add_node(to_map_pos(pos, IdxPos(4, 4, 2)),
         {0x8, 0x8, 0x8});
     lightning_system.add_node(to_map_pos(pos, IdxPos(7, 7, 2)),

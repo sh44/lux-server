@@ -6,6 +6,7 @@
 #include <lux/alias/vector.hpp>
 #include <lux/alias/hash_map.hpp>
 #include <lux/alias/string.hpp>
+#include <lux/common.hpp>
 #include <lux/world/map.hpp>
 #include <lux/world/entity.hpp>
 //
@@ -19,6 +20,7 @@ class Database
 {
 public:
     Database();
+    LUX_NO_COPY(Database);
 
     template<typename... Args>
     void add_entity(Args const &...args);

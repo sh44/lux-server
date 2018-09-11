@@ -9,6 +9,14 @@
 #include <lux/alias/string.hpp>
 #include <lux/common.hpp>
 #include <lux/net/common.hpp>
+#include <lux/net/client/tick.hpp>
+#include <lux/net/client/signal.hpp>
+#include <lux/net/client/init.hpp>
+#include <lux/net/server/tick.hpp>
+#include <lux/net/server/signal.hpp>
+#include <lux/net/server/init.hpp>
+#include <lux/net/serializer.inl>
+#include <lux/net/deserializer.inl>
 #include <lux/world/entity.hpp>
 #include <lux/world/map.hpp>
 //
@@ -43,12 +51,12 @@ void Player::net_input_tick()
 {
     receive_packets();
     while(!in_signal_buffers.empty()) {
-        deserialize_packet(in_signal_buffers.front(), nb.cs);
+        nb.deserializer.deserialize_packet(in_signal_buffers.front(), nb.cs);
         in_signal_buffers.pop();
         handle_signal();
     }
     if(in_tick_buffer != nullptr) {
-        deserialize_packet(in_tick_buffer, nb.ct);
+        nb.deserializer.deserialize_packet(in_tick_buffer, nb.ct);
         handle_tick();
     } else {
         LUX_LOG("PLAYER", WARN, "tick packet lost");
@@ -92,7 +100,7 @@ bool Player::receive_init()
         U8 channel_id;
         ENetPacket *pack = enet_peer_receive(peer, &channel_id);
         if(pack != nullptr && channel_id == net::INIT_CHANNEL) {
-            serialize_packet(pack, nb.ci);
+            nb.serializer.serialize_packet(pack, nb.ci);
             return true;
         }
         std::this_thread::sleep_for(SLEEP_DURATION);
@@ -109,19 +117,19 @@ void Player::send_packet(U8 channel_id, ENetPacket *pack)
 
 void Player::send_tick()
 {
-    serialize_packet(nb.unreliable_packet, nb.st);
+    nb.serializer.serialize_packet(nb.unreliable_packet, nb.st);
     send_packet(net::TICK_CHANNEL, nb.unreliable_packet);
 }
 
 void Player::send_signal()
 {
-    serialize_packet(nb.unreliable_packet, nb.ss);
+    nb.serializer.serialize_packet(nb.unreliable_packet, nb.ss);
     send_packet(net::SIGNAL_CHANNEL, nb.reliable_packet);
 }
 
 void Player::send_init()
 {
-    serialize_packet(nb.unreliable_packet, nb.si);
+    nb.serializer.serialize_packet(nb.unreliable_packet, nb.si);
     send_packet(net::INIT_CHANNEL, nb.reliable_packet);
 }
 

@@ -2,6 +2,7 @@
 
 #include <btBulletDynamicsCommon.h>
 //
+#include <lux/common.hpp>
 #include <lux/world/entity.hpp>
 
 class World;
@@ -12,8 +13,7 @@ class Entity
 {
 public:
     Entity(World &world, EntityType const &type, btRigidBody *body);
-    Entity(Entity const &that) = delete;
-    Entity &operator=(Entity const &that) = delete;
+    LUX_NO_COPY(Entity);
 
     EntityPos get_pos() const;
 

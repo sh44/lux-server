@@ -3,6 +3,7 @@
 #include <lux/alias/queue.hpp>
 #include <lux/alias/set.hpp>
 #include <lux/alias/pos_map.hpp>
+#include <lux/common.hpp>
 #include <lux/world/map.hpp>
 
 class LightningSystem
@@ -15,6 +16,9 @@ class LightningSystem
             idx(idx), col(col) { }
     };
     public:
+    LightningSystem() = default;
+    LUX_NO_COPY(LightningSystem);
+
     void add_node(MapPos const &pos, Vec3UI const &col);
     void update(Chunk &chunk, ChkPos const &pos);
 

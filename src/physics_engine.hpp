@@ -4,6 +4,7 @@
 //
 #include <btBulletDynamicsCommon.h>
 //
+#include <lux/common.hpp>
 #include <lux/world/entity.hpp>
 #include <lux/world/map.hpp>
 
@@ -11,6 +12,7 @@ class PhysicsEngine
 {
     public:
     PhysicsEngine();
+    LUX_NO_COPY(PhysicsEngine);
 
     btRigidBody *add_entity(EntityPos const &pos);
     btRigidBody *add_shape(MapPos const &pos, btCollisionShape *shape);
