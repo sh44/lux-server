@@ -27,18 +27,6 @@ int main()
             std::getline(std::cin, input);
             server.kick_player(addr.host, input);
         }
-        else if(input == "msg")
-        {
-            std::cout << "hostname: ";
-            std::getline(std::cin, input);
-
-            ENetAddress addr;
-            enet_address_set_host(&addr, input.c_str());
-
-            std::cout << "msg: ";
-            std::getline(std::cin, input);
-            server.send_msg(addr.host, input);
-        }
     }
     return 0;
 }
