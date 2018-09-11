@@ -7,7 +7,6 @@
 //
 #include <lux/alias/scalar.hpp>
 #include <lux/alias/string.hpp>
-#include <lux/util/log.hpp>
 #include <lux/common.hpp>
 #include <lux/net/common.hpp>
 #include <lux/world/entity.hpp>
@@ -52,7 +51,7 @@ void Player::net_input_tick()
         deserialize_packet(in_tick_buffer, nb.ct);
         handle_tick();
     } else {
-        util::log("PLAYER", util::WARN, "tick packet lost");
+        LUX_LOG("PLAYER", WARN, "tick packet lost");
     }
 }
 
@@ -143,16 +142,16 @@ void Player::handle_signal()
 void Player::handle_init()
 {
     net::client::Init const &ci = nb.ci;
-    util::log("PLAYER", util::INFO, "received initialization data");
+    LUX_LOG("PLAYER", INFO, "received initialization data");
     String client_name(ci.client_name.begin(), ci.client_name.end());
-    util::log("PLAYER", util::INFO, "client name: %s", client_name);
+    LUX_LOG("PLAYER", INFO, "client name: %s", client_name);
 }
 
 void Player::handle_conf()
 {
     net::client::Conf const &cc = nb.cs.conf;
-    util::log("PLAYER", util::INFO, "changing config");
-    util::log("PLAYER", util::INFO, "load range: %.2f", cc.load_range);
+    LUX_LOG("PLAYER", INFO, "changing config");
+    LUX_LOG("PLAYER", INFO, "load range: %.2f", cc.load_range);
     load_range = cc.load_range;
 }
 

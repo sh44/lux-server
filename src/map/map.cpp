@@ -1,6 +1,6 @@
 #include <cassert>
 //
-#include <lux/util/log.hpp>
+#include <lux/common.hpp>
 #include <lux/world/map.hpp>
 //
 #include <data/database.hpp>
@@ -215,7 +215,7 @@ Chunk &Map::load_chunk(ChkPos const &pos)
 {
     assert(chunks.count(pos) == 0);
 
-    util::log("MAP", util::DEBUG, "loading chunk %zd, %zd, %zd", pos.x, pos.y, pos.z);
+    LUX_LOG("MAP", DEBUG, "loading chunk %zd, %zd, %zd", pos.x, pos.y, pos.z);
     chunks.emplace(pos, Chunk());
     Chunk &chunk = chunks.at(pos);
     generator.generate_chunk(chunk, pos);

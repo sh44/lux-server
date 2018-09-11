@@ -1,3 +1,4 @@
+#include <lux/common.hpp>
 #include <lux/world/entity.hpp>
 //
 #include <data/database.hpp>
@@ -34,7 +35,7 @@ void World::tick()
 
 Entity &World::create_player()
 {
-    util::log("WORLD", util::DEBUG, "created player");
+    LUX_LOG("WORLD", DEBUG, "created player");
     return create_entity(db.entities[config.player_type],
         physics_engine.add_entity({2, 2, -60.5}));
 }

@@ -3,7 +3,7 @@
 #include <list>
 //
 #include <lux/alias/vector.hpp>
-#include <lux/util/log.hpp>
+#include <lux/common.hpp>
 //
 #include <data/database.hpp>
 #include <data/config.hpp>
@@ -38,7 +38,8 @@ Entity &World::create_entity(Args &&...args)
     entity_storage.emplace_back(*this, args...);
     Entity &result = entity_storage.back();
     auto pos = result.get_pos();
-    util::log("WORLD", util::DEBUG, "created new entity, typeid: %s, pos: %.2f, %.2f, %.2f",
-              db.get_entity_id(result.type.str_id), pos.x, pos.y, pos.z);
+    LUX_LOG("WORLD", DEBUG,
+            "created new entity, typeid: %s, pos: %.2f, %.2f, %.2f",
+            db.get_entity_id(result.type.str_id), pos.x, pos.y, pos.z);
     return result;
 }
