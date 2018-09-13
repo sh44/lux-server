@@ -14,12 +14,13 @@ struct {
     U16 port = 31337;
 } config;
 
-struct Client {
-    ENetPeer* peer;
-    String    name;
 };
 
-struct {
+struct Server {
+    struct Client {
+        ENetPeer* peer;
+        String    name;
+    };
     std::atomic<bool> running = false;
     std::thread       thread;
     ENetHost*         host;
@@ -36,7 +37,7 @@ void erase_client(Uns id) {
 void kick_client(String const& name, String const& reason) {
     LUX_LOG("kicking player %s, reason %s", name.c_str(), reason.c_str());
     auto it = std::find_if(server.clients.begin(), server.clients.end(),
-        [&] (Client const& v) { return v.name == name; });
+        [&] (Server::Client const& v) { return v.name == name; });
     Uns client_id = it - server.clients.begin();
     if(client_id >= server.clients.size()) {
         LUX_LOG("tried to kick non-existant client %s", name.c_str());
@@ -68,7 +69,7 @@ void server_main() {
         while(enet_host_service(server.host, &event, 0) > 0) {
             if(event.type == ENET_EVENT_TYPE_CONNECT) {
                 LUX_LOG("new client connected"); //@CONSIDER logging IP
-                Client& client = server.clients.emplace_back();
+                Server::Client& client = server.clients.emplace_back();
                 client.peer = event.peer;
                 client.peer->data = (void *)(server.clients.size() - 1);
                 //@TODO set entity
