@@ -11,7 +11,7 @@ Uns constexpr MAX_CLIENTS  = 16;
 Uns constexpr CHANNEL_NUM = 3;
 
 struct {
-    U16 port;
+    U16 port = 31337;
 } config;
 
 struct Client {
