@@ -60,8 +60,11 @@ void kick_client(String const& name, String const& reason) {
 
 //@CONSIDER custom error codes (enum?)
 int add_client(ENetPeer* peer) {
+    //@CONSIDER use enet_address_get_host_ip
     U8* ip = (U8*)&peer->address.host;
     static_assert(sizeof(peer->address.host) == 4);
+    //@TODO port
+    //@TODO split function into scopes
     LUX_LOG("new client %u.%u.%u.%u connecting", ip[0], ip[1], ip[2], ip[3]);
 
     ///retrieve init packet
@@ -76,33 +79,29 @@ int add_client(ENetPeer* peer) {
     U8  channel_id;
     ENetPacket* init_pack;
     do {
+        //@CONSIDER checking return val here, or using a while loop
         enet_host_service(server.host, nullptr, TRY_TIME);
         init_pack = enet_peer_receive(peer, &channel_id);
+        if(init_pack != nullptr && channel_id != INIT_CHANNEL) {
+            LUX_LOG("ignoring unexpected packet on channel %u", channel_id);
+            enet_packet_destroy(init_pack);
+            init_pack = nullptr;
+        }
         if(tries >= MAX_TRIES) {
             LUX_LOG("client did not send an init packet");
             return -1;
         }
-        if(init_pack != nullptr && channel_id == TICK_CHANNEL) {
-            LUX_LOG("ignoring tick packet sent by client on channel %u",
-                    channel_id);
-            enet_packet_destroy(init_pack);
-        } else if(init_pack != nullptr && channel_id != INIT_CHANNEL) {
-            LUX_LOG("client sent a packet on unexcepted channel %u"
-                    ", we expected it on channel %u", channel_id, INIT_CHANNEL);
-            enet_packet_destroy(init_pack);
-            return -1;
-        }
         ++tries;
     } while(init_pack == nullptr);
-    LUX_LOG("received init packet after %zu/%zu", tries, MAX_TRIES);
+    LUX_LOG("received init packet after %zu/%zu tries", tries, MAX_TRIES);
 
     ///we are gonna do a direct copy, so we disable padding,
     ///no need to reverse the byte order,
     ///because we are not using anything bigger than a byte right now,
     //@CONSIDER adding manual padding to increase efficiency
+    //   @RESEARCH would efficiency actually be increased then?
     #pragma pack(push, 1)
-    struct
-    {
+    struct {
         Arr<U8, 3> ver;
         Arr<U8, CLIENT_NAME_LEN> name;
     } client_init_data;
@@ -140,12 +139,12 @@ int add_client(ENetPeer* peer) {
     //@CONSIDER putting it outside function scope, as this struct gets
     //reused for every client connection, maybe even do it for the packet
     #pragma pack(push, 1)
-    struct
-    {
+    struct {
         Arr<U8, SERVER_NAME_LEN> name = conf.name;
     } server_init_data;
     #pragma pack(pop)
 
+    //@TODO use packet buffer in server
     ENetPacket* server_init_pack =
         enet_packet_create((U8*)&server_init_data,
         sizeof(server_init_data), ENET_PACKET_FLAG_RELIABLE);
@@ -155,11 +154,9 @@ int add_client(ENetPeer* peer) {
     }
     if(enet_peer_send(peer, INIT_CHANNEL, server_init_pack) < 0) {
         LUX_LOG("failed to send server init packet");
-        enet_packet_destroy(server_init_pack);
         return -1;
     }
     enet_host_flush(server.host);
-    enet_packet_destroy(server_init_pack);
 
     Server::Client* client = &server.clients.emplace_back();
     client->peer = peer;
@@ -181,7 +178,7 @@ void server_main() {
     if(server.host == nullptr) {
         LUX_FATAL("couldn't initialize ENet host");
     }
-    U8 constexpr server_name[] = "lux-client";
+    U8 constexpr server_name[] = "lux-server";
     static_assert(sizeof(server_name) <= SERVER_NAME_LEN);
     std::memcpy(conf.name.data(), server_name, sizeof(server_name));
 
