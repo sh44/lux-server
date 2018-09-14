@@ -5,8 +5,8 @@
 //
 #include <enet/enet.h>
 //
-#include <common.hpp>
-#include <net.hpp>
+#include <lux/common.hpp>
+#include <lux/net.hpp>
 
 Uns constexpr MAX_CLIENTS  = 16;
 
