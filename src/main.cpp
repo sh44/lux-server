@@ -90,7 +90,7 @@ int add_client(ENetPeer* peer) {
         ++tries;
         std::this_thread::sleep_for(TRY_TIME);
     }
-    LUX_LOG("received init packet after %zu", tries);
+    LUX_LOG("received init packet after %zu/%zu", tries, MAX_TRIES);
 
     ///we are gonna do a direct copy, so we disable padding,
     ///no need to reverse the byte order,
