@@ -58,6 +58,7 @@ void kick_client(String const& name, String const& reason) {
     erase_client(client_id);
 }
 
+//@CONSIDER custom error codes (enum?)
 int add_client(ENetPeer* peer) {
     U8* ip = (U8*)&peer->address.host;
     static_assert(sizeof(peer->address.host) == 4);
