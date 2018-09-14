@@ -6,7 +6,8 @@
 #include <enet/enet.h>
 //
 #include <lux_shared/common.hpp>
-#include <lux_shared/net.hpp>
+#include <lux_shared/net/common.hpp>
+#include <lux_shared/net/data.hpp>
 #include <lux_shared/util/tick_clock.hpp>
 
 Uns constexpr MAX_CLIENTS  = 16;
@@ -66,15 +67,7 @@ int add_client(ENetPeer* peer) {
     U8* ip = get_ip(peer->address);
     LUX_LOG("new client %u.%u.%u.%u connecting", ip[0], ip[1], ip[2], ip[3]);
 
-    ///we are gonna do a direct copy, so we disable padding,
-    ///no need to reverse the byte order,
-    ///because we are not using anything bigger than a byte right now,
-    #pragma pack(push, 1)
-    struct {
-        Arr<U8, 3> ver;
-        Arr<U8, CLIENT_NAME_LEN> name;
-    } client_init_data;
-    #pragma pack(pop)
+    NetClientInit client_init_data;
 
     { ///retrieve init packet
         LUX_LOG("awaiting init packet");
@@ -88,7 +81,6 @@ int add_client(ENetPeer* peer) {
         U8  channel_id;
         ENetPacket* init_pack;
         do {
-            //@CONSIDER checking return val here, or using a while loop
             enet_host_service(server.host, nullptr, TRY_TIME);
             init_pack = enet_peer_receive(peer, &channel_id);
             if(init_pack != nullptr && channel_id != INIT_CHANNEL) {
@@ -109,27 +101,22 @@ int add_client(ENetPeer* peer) {
                     " %zu", sizeof(client_init_data), init_pack->dataLength);
             return -1;
         }
-        ///remember, this assumes that there are no struct fields bigger
-        ///than a byte, otherwise we would need to reverse the network order
-        //@CONSIDER using a standarized deserializer function for this
+
+        //@CONSIDER using a generic de/serializer function for this
         std::memcpy((U8*)&client_init_data, init_pack->data,
                     sizeof(client_init_data));
         enet_packet_destroy(init_pack);
 
-        static_assert(sizeof(client_init_data.ver[0]) ==
-                      sizeof(NET_VERSION_MAJOR));
-        static_assert(sizeof(client_init_data.ver[1]) ==
-                      sizeof(NET_VERSION_MINOR));
-        if(client_init_data.ver[0] != NET_VERSION_MAJOR) {
+        if(client_init_data.net_ver.major != NET_VERSION_MAJOR) {
             LUX_LOG("client uses an incompatible major lux net api version"
                     ", we use %u, they use %u",
-                    NET_VERSION_MAJOR, client_init_data.ver[0]);
+                    NET_VERSION_MAJOR, client_init_data.net_ver.major);
             return -1;
         }
-        if(client_init_data.ver[1] >  NET_VERSION_MINOR) {
+        if(client_init_data.net_ver.minor >  NET_VERSION_MINOR) {
             LUX_LOG("client uses a newer minor lux net api version"
                     ", we use %u, they use %u",
-                    NET_VERSION_MINOR, client_init_data.ver[1]);
+                    NET_VERSION_MINOR, client_init_data.net_ver.minor);
             return -1;
         }
     }
@@ -137,12 +124,7 @@ int add_client(ENetPeer* peer) {
     { ///send init packet
         //@CONSIDER putting it outside function scope, as this struct gets
         //reused for every client connection
-        #pragma pack(push, 1)
-        struct {
-            U16                 tick_rate = conf.tick_rate;
-            Arr<U8, SERVER_NAME_LEN> name = conf.name;
-        } server_init_data;
-        #pragma pack(pop)
+        NetServerInit server_init_data = {conf.name, net_order(conf.tick_rate)};
 
         server.reliable_out->data = (U8*)&server_init_data;
         server.reliable_out->dataLength = sizeof(server_init_data);
