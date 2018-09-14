@@ -73,23 +73,26 @@ int add_client(ENetPeer* peer) {
     //used
     Uns tries = 0;
     U8  channel_id;
-    ENetPacket* init_pack = nullptr;
-    while(init_pack == nullptr) {
+    ENetPacket* init_pack;
+    do {
         init_pack = enet_peer_receive(peer, &channel_id);
         if(tries >= MAX_TRIES) {
             LUX_LOG("client did not send an init packet");
             return -1;
         }
-        //@RESEARCH whether an unsequenced packet can arrive before a reliable
-        //one, if so, we need to ignore tick packets here
-        if(init_pack != nullptr && channel_id != INIT_CHANNEL) {
+        if(init_pack != nullptr && channel_id == TICK_CHANNEL) {
+            LUX_LOG("ignoring tick packet sent by client on channel %u",
+                    channel_id);
+            enet_packet_destroy(init_pack);
+        } else if(init_pack != nullptr && channel_id != INIT_CHANNEL) {
             LUX_LOG("client sent a packet on unexcepted channel %u"
                     ", we expected it on channel %u", channel_id, INIT_CHANNEL);
+            enet_packet_destroy(init_pack);
             return -1;
         }
         ++tries;
         std::this_thread::sleep_for(TRY_TIME);
-    }
+    } while(init_pack == nullptr);
     LUX_LOG("received init packet after %zu/%zu", tries, MAX_TRIES);
 
     ///we are gonna do a direct copy, so we disable padding,
