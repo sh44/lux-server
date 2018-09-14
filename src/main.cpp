@@ -11,7 +11,6 @@
 Uns constexpr MAX_CLIENTS  = 16;
 
 struct {
-    U16 port = 31337;
     Arr<U8, SERVER_NAME_LEN> name = {0};
 } conf;
 
@@ -168,12 +167,25 @@ int add_client(ENetPeer* peer) {
     return 0;
 }
 
-void server_main() {
+void server_main(int argc, char** argv) {
+    U16 server_port;
+
+    { ///read commandline args
+        if(argc != 2) {
+            LUX_FATAL("usage: %s SERVER_PORT", argv[0]);
+        }
+        U64 raw_server_port = std::atol(argv[1]);
+        if(raw_server_port >= 1 << 16) {
+            LUX_FATAL("invalid port %zu given", raw_server_port);
+        }
+        server_port = raw_server_port;
+    }
+
     LUX_LOG("initializing server");
     if(enet_initialize() != 0) {
         LUX_FATAL("couldn't initialize ENet");
     }
-    ENetAddress addr = {ENET_HOST_ANY, conf.port};
+    ENetAddress addr = {ENET_HOST_ANY, server_port};
     server.host = enet_host_create(&addr, MAX_CLIENTS, CHANNEL_NUM, 0, 0);
     if(server.host == nullptr) {
         LUX_FATAL("couldn't initialize ENet host");
@@ -210,10 +222,10 @@ void server_main() {
     enet_deinitialize();
 }
 
-int main() {
+int main(int argc, char** argv) {
     LUX_LOG("starting server");
     server.running = true;
-    server.thread = std::thread(&server_main);
+    server.thread = std::thread(&server_main, argc, argv);
 
     std::string input;
     while(input != "stop") {
