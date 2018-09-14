@@ -14,8 +14,6 @@ struct {
     Arr<U8, SERVER_NAME_LEN> name = {0};
 } conf;
 
-};
-
 struct Server {
     struct Client {
         ENetPeer* peer;
