@@ -5,9 +5,9 @@
 //
 #include <enet/enet.h>
 //
-#include <lux/common.hpp>
-#include <lux/net.hpp>
-#include <lux/util/tick_clock.hpp>
+#include <lux_shared/common.hpp>
+#include <lux_shared/net.hpp>
+#include <lux_shared/util/tick_clock.hpp>
 
 Uns constexpr MAX_CLIENTS  = 16;
 
@@ -39,7 +39,7 @@ void erase_client(Uns id) {
 }
 
 void kick_peer(ENetPeer *peer) {
-    U8* ip = get_ip(peer);
+    U8* ip = get_ip(peer->address);
     LUX_LOG("terminating connection with %u.%u.%u.%u",
             ip[0], ip[1], ip[2], ip[3]);
     enet_peer_disconnect(peer, 0);
@@ -63,7 +63,7 @@ void kick_client(String const& name, String const& reason) {
 
 //@CONSIDER custom error codes (enum?)
 int add_client(ENetPeer* peer) {
-    U8* ip = get_ip(peer);
+    U8* ip = get_ip(peer->address);
     LUX_LOG("new client %u.%u.%u.%u connecting", ip[0], ip[1], ip[2], ip[3]);
 
     ///we are gonna do a direct copy, so we disable padding,
@@ -165,16 +165,18 @@ int add_client(ENetPeer* peer) {
 
 void do_tick() {
     //@RESEARCH can we use our own packet to prevent copies?
-    ENetEvent event;
-    while(enet_host_service(server.host, &event, 0) > 0) {
-        if(event.type == ENET_EVENT_TYPE_CONNECT) {
-            if(add_client(event.peer) < 0) {
-                kick_peer(event.peer);
+    { ///handle events
+        ENetEvent event;
+        while(enet_host_service(server.host, &event, 0) > 0) {
+            if(event.type == ENET_EVENT_TYPE_CONNECT) {
+                if(add_client(event.peer) < 0) {
+                    kick_peer(event.peer);
+                }
+            } else if(event.type == ENET_EVENT_TYPE_DISCONNECT) {
+                erase_client((Uns)event.peer->data);
+            } else if(event.type == ENET_EVENT_TYPE_RECEIVE) {
+                enet_packet_destroy(event.packet);
             }
-        } else if(event.type == ENET_EVENT_TYPE_DISCONNECT) {
-            erase_client((Uns)event.peer->data);
-        } else if(event.type == ENET_EVENT_TYPE_RECEIVE) {
-            enet_packet_destroy(event.packet);
         }
     }
 }
