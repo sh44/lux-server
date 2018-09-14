@@ -6,7 +6,7 @@
 #include <enet/enet.h>
 //
 #include <common.hpp>
-#include <shared.hpp>
+#include <net.hpp>
 
 Uns constexpr MAX_CLIENTS  = 16;
 
@@ -65,8 +65,8 @@ int add_client(ENetPeer* peer) {
 
     ///retrieve init packet
     LUX_LOG("awaiting init packet");
-    Uns                        constexpr MAX_TRIES = 10;
-    std::chrono::duration<F64> constexpr TRY_TIME(0.050);
+    Uns constexpr MAX_TRIES = 10;
+    Uns constexpr TRY_TIME  = 50; ///in milliseconds
 
     //@CONSIDER sleeping in a separate thread, so the server cannot be frozen
     //by malicious joining, perhaps a different, sleep-free solution could be
@@ -75,6 +75,7 @@ int add_client(ENetPeer* peer) {
     U8  channel_id;
     ENetPacket* init_pack;
     do {
+        enet_host_service(server.host, nullptr, TRY_TIME);
         init_pack = enet_peer_receive(peer, &channel_id);
         if(tries >= MAX_TRIES) {
             LUX_LOG("client did not send an init packet");
@@ -91,7 +92,6 @@ int add_client(ENetPeer* peer) {
             return -1;
         }
         ++tries;
-        std::this_thread::sleep_for(TRY_TIME);
     } while(init_pack == nullptr);
     LUX_LOG("received init packet after %zu/%zu", tries, MAX_TRIES);
 
@@ -108,8 +108,7 @@ int add_client(ENetPeer* peer) {
     #pragma pack(pop)
 
     if(sizeof(client_init_data) != init_pack->dataLength) {
-        LUX_LOG("client sent invalid init packet with size %zu"
-                "instead of %zu",
+        LUX_LOG("client sent invalid init packet with size %zu instead of %zu",
                 sizeof(client_init_data), init_pack->dataLength);
         return -1;
     }
@@ -121,19 +120,19 @@ int add_client(ENetPeer* peer) {
     enet_packet_destroy(init_pack);
 
     static_assert(sizeof(client_init_data.ver[0]) ==
-                  sizeof(LUX_NET_VERSION_MAJOR));
+                  sizeof(NET_VERSION_MAJOR));
     static_assert(sizeof(client_init_data.ver[1]) ==
-                  sizeof(LUX_NET_VERSION_MINOR));
-    if(client_init_data.ver[0] != LUX_NET_VERSION_MAJOR) {
+                  sizeof(NET_VERSION_MINOR));
+    if(client_init_data.ver[0] != NET_VERSION_MAJOR) {
         LUX_LOG("client uses an incompatible major lux net api version"
                 ", we use %u, they use %u",
-                LUX_NET_VERSION_MAJOR, client_init_data.ver[0]);
+                NET_VERSION_MAJOR, client_init_data.ver[0]);
         return -1;
     }
-    if(client_init_data.ver[1] >  LUX_NET_VERSION_MINOR) {
+    if(client_init_data.ver[1] >  NET_VERSION_MINOR) {
         LUX_LOG("client uses a newer minor lux net api version"
                 ", we use %u, they use %u",
-                LUX_NET_VERSION_MINOR, client_init_data.ver[1]);
+                NET_VERSION_MINOR, client_init_data.ver[1]);
         return -1;
     }
 
