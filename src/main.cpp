@@ -7,10 +7,12 @@
 //
 #include <lux/common.hpp>
 #include <lux/net.hpp>
+#include <lux/util/tick_clock.hpp>
 
 Uns constexpr MAX_CLIENTS  = 16;
 
 struct {
+    U16                 tick_rate = 64;
     Arr<U8, SERVER_NAME_LEN> name = {0};
 } conf;
 
@@ -21,7 +23,11 @@ struct Server {
     };
     std::atomic<bool> running = false;
     std::thread       thread;
-    ENetHost*         host;
+
+    ENetHost*     host;
+    ENetPacket*   reliable_out;
+    ENetPacket* unreliable_out;
+
     DynArr<Client>    clients;
 } server;
 
@@ -33,7 +39,7 @@ void erase_client(Uns id) {
 }
 
 void kick_peer(ENetPeer *peer) {
-    U8* ip = (U8*)&peer->address.host;
+    U8* ip = get_ip(peer);
     LUX_LOG("terminating connection with %u.%u.%u.%u",
             ip[0], ip[1], ip[2], ip[3]);
     enet_peer_disconnect(peer, 0);
@@ -57,46 +63,12 @@ void kick_client(String const& name, String const& reason) {
 
 //@CONSIDER custom error codes (enum?)
 int add_client(ENetPeer* peer) {
-    //@CONSIDER use enet_address_get_host_ip
-    U8* ip = (U8*)&peer->address.host;
-    static_assert(sizeof(peer->address.host) == 4);
-    //@TODO port
-    //@TODO split function into scopes
+    U8* ip = get_ip(peer);
     LUX_LOG("new client %u.%u.%u.%u connecting", ip[0], ip[1], ip[2], ip[3]);
-
-    ///retrieve init packet
-    LUX_LOG("awaiting init packet");
-    Uns constexpr MAX_TRIES = 10;
-    Uns constexpr TRY_TIME  = 50; ///in milliseconds
-
-    //@CONSIDER sleeping in a separate thread, so the server cannot be frozen
-    //by malicious joining, perhaps a different, sleep-free solution could be
-    //used
-    Uns tries = 0;
-    U8  channel_id;
-    ENetPacket* init_pack;
-    do {
-        //@CONSIDER checking return val here, or using a while loop
-        enet_host_service(server.host, nullptr, TRY_TIME);
-        init_pack = enet_peer_receive(peer, &channel_id);
-        if(init_pack != nullptr && channel_id != INIT_CHANNEL) {
-            LUX_LOG("ignoring unexpected packet on channel %u", channel_id);
-            enet_packet_destroy(init_pack);
-            init_pack = nullptr;
-        }
-        if(tries >= MAX_TRIES) {
-            LUX_LOG("client did not send an init packet");
-            return -1;
-        }
-        ++tries;
-    } while(init_pack == nullptr);
-    LUX_LOG("received init packet after %zu/%zu tries", tries, MAX_TRIES);
 
     ///we are gonna do a direct copy, so we disable padding,
     ///no need to reverse the byte order,
     ///because we are not using anything bigger than a byte right now,
-    //@CONSIDER adding manual padding to increase efficiency
-    //   @RESEARCH would efficiency actually be increased then?
     #pragma pack(push, 1)
     struct {
         Arr<U8, 3> ver;
@@ -104,56 +76,82 @@ int add_client(ENetPeer* peer) {
     } client_init_data;
     #pragma pack(pop)
 
-    if(sizeof(client_init_data) != init_pack->dataLength) {
-        LUX_LOG("client sent invalid init packet with size %zu instead of %zu",
-                sizeof(client_init_data), init_pack->dataLength);
-        return -1;
-    }
-    ///remember, this assumes that there are no struct fields bigger
-    ///than a byte, otherwise we would need to reverse the network order
-    //@CONSIDER using a standarized deserializer function for this
-    std::memcpy((U8*)&client_init_data, init_pack->data,
-                sizeof(client_init_data));
-    enet_packet_destroy(init_pack);
+    { ///retrieve init packet
+        LUX_LOG("awaiting init packet");
+        Uns constexpr MAX_TRIES = 10;
+        Uns constexpr TRY_TIME  = 50; ///in milliseconds
 
-    static_assert(sizeof(client_init_data.ver[0]) ==
-                  sizeof(NET_VERSION_MAJOR));
-    static_assert(sizeof(client_init_data.ver[1]) ==
-                  sizeof(NET_VERSION_MINOR));
-    if(client_init_data.ver[0] != NET_VERSION_MAJOR) {
-        LUX_LOG("client uses an incompatible major lux net api version"
-                ", we use %u, they use %u",
-                NET_VERSION_MAJOR, client_init_data.ver[0]);
-        return -1;
-    }
-    if(client_init_data.ver[1] >  NET_VERSION_MINOR) {
-        LUX_LOG("client uses a newer minor lux net api version"
-                ", we use %u, they use %u",
-                NET_VERSION_MINOR, client_init_data.ver[1]);
-        return -1;
+        //@CONSIDER sleeping in a separate thread, so the server cannot be
+        //frozen by malicious joining, perhaps a different, sleep-free solution
+        //could be used
+        Uns tries = 0;
+        U8  channel_id;
+        ENetPacket* init_pack;
+        do {
+            //@CONSIDER checking return val here, or using a while loop
+            enet_host_service(server.host, nullptr, TRY_TIME);
+            init_pack = enet_peer_receive(peer, &channel_id);
+            if(init_pack != nullptr && channel_id != INIT_CHANNEL) {
+                LUX_LOG("ignoring unexpected packet on channel %u", channel_id);
+                enet_packet_destroy(init_pack);
+                init_pack = nullptr;
+            }
+            if(tries >= MAX_TRIES) {
+                LUX_LOG("client did not send an init packet");
+                return -1;
+            }
+            ++tries;
+        } while(init_pack == nullptr);
+        LUX_LOG("received init packet after %zu/%zu tries", tries, MAX_TRIES);
+
+        if(sizeof(client_init_data) != init_pack->dataLength) {
+            LUX_LOG("client sent invalid init packet with size %zu instead of"
+                    " %zu", sizeof(client_init_data), init_pack->dataLength);
+            return -1;
+        }
+        ///remember, this assumes that there are no struct fields bigger
+        ///than a byte, otherwise we would need to reverse the network order
+        //@CONSIDER using a standarized deserializer function for this
+        std::memcpy((U8*)&client_init_data, init_pack->data,
+                    sizeof(client_init_data));
+        enet_packet_destroy(init_pack);
+
+        static_assert(sizeof(client_init_data.ver[0]) ==
+                      sizeof(NET_VERSION_MAJOR));
+        static_assert(sizeof(client_init_data.ver[1]) ==
+                      sizeof(NET_VERSION_MINOR));
+        if(client_init_data.ver[0] != NET_VERSION_MAJOR) {
+            LUX_LOG("client uses an incompatible major lux net api version"
+                    ", we use %u, they use %u",
+                    NET_VERSION_MAJOR, client_init_data.ver[0]);
+            return -1;
+        }
+        if(client_init_data.ver[1] >  NET_VERSION_MINOR) {
+            LUX_LOG("client uses a newer minor lux net api version"
+                    ", we use %u, they use %u",
+                    NET_VERSION_MINOR, client_init_data.ver[1]);
+            return -1;
+        }
     }
 
-    //@CONSIDER putting it outside function scope, as this struct gets
-    //reused for every client connection, maybe even do it for the packet
-    #pragma pack(push, 1)
-    struct {
-        Arr<U8, SERVER_NAME_LEN> name = conf.name;
-    } server_init_data;
-    #pragma pack(pop)
+    { ///send init packet
+        //@CONSIDER putting it outside function scope, as this struct gets
+        //reused for every client connection
+        #pragma pack(push, 1)
+        struct {
+            U16                 tick_rate = conf.tick_rate;
+            Arr<U8, SERVER_NAME_LEN> name = conf.name;
+        } server_init_data;
+        #pragma pack(pop)
 
-    //@TODO use packet buffer in server
-    ENetPacket* server_init_pack =
-        enet_packet_create((U8*)&server_init_data,
-        sizeof(server_init_data), ENET_PACKET_FLAG_RELIABLE);
-    if(server_init_pack == nullptr) {
-        LUX_LOG("failed to create server init packet");
-        return -1;
+        server.reliable_out->data = (U8*)&server_init_data;
+        server.reliable_out->dataLength = sizeof(server_init_data);
+        if(enet_peer_send(peer, INIT_CHANNEL, server.reliable_out) < 0) {
+            LUX_LOG("failed to send server init packet");
+            return -1;
+        }
+        enet_host_flush(server.host);
     }
-    if(enet_peer_send(peer, INIT_CHANNEL, server_init_pack) < 0) {
-        LUX_LOG("failed to send server init packet");
-        return -1;
-    }
-    enet_host_flush(server.host);
 
     Server::Client* client = &server.clients.emplace_back();
     client->peer = peer;
@@ -163,6 +161,22 @@ int add_client(ENetPeer* peer) {
     LUX_LOG("client %s connected successfully", client->name.c_str());
     //@TODO set entity
     return 0;
+}
+
+void do_tick() {
+    //@RESEARCH can we use our own packet to prevent copies?
+    ENetEvent event;
+    while(enet_host_service(server.host, &event, 0) > 0) {
+        if(event.type == ENET_EVENT_TYPE_CONNECT) {
+            if(add_client(event.peer) < 0) {
+                kick_peer(event.peer);
+            }
+        } else if(event.type == ENET_EVENT_TYPE_DISCONNECT) {
+            erase_client((Uns)event.peer->data);
+        } else if(event.type == ENET_EVENT_TYPE_RECEIVE) {
+            enet_packet_destroy(event.packet);
+        }
+    }
 }
 
 void server_main(int argc, char** argv) {
@@ -183,39 +197,54 @@ void server_main(int argc, char** argv) {
     if(enet_initialize() != 0) {
         LUX_FATAL("couldn't initialize ENet");
     }
-    ENetAddress addr = {ENET_HOST_ANY, server_port};
-    server.host = enet_host_create(&addr, MAX_CLIENTS, CHANNEL_NUM, 0, 0);
-    if(server.host == nullptr) {
-        LUX_FATAL("couldn't initialize ENet host");
+
+    { ///init server
+        ENetAddress addr = {ENET_HOST_ANY, server_port};
+        server.host = enet_host_create(&addr, MAX_CLIENTS, CHANNEL_NUM, 0, 0);
+        if(server.host == nullptr) {
+            LUX_FATAL("couldn't initialize ENet host");
+        }
+        server.reliable_out = enet_packet_create(nullptr, 0,
+            ENET_PACKET_FLAG_RELIABLE | ENET_PACKET_FLAG_NO_ALLOCATE);
+        if(server.reliable_out == nullptr) {
+            LUX_FATAL("couldn't initialize reliable output packet");
+        }
+        server.unreliable_out = enet_packet_create(nullptr, 0,
+            ENET_PACKET_FLAG_UNSEQUENCED | ENET_PACKET_FLAG_NO_ALLOCATE);
+        if(server.unreliable_out == nullptr) {
+            LUX_FATAL("couldn't initialize unreliable output packet");
+        }
+
+        U8 constexpr server_name[] = "lux-server";
+        static_assert(sizeof(server_name) <= SERVER_NAME_LEN);
+        std::memcpy(conf.name.data(), server_name, sizeof(server_name));
     }
-    U8 constexpr server_name[] = "lux-server";
-    static_assert(sizeof(server_name) <= SERVER_NAME_LEN);
-    std::memcpy(conf.name.data(), server_name, sizeof(server_name));
 
-    ENetEvent event; //@RESEARCH can we use our own packet to prevent copies?
-    while(server.running) {
-        //@TODO world tick
-
-        while(enet_host_service(server.host, &event, 0) > 0) {
-            if(event.type == ENET_EVENT_TYPE_CONNECT) {
-                if(add_client(event.peer) < 0) {
-                    kick_peer(event.peer);
-                }
-            } else if(event.type == ENET_EVENT_TYPE_DISCONNECT) {
-                erase_client((Uns)event.peer->data);
-            } else if(event.type == ENET_EVENT_TYPE_RECEIVE) {
-                enet_packet_destroy(event.packet);
+    { ///main loop
+        auto tick_len = util::TickClock::Duration(1.0 / (F64)conf.tick_rate);
+        util::TickClock clock(tick_len);
+        while(server.running) {
+            clock.start();
+            do_tick();
+            clock.stop();
+            auto remaining = clock.synchronize();
+            if(remaining < util::TickClock::Duration::zero()) {
+                LUX_LOG("tick overhead of %.2fs", std::abs(remaining.count()));
             }
         }
     }
 
     LUX_LOG("deinitializing server");
-    LUX_LOG("kicking all clients");
-    auto it = server.clients.begin();
-    while(it != server.clients.end()) {
-        kick_client(it->name, "server stopping");
-        it = server.clients.begin();
+
+    { ///kick all
+        LUX_LOG("kicking all clients");
+        auto it = server.clients.begin();
+        while(it != server.clients.end()) {
+            kick_client(it->name, "server stopping");
+            it = server.clients.begin();
+        }
     }
+
     enet_host_destroy(server.host);
     enet_deinitialize();
 }
