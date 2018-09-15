@@ -72,7 +72,8 @@ int add_client(ENetPeer* peer) {
     U8* ip = get_ip(peer->address);
     LUX_LOG("new client %u.%u.%u.%u connecting", ip[0], ip[1], ip[2], ip[3]);
 
-    NetClientInit client_init_data;
+    NetClientInit* client_init_data;
+    ENetPacket*    init_pack;
 
     { ///retrieve init packet
         LUX_LOG("awaiting init packet");
@@ -84,44 +85,48 @@ int add_client(ENetPeer* peer) {
         //could be used
         Uns tries = 0;
         U8  channel_id;
-        ENetPacket* init_pack;
         do {
             enet_host_service(server.host, nullptr, TRY_TIME);
             init_pack = enet_peer_receive(peer, &channel_id);
-            if(init_pack != nullptr && channel_id != INIT_CHANNEL) {
-                LUX_LOG("ignoring unexpected packet on channel %u", channel_id);
-                enet_packet_destroy(init_pack);
-                init_pack = nullptr;
+            if(init_pack != nullptr) {
+                if(channel_id == INIT_CHANNEL) {
+                    break;
+                } else {
+                    LUX_LOG("ignoring unexpected packet on channel %u",
+                            channel_id);
+                    enet_packet_destroy(init_pack);
+                }
             }
             if(tries >= MAX_TRIES) {
                 LUX_LOG("client did not send an init packet");
                 return -1;
             }
             ++tries;
-        } while(init_pack == nullptr);
+        } while(true);
         LUX_LOG("received init packet after %zu/%zu tries", tries, MAX_TRIES);
 
-        if(sizeof(client_init_data) != init_pack->dataLength) {
+        if(sizeof(NetClientInit) != init_pack->dataLength) {
             LUX_LOG("client sent invalid init packet with size %zu instead of"
-                    " %zu", sizeof(client_init_data), init_pack->dataLength);
+                    " %zu", sizeof(NetClientInit), init_pack->dataLength);
+            //@RESEARCH for a better way of cleanup when exitting
+            enet_packet_destroy(init_pack);
             return -1;
         }
 
-        //@CONSIDER using a generic de/serializer function for this
-        std::memcpy((U8*)&client_init_data, init_pack->data,
-                    sizeof(client_init_data));
-        enet_packet_destroy(init_pack);
+        client_init_data = (NetClientInit*)init_pack->data;
 
-        if(client_init_data.net_ver.major != NET_VERSION_MAJOR) {
+        if(client_init_data->net_ver.major != NET_VERSION_MAJOR) {
             LUX_LOG("client uses an incompatible major lux net api version"
                     ", we use %u, they use %u",
-                    NET_VERSION_MAJOR, client_init_data.net_ver.major);
+                    NET_VERSION_MAJOR, client_init_data->net_ver.major);
+            enet_packet_destroy(init_pack);
             return -1;
         }
-        if(client_init_data.net_ver.minor >  NET_VERSION_MINOR) {
+        if(client_init_data->net_ver.minor >  NET_VERSION_MINOR) {
             LUX_LOG("client uses a newer minor lux net api version"
                     ", we use %u, they use %u",
-                    NET_VERSION_MINOR, client_init_data.net_ver.minor);
+                    NET_VERSION_MINOR, client_init_data->net_ver.minor);
+            enet_packet_destroy(init_pack);
             return -1;
         }
     }
@@ -135,17 +140,19 @@ int add_client(ENetPeer* peer) {
         server.reliable_out->dataLength = sizeof(server_init_data);
         if(enet_peer_send(peer, INIT_CHANNEL, server.reliable_out) < 0) {
             LUX_LOG("failed to send server init packet");
+            enet_packet_destroy(init_pack);
             return -1;
         }
         enet_host_flush(server.host);
     }
 
-    Server::Client* client = &server.clients.emplace_back();
-    client->peer = peer;
-    client->peer->data = (void*)(server.clients.size() - 1);
-    client->name = String((char const*)client_init_data.name.data());
+    Server::Client& client = server.clients.emplace_back();
+    client.peer = peer;
+    client.peer->data = (void*)(server.clients.size() - 1);
+    client.name = String((char const*)client_init_data->name.data());
+    enet_packet_destroy(init_pack);
 
-    LUX_LOG("client %s connected successfully", client->name.c_str());
+    LUX_LOG("client %s connected successfully", client.name.c_str());
     //@TODO set entity
     return 0;
 }
