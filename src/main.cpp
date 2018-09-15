@@ -168,7 +168,10 @@ int add_client(ENetPeer* peer) {
     return 0;
 }
 
-void send_signal(ENetPeer* peer) {
+//@CONSIDER using a slice
+void send_signal(ENetPeer* peer, U8* data, SizeT len) {
+    server.reliable_out->data       = data;
+    server.reliable_out->dataLength = len;
     if(enet_peer_send(peer, SIGNAL_CHANNEL, server.reliable_out) < 0) {
         LUX_LOG("failed to send server channel packet");
         //@TODO some info here
@@ -275,9 +278,7 @@ void handle_signal(ENetPeer* peer, ENetPacket *pack) {
         }
     }
 
-    server.reliable_out->data       = pack_data;
-    server.reliable_out->dataLength = pack_len;
-    send_signal(peer);
+    send_signal(peer, pack_data, pack_len);
 }
 
 void do_tick() {
