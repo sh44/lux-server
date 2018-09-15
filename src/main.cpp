@@ -104,12 +104,15 @@ int add_client(ENetPeer* peer) {
             ++tries;
         } while(true);
         LUX_LOG("received init packet after %zu/%zu tries", tries, MAX_TRIES);
+    }
+    ///we need to keep the packet around, because we read its contents directly
+    ///through the NetClientInit struct pointer
+    defer { LUX_LOG("test"); enet_packet_destroy(init_pack); };
 
+    { ///parse client init packet
         if(sizeof(NetClientInit) != init_pack->dataLength) {
             LUX_LOG("client sent invalid init packet with size %zu instead of"
                     " %zu", sizeof(NetClientInit), init_pack->dataLength);
-            //@RESEARCH for a better way of cleanup when exitting
-            enet_packet_destroy(init_pack);
             return -1;
         }
 
@@ -119,14 +122,12 @@ int add_client(ENetPeer* peer) {
             LUX_LOG("client uses an incompatible major lux net api version"
                     ", we use %u, they use %u",
                     NET_VERSION_MAJOR, client_init_data->net_ver.major);
-            enet_packet_destroy(init_pack);
             return -1;
         }
         if(client_init_data->net_ver.minor >  NET_VERSION_MINOR) {
             LUX_LOG("client uses a newer minor lux net api version"
                     ", we use %u, they use %u",
                     NET_VERSION_MINOR, client_init_data->net_ver.minor);
-            enet_packet_destroy(init_pack);
             return -1;
         }
     }
@@ -140,7 +141,6 @@ int add_client(ENetPeer* peer) {
         server.reliable_out->dataLength = sizeof(server_init_data);
         if(enet_peer_send(peer, INIT_CHANNEL, server.reliable_out) < 0) {
             LUX_LOG("failed to send server init packet");
-            enet_packet_destroy(init_pack);
             return -1;
         }
         enet_host_flush(server.host);
@@ -169,7 +169,7 @@ void do_tick() {
             } else if(event.type == ENET_EVENT_TYPE_DISCONNECT) {
                 erase_client((Uns)event.peer->data);
             } else if(event.type == ENET_EVENT_TYPE_RECEIVE) {
-                enet_packet_destroy(event.packet);
+                defer { enet_packet_destroy(event.packet); };
             }
         }
     }
@@ -193,13 +193,18 @@ void server_main(int argc, char** argv) {
     if(enet_initialize() != 0) {
         LUX_FATAL("couldn't initialize ENet");
     }
+    defer { enet_deinitialize(); };
 
-    { ///init server
+    {
         ENetAddress addr = {ENET_HOST_ANY, server_port};
         server.host = enet_host_create(&addr, MAX_CLIENTS, CHANNEL_NUM, 0, 0);
         if(server.host == nullptr) {
             LUX_FATAL("couldn't initialize ENet host");
         }
+    }
+    defer { enet_host_destroy(server.host); };
+
+    {
         server.reliable_out = enet_packet_create(nullptr, 0,
             ENET_PACKET_FLAG_RELIABLE | ENET_PACKET_FLAG_NO_ALLOCATE);
         if(server.reliable_out == nullptr) {
@@ -210,7 +215,9 @@ void server_main(int argc, char** argv) {
         if(server.unreliable_out == nullptr) {
             LUX_FATAL("couldn't initialize unreliable output packet");
         }
+    }
 
+    {
         U8 constexpr server_name[] = "lux-server";
         static_assert(sizeof(server_name) <= SERVER_NAME_LEN);
         std::memcpy(conf.name.data(), server_name, sizeof(server_name));
@@ -240,9 +247,6 @@ void server_main(int argc, char** argv) {
             it = server.clients.begin();
         }
     }
-
-    enet_host_destroy(server.host);
-    enet_deinitialize();
 }
 
 int main(int argc, char** argv) {
