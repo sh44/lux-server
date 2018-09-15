@@ -11,6 +11,8 @@
 #include <lux_shared/net/common.hpp>
 #include <lux_shared/net/data.hpp>
 #include <lux_shared/util/tick_clock.hpp>
+//
+#include <map.hpp>
 
 Uns constexpr MAX_CLIENTS  = 16;
 
@@ -166,6 +168,118 @@ int add_client(ENetPeer* peer) {
     return 0;
 }
 
+void send_signal(ENetPeer* peer) {
+    if(enet_peer_send(peer, SIGNAL_CHANNEL, server.reliable_out) < 0) {
+        LUX_LOG("failed to send server channel packet");
+        //@TODO some info here
+    }
+    enet_host_flush(server.host);
+}
+
+void handle_tick(ENetPeer* peer, ENetPacket *pack) {
+
+}
+
+void handle_signal(ENetPeer* peer, ENetPacket *pack) {
+    auto log_fail = [&]() {
+        U8 *ip = get_ip(peer->address);
+        LUX_LOG("    ignoring packet");
+        LUX_LOG("    size: %zuB", pack->dataLength);
+        LUX_LOG("    peer: ");
+        LUX_LOG("        ip: %u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+        LUX_LOG("        id: %zu", (Uns)peer->data);
+        LUX_LOG("        name: %s", server.clients[(Uns)peer->data].name.c_str());
+    };
+    if(pack->dataLength < 1) {
+        //@TODO additional peer info
+        LUX_LOG("couldn't read signal header, ignoring it");
+        log_fail();
+        return;
+    }
+
+    Slice<U8> dynamic_segment;
+    NetClientSignal* signal = (NetClientSignal*)pack->data;
+
+    { ///verify size
+        ///we don't count the header
+        SizeT static_dynamic_size = pack->dataLength - 1;
+        SizeT needed_static_size;
+        switch(signal->type) {
+            case NetClientSignal::MAP_REQUEST: {
+                needed_static_size = sizeof(NetClientSignal::MapRequest);
+            } break;
+            default: {
+                LUX_LOG("unexpected signal type, ignoring it");
+                LUX_LOG("    type: %u", signal->type);
+                log_fail();
+                return;
+            }
+        }
+        if(static_dynamic_size < needed_static_size) {
+            LUX_LOG("received packet static segment too small");
+            LUX_LOG("    expected size: atleast %zuB", needed_static_size + 1);
+            log_fail();
+            return;
+        }
+        SizeT dynamic_size = static_dynamic_size - needed_static_size;
+        SizeT needed_dynamic_size;
+        switch(signal->type) {
+            case NetClientSignal::MAP_REQUEST: {
+                needed_dynamic_size = signal->map_request.requests.len *
+                                      sizeof(ChkPos);
+            } break;
+            default: LUX_ASSERT(false);
+        }
+        if(dynamic_size != needed_static_size) {
+            LUX_LOG("received packet dynamic segment size differs from expected");
+            LUX_LOG("    expected size: %zuB", needed_dynamic_size +
+                                               needed_static_size);
+            log_fail();
+            return;
+        }
+        dynamic_segment.set((U8*)(pack->data + 1 + needed_static_size),
+                            needed_dynamic_size);
+    }
+
+    { ///parse the packet
+        switch(signal->type) {
+            case NetClientSignal::MAP_REQUEST: {
+                typedef NetServerSignal::MapLoad::Chunk NetChunk;
+                Slice<ChkPos> requests = dynamic_segment;
+                SizeT pack_len = 1 + sizeof(NetServerSignal::MapLoad) +
+                    requests.len * sizeof(NetChunk);
+                //@CONSIDER moving it outside the switch
+                //@CONSIDER using DynArr?
+                U8 *pack_data = new U8[pack_len];
+                defer { delete[] pack_data; };
+
+                NetChunk* chunks = (NetChunk*)(pack_data + 1 +
+                    sizeof(NetServerSignal::MapLoad));
+                for(Uns i = 0; i < requests.len; ++i) {
+                    requests[i].x = net_order(requests[i].x);
+                    requests[i].y = net_order(requests[i].y);
+                    requests[i].z = net_order(requests[i].z);
+
+                    guarantee_chunk(requests[i]);
+                    Chunk const& chunk = get_chunk(requests[i]);
+                    chunks[i].pos = requests[i];
+                    ///wish we could just cast the pointer to it, but we need to
+                    ///change the net order after all...
+                    for(Uns j = 0; j < CHK_VOL; ++j) {
+                        chunks[i].voxels[j] = net_order(chunk.voxels[j]);
+                        chunks[i].light_lvls[j] =
+                            net_order(chunk.light_lvls[j]);
+                    }
+                }
+                server.reliable_out->data       = pack_data;
+                server.reliable_out->dataLength = pack_len;
+                send_signal(peer);
+            } break;
+            default: LUX_ASSERT(false);
+        }
+    }
+}
+
 void do_tick() {
     //@RESEARCH can we use our own packet to prevent copies?
     { ///handle events
@@ -179,8 +293,29 @@ void do_tick() {
                 erase_client((Uns)event.peer->data);
             } else if(event.type == ENET_EVENT_TYPE_RECEIVE) {
                 defer { enet_packet_destroy(event.packet); };
+                if(!is_client_connected((Uns)event.peer->data)) {
+                    U8 *ip = get_ip(event.peer->address);
+                    LUX_LOG("ignoring packet from not connected peer");
+                    LUX_LOG("    ip: %u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+                } else {
+                    if(event.channelID == TICK_CHANNEL) {
+                        handle_tick(event.peer, event.packet);
+                    } else if(event.channelID == SIGNAL_CHANNEL) {
+                        handle_signal(event.peer, event.packet);
+                    } else {
+                        auto const &name =
+                            server.clients[(Uns)event.peer->data].name;
+                        LUX_LOG("ignoring unexpected packet");
+                        LUX_LOG("    channel: %u", event.channelID);
+                        LUX_LOG("    from: %s", name.c_str());
+                    }
+                }
             }
         }
+    }
+
+    { ///world tick
+
     }
 }
 
