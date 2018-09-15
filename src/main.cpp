@@ -3,6 +3,7 @@
 #include <thread>
 #include <iostream>
 #include <cstdlib>
+#include <cstring>
 //
 #include <enet/enet.h>
 //
@@ -39,27 +40,32 @@ bool is_client_connected(Uns id) {
 
 void erase_client(Uns id) {
     LUX_ASSERT(is_client_connected(id));
-    LUX_LOG("client %s disconnected", server.clients[id].name.c_str());
+    LUX_LOG("client disconnected");
+    LUX_LOG("\tid: %zu" , id);
+    LUX_LOG("\tname: %s", server.clients[id].name.c_str());
     //@TODO delete entity
     server.clients.erase(server.clients.begin() + id);
 }
 
 void kick_peer(ENetPeer *peer) {
     U8* ip = get_ip(peer->address);
-    LUX_LOG("terminating connection with %u.%u.%u.%u",
-            ip[0], ip[1], ip[2], ip[3]);
+    LUX_LOG("terminating connection with peer");
+    LUX_LOG("\tip: %u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
     enet_peer_disconnect(peer, 0);
     enet_host_flush(server.host);
     enet_peer_reset(peer);
 }
 
 void kick_client(String const& name, String const& reason) {
-    LUX_LOG("kicking client %s, reason %s", name.c_str(), reason.c_str());
+    LUX_LOG("kicking client");
+    LUX_LOG("\tname: %s", name.c_str());
+    LUX_LOG("\treason: %s", reason.c_str());
     auto it = std::find_if(server.clients.begin(), server.clients.end(),
         [&] (Server::Client const& v) { return v.name == name; });
     Uns client_id = it - server.clients.begin();
+    LUX_LOG("\tid: %zu", client_id);
     if(!is_client_connected(client_id)) {
-        LUX_LOG("tried to kick non-existant client %s", name.c_str());
+        LUX_LOG("tried to kick non-existant client");
         return; //@CONSIDER return value for failure
     }
     //@TODO kick message
@@ -70,7 +76,8 @@ void kick_client(String const& name, String const& reason) {
 //@CONSIDER custom error codes (enum?)
 int add_client(ENetPeer* peer) {
     U8* ip = get_ip(peer->address);
-    LUX_LOG("new client %u.%u.%u.%u connecting", ip[0], ip[1], ip[2], ip[3]);
+    LUX_LOG("new client connecting")
+    LUX_LOG("\tip: %u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
 
     NetClientInit* client_init_data;
     ENetPacket*    init_pack;
@@ -92,8 +99,8 @@ int add_client(ENetPeer* peer) {
                 if(channel_id == INIT_CHANNEL) {
                     break;
                 } else {
-                    LUX_LOG("ignoring unexpected packet on channel %u",
-                            channel_id);
+                    LUX_LOG("ignoring unexpected packet");
+                    LUX_LOG("\tchannel: %u", channel_id);
                     enet_packet_destroy(init_pack);
                 }
             }
@@ -103,31 +110,33 @@ int add_client(ENetPeer* peer) {
             }
             ++tries;
         } while(true);
-        LUX_LOG("received init packet after %zu/%zu tries", tries, MAX_TRIES);
+        LUX_LOG("received init packet");
+        LUX_LOG("\t%zu/%zu tries", tries, MAX_TRIES);
     }
     ///we need to keep the packet around, because we read its contents directly
     ///through the NetClientInit struct pointer
-    defer { LUX_LOG("test"); enet_packet_destroy(init_pack); };
+    defer { enet_packet_destroy(init_pack); };
 
     { ///parse client init packet
         if(sizeof(NetClientInit) != init_pack->dataLength) {
-            LUX_LOG("client sent invalid init packet with size %zu instead of"
-                    " %zu", sizeof(NetClientInit), init_pack->dataLength);
+            LUX_LOG("client sent invalid init packet");
+            LUX_LOG("\texpected size: %zuB", sizeof(NetClientInit));
+            LUX_LOG("\tactual size: %zuB", init_pack->dataLength);
             return -1;
         }
 
         client_init_data = (NetClientInit*)init_pack->data;
 
         if(client_init_data->net_ver.major != NET_VERSION_MAJOR) {
-            LUX_LOG("client uses an incompatible major lux net api version"
-                    ", we use %u, they use %u",
-                    NET_VERSION_MAJOR, client_init_data->net_ver.major);
+            LUX_LOG("client uses an incompatible major lux net api version");
+            LUX_LOG("\tours: %u", NET_VERSION_MAJOR);
+            LUX_LOG("\ttheirs: %u", client_init_data->net_ver.major);
             return -1;
         }
         if(client_init_data->net_ver.minor >  NET_VERSION_MINOR) {
-            LUX_LOG("client uses a newer minor lux net api version"
-                    ", we use %u, they use %u",
-                    NET_VERSION_MINOR, client_init_data->net_ver.minor);
+            LUX_LOG("client uses a newer minor lux net api version");
+            LUX_LOG("\tours: %u", NET_VERSION_MINOR);
+            LUX_LOG("\ttheirs: %u", client_init_data->net_ver.minor);
             return -1;
         }
     }
@@ -150,10 +159,10 @@ int add_client(ENetPeer* peer) {
     client.peer = peer;
     client.peer->data = (void*)(server.clients.size() - 1);
     client.name = String((char const*)client_init_data->name.data());
-    enet_packet_destroy(init_pack);
-
-    LUX_LOG("client %s connected successfully", client.name.c_str());
     //@TODO set entity
+
+    LUX_LOG("client connected successfully");
+    LUX_LOG("\tname: %s", client.name.c_str());
     return 0;
 }
 
