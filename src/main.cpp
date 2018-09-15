@@ -197,6 +197,8 @@ void handle_signal(ENetPeer* peer, ENetPacket *pack) {
         return;
     }
 
+    SizeT static_size;
+    SizeT dynamic_size;
     Slice<U8> dynamic_segment;
     NetClientSignal* signal = (NetClientSignal*)pack->data;
 
@@ -221,7 +223,8 @@ void handle_signal(ENetPeer* peer, ENetPacket *pack) {
             log_fail();
             return;
         }
-        SizeT dynamic_size = static_dynamic_size - needed_static_size;
+        static_size = needed_static_size;
+        dynamic_size = static_dynamic_size - static_size;
         SizeT needed_dynamic_size;
         switch(signal->type) {
             case NetClientSignal::MAP_REQUEST: {
@@ -233,28 +236,24 @@ void handle_signal(ENetPeer* peer, ENetPacket *pack) {
         if(dynamic_size != needed_static_size) {
             LUX_LOG("received packet dynamic segment size differs from expected");
             LUX_LOG("    expected size: %zuB", needed_dynamic_size +
-                                               needed_static_size);
+                                               static_size + 1);
             log_fail();
             return;
         }
-        dynamic_segment.set((U8*)(pack->data + 1 + needed_static_size),
-                            needed_dynamic_size);
+        dynamic_segment.set((U8*)(pack->data + 1 + static_size), dynamic_size);
     }
+
+    SizeT pack_len = 1 + static_size + dynamic_size;
+    U8 *pack_data = new U8[pack_len];
+    defer { delete[] pack_data; };
 
     { ///parse the packet
         switch(signal->type) {
             case NetClientSignal::MAP_REQUEST: {
                 typedef NetServerSignal::MapLoad::Chunk NetChunk;
                 Slice<ChkPos> requests = dynamic_segment;
-                SizeT pack_len = 1 + sizeof(NetServerSignal::MapLoad) +
-                    requests.len * sizeof(NetChunk);
-                //@CONSIDER moving it outside the switch
-                //@CONSIDER using DynArr?
-                U8 *pack_data = new U8[pack_len];
-                defer { delete[] pack_data; };
 
-                NetChunk* chunks = (NetChunk*)(pack_data + 1 +
-                    sizeof(NetServerSignal::MapLoad));
+                NetChunk* chunks = (NetChunk*)(pack_data + 1 + static_size);
                 for(Uns i = 0; i < requests.len; ++i) {
                     requests[i].x = net_order(requests[i].x);
                     requests[i].y = net_order(requests[i].y);
@@ -271,13 +270,14 @@ void handle_signal(ENetPeer* peer, ENetPacket *pack) {
                             net_order(chunk.light_lvls[j]);
                     }
                 }
-                server.reliable_out->data       = pack_data;
-                server.reliable_out->dataLength = pack_len;
-                send_signal(peer);
             } break;
             default: LUX_ASSERT(false);
         }
     }
+
+    server.reliable_out->data       = pack_data;
+    server.reliable_out->dataLength = pack_len;
+    send_signal(peer);
 }
 
 void do_tick() {
