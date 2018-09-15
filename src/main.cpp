@@ -270,7 +270,7 @@ void do_tick() {
         ENetEvent event;
         while(enet_host_service(server.host, &event, 0) > 0) {
             if(event.type == ENET_EVENT_TYPE_CONNECT) {
-                if(add_client(event.peer) < 0) {
+                if(add_client(event.peer) != LUX_RVAL_OK) {
                     kick_peer(event.peer);
                 }
             } else if(event.type == ENET_EVENT_TYPE_DISCONNECT) {
