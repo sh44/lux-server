@@ -30,11 +30,25 @@ struct Server {
     std::thread       thread;
 
     ENetHost*     host;
-    ENetPacket*   reliable_out;
-    ENetPacket* unreliable_out;
 
     DynArr<Client>    clients;
 } server;
+
+int send_packet(ENetPeer* peer, Slice<U8> slice, U8 channel, U32 flags) {
+    ENetPacket* pack = enet_packet_create(slice.beg, slice.len,
+        ENET_PACKET_FLAG_NO_ALLOCATE | flags);
+    if(pack == nullptr) {
+        //@CONSIDER some better error handling here?
+        LUX_LOG("couldn't create output packet");
+        return -1;
+    }
+    if(enet_peer_send(peer, channel, pack) < 0) {
+        LUX_LOG("failed to send server packet");
+        //@TODO some info here
+    }
+    enet_host_flush(server.host);
+    return 0;
+}
 
 bool is_client_connected(Uns id) {
     return id < server.clients.size();
@@ -144,17 +158,13 @@ int add_client(ENetPeer* peer) {
     }
 
     { ///send init packet
-        //@CONSIDER putting it outside function scope, as this struct gets
-        //reused for every client connection
         NetServerInit server_init_data = {conf.name, net_order(conf.tick_rate)};
 
-        server.reliable_out->data = (U8*)&server_init_data;
-        server.reliable_out->dataLength = sizeof(server_init_data);
-        if(enet_peer_send(peer, INIT_CHANNEL, server.reliable_out) < 0) {
+        if(send_packet(peer, {(U8*)&server_init_data, sizeof(server_init_data)},
+                    INIT_CHANNEL, ENET_PACKET_FLAG_RELIABLE) < 0) {
             LUX_LOG("failed to send server init packet");
             return -1;
         }
-        enet_host_flush(server.host);
     }
 
     Server::Client& client = server.clients.emplace_back();
@@ -166,17 +176,6 @@ int add_client(ENetPeer* peer) {
     LUX_LOG("client connected successfully");
     LUX_LOG("    name: %s", client.name.c_str());
     return 0;
-}
-
-//@CONSIDER using a slice
-void send_signal(ENetPeer* peer, Slice<U8> slice) {
-    server.reliable_out->data       = slice.beg;
-    server.reliable_out->dataLength = slice.len;
-    if(enet_peer_send(peer, SIGNAL_CHANNEL, server.reliable_out) < 0) {
-        LUX_LOG("failed to send server channel packet");
-        //@TODO some info here
-    }
-    enet_host_flush(server.host);
 }
 
 void handle_tick(ENetPeer* peer, ENetPacket *pack) {
@@ -278,7 +277,8 @@ void handle_signal(ENetPeer* peer, ENetPacket *pack) {
         }
     }
 
-    send_signal(peer, {pack_data, pack_len});
+    send_packet(peer, {pack_data, pack_len}, SIGNAL_CHANNEL,
+                ENET_PACKET_FLAG_RELIABLE);
 }
 
 void do_tick() {
@@ -348,19 +348,6 @@ void server_main(int argc, char** argv) {
         }
     }
     defer { enet_host_destroy(server.host); };
-
-    {
-        server.reliable_out = enet_packet_create(nullptr, 0,
-            ENET_PACKET_FLAG_RELIABLE | ENET_PACKET_FLAG_NO_ALLOCATE);
-        if(server.reliable_out == nullptr) {
-            LUX_FATAL("couldn't initialize reliable output packet");
-        }
-        server.unreliable_out = enet_packet_create(nullptr, 0,
-            ENET_PACKET_FLAG_UNSEQUENCED | ENET_PACKET_FLAG_NO_ALLOCATE);
-        if(server.unreliable_out == nullptr) {
-            LUX_FATAL("couldn't initialize unreliable output packet");
-        }
-    }
 
     {
         U8 constexpr server_name[] = "lux-server";
