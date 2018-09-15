@@ -160,8 +160,8 @@ int add_client(ENetPeer* peer) {
     { ///send init packet
         NetServerInit server_init_data = {conf.name, net_order(conf.tick_rate)};
 
-        if(send_packet(peer, {(U8*)&server_init_data, sizeof(server_init_data)},
-                    INIT_CHANNEL, ENET_PACKET_FLAG_RELIABLE) < 0) {
+        if(send_packet(peer, Slice<U8>(server_init_data), INIT_CHANNEL,
+                       ENET_PACKET_FLAG_RELIABLE) < 0) {
             LUX_LOG("failed to send server init packet");
             return -1;
         }
@@ -245,9 +245,10 @@ void handle_signal(ENetPeer* peer, ENetPacket *pack) {
         dynamic_segment.set((U8*)(pack->data + 1 + static_size), dynamic_size);
     }
 
-    SizeT pack_len = 1 + static_size + dynamic_size;
-    U8 *pack_data = new U8[pack_len];
-    defer { delete[] pack_data; };
+    Slice<U8> out_data;
+    out_data.len = 1 + static_size + dynamic_size;
+    out_data.beg = new U8[out_data.len];
+    defer { delete[] out_data.beg; };
 
     { ///parse the packet
         switch(signal->type) {
@@ -255,7 +256,7 @@ void handle_signal(ENetPeer* peer, ENetPacket *pack) {
                 typedef NetServerSignal::MapLoad::Chunk NetChunk;
                 Slice<ChkPos> requests = dynamic_segment;
 
-                NetChunk* chunks = (NetChunk*)(pack_data + 1 + static_size);
+                NetChunk* chunks = (NetChunk*)(out_data.beg + 1 + static_size);
                 for(Uns i = 0; i < requests.len; ++i) {
                     requests[i].x = net_order(requests[i].x);
                     requests[i].y = net_order(requests[i].y);
@@ -277,8 +278,7 @@ void handle_signal(ENetPeer* peer, ENetPacket *pack) {
         }
     }
 
-    send_packet(peer, {pack_data, pack_len}, SIGNAL_CHANNEL,
-                ENET_PACKET_FLAG_RELIABLE);
+    send_packet(peer, out_data, SIGNAL_CHANNEL, ENET_PACKET_FLAG_RELIABLE);
 }
 
 void do_tick() {
