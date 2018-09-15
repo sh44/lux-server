@@ -2,6 +2,7 @@
 #include <atomic>
 #include <thread>
 #include <iostream>
+#include <cstdlib>
 //
 #include <enet/enet.h>
 //
@@ -32,8 +33,12 @@ struct Server {
     DynArr<Client>    clients;
 } server;
 
+bool is_client_connected(Uns id) {
+    return id < server.clients.size();
+}
+
 void erase_client(Uns id) {
-    LUX_ASSERT(id < server.clients.size());
+    LUX_ASSERT(is_client_connected(id));
     LUX_LOG("client %s disconnected", server.clients[id].name.c_str());
     //@TODO delete entity
     server.clients.erase(server.clients.begin() + id);
@@ -53,7 +58,7 @@ void kick_client(String const& name, String const& reason) {
     auto it = std::find_if(server.clients.begin(), server.clients.end(),
         [&] (Server::Client const& v) { return v.name == name; });
     Uns client_id = it - server.clients.begin();
-    if(client_id >= server.clients.size()) {
+    if(!is_client_connected(client_id)) {
         LUX_LOG("tried to kick non-existant client %s", name.c_str());
         return; //@CONSIDER return value for failure
     }
