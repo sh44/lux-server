@@ -10,6 +10,7 @@
 #include <lux_shared/common.hpp>
 #include <lux_shared/net/common.hpp>
 #include <lux_shared/net/data.hpp>
+#include <lux_shared/net/enet.hpp>
 #include <lux_shared/util/tick_clock.hpp>
 //
 #include <map.hpp>
@@ -33,22 +34,6 @@ struct Server {
 
     DynArr<Client>    clients;
 } server;
-
-int send_packet(ENetPeer* peer, Slice<U8> slice, U8 channel, U32 flags) {
-    ENetPacket* pack = enet_packet_create(slice.beg, slice.len,
-        ENET_PACKET_FLAG_NO_ALLOCATE | flags);
-    if(pack == nullptr) {
-        //@CONSIDER some better error handling here?
-        LUX_LOG("couldn't create output packet");
-        return -1;
-    }
-    if(enet_peer_send(peer, channel, pack) < 0) {
-        LUX_LOG("failed to send server packet");
-        //@TODO some info here
-    }
-    enet_host_flush(server.host);
-    return 0;
-}
 
 bool is_client_connected(Uns id) {
     return id < server.clients.size();
@@ -89,8 +74,7 @@ void kick_client(String const& name, String const& reason) {
     erase_client(client_id);
 }
 
-//@CONSIDER custom error codes (enum?)
-int add_client(ENetPeer* peer) {
+LUX_RVAL add_client(ENetPeer* peer) {
     U8* ip = get_ip(peer->address);
     LUX_LOG("new client connecting")
     LUX_LOG("    ip: %u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
@@ -122,7 +106,7 @@ int add_client(ENetPeer* peer) {
             }
             if(tries >= MAX_TRIES) {
                 LUX_LOG("client did not send an init packet");
-                return -1;
+                return LUX_RVAL_CLIENT_INIT;
             }
             ++tries;
         } while(true);
@@ -131,14 +115,14 @@ int add_client(ENetPeer* peer) {
     }
     ///we need to keep the packet around, because we read its contents directly
     ///through the NetClientInit struct pointer
-    defer { enet_packet_destroy(init_pack); };
+    LUX_DEFER { enet_packet_destroy(init_pack); };
 
     { ///parse client init packet
         if(sizeof(NetClientInit) != init_pack->dataLength) {
             LUX_LOG("client sent invalid init packet");
             LUX_LOG("    expected size: %zuB", sizeof(NetClientInit));
             LUX_LOG("    actual size: %zuB", init_pack->dataLength);
-            return -1;
+            return LUX_RVAL_CLIENT_INIT;
         }
 
         client_init_data = (NetClientInit*)init_pack->data;
@@ -147,24 +131,22 @@ int add_client(ENetPeer* peer) {
             LUX_LOG("client uses an incompatible major lux net api version");
             LUX_LOG("    ours: %u", NET_VERSION_MAJOR);
             LUX_LOG("    theirs: %u", client_init_data->net_ver.major);
-            return -1;
+            return LUX_RVAL_CLIENT_INIT;
         }
         if(client_init_data->net_ver.minor >  NET_VERSION_MINOR) {
             LUX_LOG("client uses a newer minor lux net api version");
             LUX_LOG("    ours: %u", NET_VERSION_MINOR);
             LUX_LOG("    theirs: %u", client_init_data->net_ver.minor);
-            return -1;
+            return LUX_RVAL_CLIENT_INIT;
         }
     }
 
     { ///send init packet
         NetServerInit server_init_data = {conf.name, net_order(conf.tick_rate)};
 
-        if(send_packet(peer, Slice<U8>(server_init_data), INIT_CHANNEL,
-                       ENET_PACKET_FLAG_RELIABLE) < 0) {
-            LUX_LOG("failed to send server init packet");
-            return -1;
-        }
+        LuxRval rval =
+            send_init(peer, server.host, Slice<U8>(server_init_data));
+        if(rval != LUX_RVAL_OK) return rval;
     }
 
     Server::Client& client = server.clients.emplace_back();
@@ -175,14 +157,14 @@ int add_client(ENetPeer* peer) {
 
     LUX_LOG("client connected successfully");
     LUX_LOG("    name: %s", client.name.c_str());
-    return 0;
+    return LUX_RVAL_OK;
 }
 
 void handle_tick(ENetPeer* peer, ENetPacket *pack) {
 
 }
 
-void handle_signal(ENetPeer* peer, ENetPacket *pack) {
+LUX_RVAL handle_signal(ENetPeer* peer, ENetPacket *pack) {
     auto log_fail = [&]() {
         U8 *ip = get_ip(peer->address);
         LUX_LOG("    ignoring packet");
@@ -196,7 +178,7 @@ void handle_signal(ENetPeer* peer, ENetPacket *pack) {
         //@TODO additional peer info
         LUX_LOG("couldn't read signal header, ignoring it");
         log_fail();
-        return;
+        return LUX_RVAL_CLIENT_SIGNAL;
     }
 
     SizeT static_size;
@@ -216,14 +198,14 @@ void handle_signal(ENetPeer* peer, ENetPacket *pack) {
                 LUX_LOG("unexpected signal type, ignoring it");
                 LUX_LOG("    type: %u", signal->type);
                 log_fail();
-                return;
+                return LUX_RVAL_CLIENT_SIGNAL;
             }
         }
         if(static_dynamic_size < needed_static_size) {
             LUX_LOG("received packet static segment too small");
             LUX_LOG("    expected size: atleast %zuB", needed_static_size + 1);
             log_fail();
-            return;
+            return LUX_RVAL_CLIENT_SIGNAL;
         }
         static_size = needed_static_size;
         dynamic_size = static_dynamic_size - static_size;
@@ -240,7 +222,7 @@ void handle_signal(ENetPeer* peer, ENetPacket *pack) {
             LUX_LOG("    expected size: %zuB", needed_dynamic_size +
                                                static_size + 1);
             log_fail();
-            return;
+            return LUX_RVAL_CLIENT_SIGNAL;
         }
         dynamic_segment.set((U8*)(pack->data + 1 + static_size), dynamic_size);
     }
@@ -248,7 +230,7 @@ void handle_signal(ENetPeer* peer, ENetPacket *pack) {
     Slice<U8> out_data;
     out_data.len = 1 + static_size + dynamic_size;
     out_data.beg = new U8[out_data.len];
-    defer { delete[] out_data.beg; };
+    LUX_DEFER { delete[] out_data.beg; };
 
     { ///parse the packet
         switch(signal->type) {
@@ -278,7 +260,8 @@ void handle_signal(ENetPeer* peer, ENetPacket *pack) {
         }
     }
 
-    send_packet(peer, out_data, SIGNAL_CHANNEL, ENET_PACKET_FLAG_RELIABLE);
+    send_signal(peer, server.host, out_data);
+    return LUX_RVAL_OK;
 }
 
 void do_tick() {
@@ -293,7 +276,7 @@ void do_tick() {
             } else if(event.type == ENET_EVENT_TYPE_DISCONNECT) {
                 erase_client((Uns)event.peer->data);
             } else if(event.type == ENET_EVENT_TYPE_RECEIVE) {
-                defer { enet_packet_destroy(event.packet); };
+                LUX_DEFER { enet_packet_destroy(event.packet); };
                 if(!is_client_connected((Uns)event.peer->data)) {
                     U8 *ip = get_ip(event.peer->address);
                     LUX_LOG("ignoring packet from not connected peer");
@@ -302,7 +285,7 @@ void do_tick() {
                     if(event.channelID == TICK_CHANNEL) {
                         handle_tick(event.peer, event.packet);
                     } else if(event.channelID == SIGNAL_CHANNEL) {
-                        handle_signal(event.peer, event.packet);
+                        (void)handle_signal(event.peer, event.packet);
                     } else {
                         auto const &name =
                             server.clients[(Uns)event.peer->data].name;
@@ -320,7 +303,10 @@ void do_tick() {
     }
 }
 
-void server_main(int argc, char** argv) {
+LUX_RVAL server_main(int argc, char** argv) {
+    ///if we exit with an error
+    LUX_DEFER { server.running = false; };
+
     U16 server_port;
 
     { ///read commandline args
@@ -338,7 +324,7 @@ void server_main(int argc, char** argv) {
     if(enet_initialize() != 0) {
         LUX_FATAL("couldn't initialize ENet");
     }
-    defer { enet_deinitialize(); };
+    LUX_DEFER { enet_deinitialize(); };
 
     {
         ENetAddress addr = {ENET_HOST_ANY, server_port};
@@ -347,7 +333,7 @@ void server_main(int argc, char** argv) {
             LUX_FATAL("couldn't initialize ENet host");
         }
     }
-    defer { enet_host_destroy(server.host); };
+    LUX_DEFER { enet_host_destroy(server.host); };
 
     {
         U8 constexpr server_name[] = "lux-server";
@@ -379,6 +365,7 @@ void server_main(int argc, char** argv) {
             it = server.clients.begin();
         }
     }
+    return LUX_RVAL_OK;
 }
 
 int main(int argc, char** argv) {
@@ -387,7 +374,7 @@ int main(int argc, char** argv) {
     server.thread = std::thread(&server_main, argc, argv);
 
     std::string input;
-    while(input != "stop") {
+    while(input != "stop" && server.running) {
         std::getline(std::cin, input);
     }
 
