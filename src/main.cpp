@@ -75,7 +75,7 @@ void kick_client(String const& name, String const& reason) {
     erase_client(client_id);
 }
 
-LUX_RVAL add_client(ENetPeer* peer) {
+LUX_MAY_FAIL add_client(ENetPeer* peer) {
     U8* ip = get_ip(peer->address);
     LUX_LOG("new client connecting")
     LUX_LOG("    ip: %u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
@@ -107,7 +107,7 @@ LUX_RVAL add_client(ENetPeer* peer) {
             }
             if(tries >= MAX_TRIES) {
                 LUX_LOG("client did not send an init packet");
-                return LUX_RVAL_CLIENT_INIT;
+                return LUX_FAIL;
             }
             ++tries;
         } while(true);
@@ -123,7 +123,7 @@ LUX_RVAL add_client(ENetPeer* peer) {
             LUX_LOG("client sent invalid init packet");
             LUX_LOG("    expected size: %zuB", sizeof(NetClientInit));
             LUX_LOG("    actual size: %zuB", init_pack->dataLength);
-            return LUX_RVAL_CLIENT_INIT;
+            return LUX_FAIL;
         }
 
         client_init_data = (NetClientInit*)init_pack->data;
@@ -132,13 +132,13 @@ LUX_RVAL add_client(ENetPeer* peer) {
             LUX_LOG("client uses an incompatible major lux net api version");
             LUX_LOG("    ours: %u", NET_VERSION_MAJOR);
             LUX_LOG("    theirs: %u", client_init_data->net_ver.major);
-            return LUX_RVAL_CLIENT_INIT;
+            return LUX_FAIL;
         }
         if(client_init_data->net_ver.minor >  NET_VERSION_MINOR) {
             LUX_LOG("client uses a newer minor lux net api version");
             LUX_LOG("    ours: %u", NET_VERSION_MINOR);
             LUX_LOG("    theirs: %u", client_init_data->net_ver.minor);
-            return LUX_RVAL_CLIENT_INIT;
+            return LUX_FAIL;
         }
     }
 
@@ -147,7 +147,7 @@ LUX_RVAL add_client(ENetPeer* peer) {
 
         LuxRval rval =
             send_init(peer, server.host, Slice<U8>(server_init_data));
-        if(rval != LUX_RVAL_OK) return rval;
+        if(rval != LUX_OK) return rval;
     }
 
     Server::Client& client = server.clients.emplace_back();
@@ -158,20 +158,21 @@ LUX_RVAL add_client(ENetPeer* peer) {
 
     LUX_LOG("client connected successfully");
     LUX_LOG("    name: %s", client.name.c_str());
-    return LUX_RVAL_OK;
+    return LUX_OK;
 }
 
-LUX_RVAL send_map_load(ENetPeer* peer, Slice<ChkPos> requests) {
+LUX_MAY_FAIL send_map_load(ENetPeer* peer, Slice<ChkPos> requests) {
     typedef NetServerSignal::MapLoad::Chunk NetChunk;
     SizeT constexpr out_static_sz = sizeof(NetServerSignal::MapLoad);
     SizeT out_dyn_sz = requests.len * sizeof(NetChunk);
 
+    //@TODO put into buffer
     Slice<U8> out_data;
     out_data.len = 1 + out_static_sz + out_dyn_sz;
     out_data.beg = (U8*)malloc(out_data.len);
     if(out_data.beg == nullptr) {
         LUX_LOG("failed to allocate output packet of size %zuB", out_data.len);
-        return LUX_RVAL_ALLOC;
+        return LUX_FAIL;
     }
     LUX_DEFER { free(out_data.beg); };
 
@@ -191,19 +192,19 @@ LUX_RVAL send_map_load(ENetPeer* peer, Slice<ChkPos> requests) {
             chunks[i].voxels[j]     = net_order(chunk.voxels[j]);
             chunks[i].light_lvls[j] = net_order(chunk.light_lvls[j]);
         }
-        LuxRval rval = send_signal(peer, server.host, out_data);
-        if(rval != LUX_RVAL_OK) {
-            return rval;
-        }
     }
-    return LUX_RVAL_OK;
+    LuxRval rval = send_signal(peer, server.host, out_data);
+    if(rval != LUX_OK) {
+        return rval;
+    }
+    return LUX_OK;
 }
 
 void handle_tick(ENetPeer* peer, ENetPacket *pack) {
 
 }
 
-LUX_RVAL handle_signal(ENetPeer* peer, ENetPacket *pack) {
+LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket *pack) {
     auto log_fail = [&]() {
         U8 *ip = get_ip(peer->address);
         LUX_LOG("    ignoring packet");
@@ -217,7 +218,7 @@ LUX_RVAL handle_signal(ENetPeer* peer, ENetPacket *pack) {
         //@TODO additional peer info
         LUX_LOG("couldn't read signal header, ignoring it");
         log_fail();
-        return LUX_RVAL_CLIENT_SIGNAL;
+        return LUX_FAIL;
     }
 
     SizeT static_size;
@@ -237,14 +238,14 @@ LUX_RVAL handle_signal(ENetPeer* peer, ENetPacket *pack) {
                 LUX_LOG("unexpected signal type, ignoring it");
                 LUX_LOG("    type: %u", signal->type);
                 log_fail();
-                return LUX_RVAL_CLIENT_SIGNAL;
+                return LUX_FAIL;
             }
         }
         if(static_dynamic_size < needed_static_size) {
             LUX_LOG("received packet static segment too small");
             LUX_LOG("    expected size: atleast %zuB", needed_static_size + 1);
             log_fail();
-            return LUX_RVAL_CLIENT_SIGNAL;
+            return LUX_FAIL;
         }
         static_size = needed_static_size;
         dynamic_size = static_dynamic_size - static_size;
@@ -261,7 +262,7 @@ LUX_RVAL handle_signal(ENetPeer* peer, ENetPacket *pack) {
             LUX_LOG("    expected size: %zuB", needed_dynamic_size +
                                                static_size + 1);
             log_fail();
-            return LUX_RVAL_CLIENT_SIGNAL;
+            return LUX_FAIL;
         }
         dynamic_segment.set((U8*)(pack->data + 1 + static_size), dynamic_size);
     }
@@ -271,14 +272,14 @@ LUX_RVAL handle_signal(ENetPeer* peer, ENetPacket *pack) {
             case NetClientSignal::MAP_REQUEST: {
                 Slice<ChkPos> requests = dynamic_segment;
                 LuxRval rval = send_map_load(peer, requests);
-                if(rval != LUX_RVAL_OK) {
+                if(rval != LUX_OK) {
                     return rval;
                 }
             } break;
             default: LUX_ASSERT(false);
         }
     }
-    return LUX_RVAL_OK;
+    return LUX_OK;
 }
 
 void do_tick() {
@@ -287,7 +288,7 @@ void do_tick() {
         ENetEvent event;
         while(enet_host_service(server.host, &event, 0) > 0) {
             if(event.type == ENET_EVENT_TYPE_CONNECT) {
-                if(add_client(event.peer) != LUX_RVAL_OK) {
+                if(add_client(event.peer) != LUX_OK) {
                     kick_peer(event.peer);
                 }
             } else if(event.type == ENET_EVENT_TYPE_DISCONNECT) {
@@ -320,7 +321,7 @@ void do_tick() {
     }
 }
 
-LUX_RVAL server_main(int argc, char** argv) {
+void server_main(int argc, char** argv) {
     ///if we exit with an error
     LUX_DEFER { server.running = false; };
 
@@ -382,7 +383,6 @@ LUX_RVAL server_main(int argc, char** argv) {
             it = server.clients.begin();
         }
     }
-    return LUX_RVAL_OK;
 }
 
 int main(int argc, char** argv) {
