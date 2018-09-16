@@ -15,6 +15,7 @@
 #include <lux_shared/util/tick_clock.hpp>
 //
 #include <map.hpp>
+#include <entity.hpp>
 
 Uns constexpr MAX_CLIENTS  = 16;
 
@@ -27,6 +28,7 @@ struct Server {
     struct Client {
         ENetPeer* peer;
         String    name;
+        Entity*   entity;
     };
     std::atomic<bool> running = false;
     std::thread       thread;
@@ -45,7 +47,7 @@ void erase_client(Uns id) {
     LUX_LOG("client disconnected");
     LUX_LOG("    id: %zu" , id);
     LUX_LOG("    name: %s", server.clients[id].name.c_str());
-    //@TODO delete entity
+    remove_entity(*server.clients[id].entity);
     server.clients.erase(server.clients.begin() + id);
 }
 
@@ -154,7 +156,7 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
     client.peer = peer;
     client.peer->data = (void*)(server.clients.size() - 1);
     client.name = String((char const*)client_init_data->name.data());
-    //@TODO set entity
+    client.entity = &create_player();
 
     LUX_LOG("client connected successfully");
     LUX_LOG("    name: %s", client.name.c_str());
@@ -169,12 +171,12 @@ LUX_MAY_FAIL send_map_load(ENetPeer* peer, Slice<ChkPos> requests) {
     //@TODO put into buffer
     Slice<U8> out_data;
     out_data.len = 1 + out_static_sz + out_dyn_sz;
-    out_data.beg = (U8*)malloc(out_data.len);
+    out_data.beg = lux_alloc<U8>(out_data.len);
     if(out_data.beg == nullptr) {
         LUX_LOG("failed to allocate output packet of size %zuB", out_data.len);
         return LUX_FAIL;
     }
-    LUX_DEFER { free(out_data.beg); };
+    LUX_DEFER { lux_free(out_data.beg); };
 
     NetServerSignal* signal = (NetServerSignal*)out_data.beg;
     signal->type = NetServerSignal::MAP_LOAD;
