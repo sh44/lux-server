@@ -5,6 +5,10 @@
 
 HashMap<ChkPos, Chunk, util::Packer<ChkPos>> chunks;
 
+void map_tick() {
+    //@TODO
+}
+
 bool is_chunk_loaded(ChkPos const& pos) {
     return chunks.count(pos) > 0;
 }

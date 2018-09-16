@@ -7,5 +7,6 @@ struct Chunk {
     Arr<LightLvl, CHK_VOL> light_lvls;
 };
 
+void map_tick();
 void guarantee_chunk(ChkPos const& pos);
 Chunk const& get_chunk(ChkPos const& pos);

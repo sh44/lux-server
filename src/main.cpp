@@ -284,7 +284,7 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket *pack) {
     return LUX_OK;
 }
 
-void do_tick() {
+void server_tick() {
     //@RESEARCH can we use our own packet to prevent copies?
     { ///handle events
         ENetEvent event;
@@ -320,7 +320,25 @@ void do_tick() {
     }
 
     { ///world tick
+        entities_tick();
+        map_tick();
+    }
 
+    { ///dispatch ticks
+        for(Server::Client& client : server.clients) {
+            //@CONSIDER a buffer
+            Slice<U8> data;
+            data.len = sizeof(NetServerTick);
+            data.beg = lux_alloc<U8>(data.len);
+            if(data.beg == nullptr) {
+                //@CONSDIER err msg
+                continue;
+            }
+            LUX_DEFER { lux_free(data.beg); };
+            NetServerTick* tick = (NetServerTick*)data.beg;
+            tick->player_pos = net_order(client.entity->pos);
+            (void)send_tick(client.peer, server.host, data);
+        }
     }
 }
 
@@ -367,7 +385,7 @@ void server_main(int argc, char** argv) {
         util::TickClock clock(tick_len);
         while(server.running) {
             clock.start();
-            do_tick();
+            server_tick();
             clock.stop();
             auto remaining = clock.synchronize();
             if(remaining < util::TickClock::Duration::zero()) {
