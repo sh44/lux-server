@@ -176,12 +176,12 @@ LUX_MAY_FAIL send_map_load(ENetPeer* peer, Slice<ChkPos> requests) {
     }
     LUX_DEFER { free(out_data.beg); };
 
+    NetServerSignal* signal = (NetServerSignal*)out_data.beg;
+    signal->type = NetServerSignal::MAP_LOAD;
+    signal->map_load.chunks.len = requests.len;
     NetChunk* chunks = (NetChunk*)(out_data.beg + 1 + out_static_sz);
     for(Uns i = 0; i < requests.len; ++i) {
-        ChkPos pos;
-        pos.x = net_order(requests[i].x);
-        pos.y = net_order(requests[i].y);
-        pos.z = net_order(requests[i].z);
+        ChkPos pos = net_order(requests[i]);
 
         guarantee_chunk(pos);
         Chunk const& chunk = get_chunk(pos);
@@ -252,12 +252,12 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket *pack) {
         SizeT needed_dynamic_size;
         switch(signal->type) {
             case NetClientSignal::MAP_REQUEST: {
-                needed_dynamic_size = signal->map_request.requests.len *
-                                      sizeof(ChkPos);
+                needed_dynamic_size =
+                    net_order(signal->map_request.requests.len) * sizeof(ChkPos);
             } break;
             default: LUX_ASSERT(false);
         }
-        if(dynamic_size != needed_static_size) {
+        if(dynamic_size != needed_dynamic_size) {
             LUX_LOG("received packet dynamic segment size differs from expected");
             LUX_LOG("    expected size: %zuB", needed_dynamic_size +
                                                static_size + 1);
@@ -299,6 +299,7 @@ void do_tick() {
                     U8 *ip = get_ip(event.peer->address);
                     LUX_LOG("ignoring packet from not connected peer");
                     LUX_LOG("    ip: %u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+                    enet_peer_reset(event.peer);
                 } else {
                     if(event.channelID == TICK_CHANNEL) {
                         handle_tick(event.peer, event.packet);
