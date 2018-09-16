@@ -9,6 +9,7 @@
 //
 #include <lux_shared/common.hpp>
 #include <lux_shared/net/common.hpp>
+#include <lux_shared/net/net_order.hpp>
 #include <lux_shared/net/data.hpp>
 #include <lux_shared/net/enet.hpp>
 #include <lux_shared/util/tick_clock.hpp>
@@ -160,6 +161,44 @@ LUX_RVAL add_client(ENetPeer* peer) {
     return LUX_RVAL_OK;
 }
 
+LUX_RVAL send_map_load(ENetPeer* peer, Slice<ChkPos> requests) {
+    typedef NetServerSignal::MapLoad::Chunk NetChunk;
+    SizeT constexpr out_static_sz = sizeof(NetServerSignal::MapLoad);
+    SizeT out_dyn_sz = requests.len * sizeof(NetChunk);
+
+    Slice<U8> out_data;
+    out_data.len = 1 + out_static_sz + out_dyn_sz;
+    out_data.beg = (U8*)malloc(out_data.len);
+    if(out_data.beg == nullptr) {
+        LUX_LOG("failed to allocate output packet of size %zuB", out_data.len);
+        return LUX_RVAL_ALLOC;
+    }
+    LUX_DEFER { free(out_data.beg); };
+
+    NetChunk* chunks = (NetChunk*)(out_data.beg + 1 + out_static_sz);
+    for(Uns i = 0; i < requests.len; ++i) {
+        ChkPos pos;
+        pos.x = net_order(requests[i].x);
+        pos.y = net_order(requests[i].y);
+        pos.z = net_order(requests[i].z);
+
+        guarantee_chunk(pos);
+        Chunk const& chunk = get_chunk(pos);
+        chunks[i].pos = net_order(pos);
+        ///wish we could just cast the pointer to it, but we need to
+        ///change the net order after all...
+        for(Uns j = 0; j < CHK_VOL; ++j) {
+            chunks[i].voxels[j]     = net_order(chunk.voxels[j]);
+            chunks[i].light_lvls[j] = net_order(chunk.light_lvls[j]);
+        }
+        LuxRval rval = send_signal(peer, server.host, out_data);
+        if(rval != LUX_RVAL_OK) {
+            return rval;
+        }
+    }
+    return LUX_RVAL_OK;
+}
+
 void handle_tick(ENetPeer* peer, ENetPacket *pack) {
 
 }
@@ -227,40 +266,18 @@ LUX_RVAL handle_signal(ENetPeer* peer, ENetPacket *pack) {
         dynamic_segment.set((U8*)(pack->data + 1 + static_size), dynamic_size);
     }
 
-    Slice<U8> out_data;
-    out_data.len = 1 + static_size + dynamic_size;
-    out_data.beg = new U8[out_data.len];
-    LUX_DEFER { delete[] out_data.beg; };
-
     { ///parse the packet
         switch(signal->type) {
             case NetClientSignal::MAP_REQUEST: {
-                typedef NetServerSignal::MapLoad::Chunk NetChunk;
                 Slice<ChkPos> requests = dynamic_segment;
-
-                NetChunk* chunks = (NetChunk*)(out_data.beg + 1 + static_size);
-                for(Uns i = 0; i < requests.len; ++i) {
-                    requests[i].x = net_order(requests[i].x);
-                    requests[i].y = net_order(requests[i].y);
-                    requests[i].z = net_order(requests[i].z);
-
-                    guarantee_chunk(requests[i]);
-                    Chunk const& chunk = get_chunk(requests[i]);
-                    chunks[i].pos = requests[i];
-                    ///wish we could just cast the pointer to it, but we need to
-                    ///change the net order after all...
-                    for(Uns j = 0; j < CHK_VOL; ++j) {
-                        chunks[i].voxels[j] = net_order(chunk.voxels[j]);
-                        chunks[i].light_lvls[j] =
-                            net_order(chunk.light_lvls[j]);
-                    }
+                LuxRval rval = send_map_load(peer, requests);
+                if(rval != LUX_RVAL_OK) {
+                    return rval;
                 }
             } break;
             default: LUX_ASSERT(false);
         }
     }
-
-    send_signal(peer, server.host, out_data);
     return LUX_RVAL_OK;
 }
 
