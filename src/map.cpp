@@ -13,7 +13,7 @@ bool is_chunk_loaded(ChkPos const& pos) {
     return chunks.count(pos) > 0;
 }
 
-Chunk& load_chunk(ChkPos const& pos) {
+static Chunk& load_chunk(ChkPos const& pos) {
     LUX_ASSERT(!is_chunk_loaded(pos));
     LUX_LOG("loading chunk");
     LUX_LOG("    pos: {%zd, %zd, %zd}", pos.x, pos.y, pos.z);
