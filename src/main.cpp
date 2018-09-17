@@ -55,9 +55,7 @@ void kick_peer(ENetPeer *peer) {
     U8* ip = get_ip(peer->address);
     LUX_LOG("terminating connection with peer");
     LUX_LOG("    ip: %u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
-    enet_peer_disconnect(peer, 0);
-    enet_host_flush(server.host);
-    enet_peer_reset(peer);
+    enet_peer_disconnect_now(peer, 0);
 }
 
 void kick_client(String const& name, String const& reason) {
