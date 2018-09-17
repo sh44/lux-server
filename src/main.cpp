@@ -30,12 +30,12 @@ struct Server {
         String    name;
         Entity*   entity;
     };
+    DynArr<Client> clients;
+
     std::atomic<bool> running = false;
     std::thread       thread;
 
-    ENetHost*     host;
-
-    DynArr<Client>    clients;
+    ENetHost*  host;
 } server;
 
 bool is_client_connected(Uns id) {
@@ -113,8 +113,7 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
             }
             ++tries;
         } while(true);
-        LUX_LOG("received init packet");
-        LUX_LOG("    %zu/%zu tries", tries, MAX_TRIES);
+        LUX_LOG("received init packet after %zu/%zu tries", tries, MAX_TRIES);
     }
     ///we need to keep the packet around, because we read its contents directly
     ///through the NetClientInit struct pointer
@@ -145,11 +144,15 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
     }
 
     { ///send init packet
-        NetServerInit server_init_data = {conf.name, net_order(conf.tick_rate)};
+        ENetPacket* pack;
+        if(create_reliable_pack(pack, sizeof(NetServerInit)) != LUX_OK) {
+            return LUX_FAIL;
+        }
+        NetServerInit* init = (NetServerInit*)pack->data;
+        init->name      = conf.name;
+        init->tick_rate = net_order(conf.tick_rate);
 
-        LuxRval rval =
-            send_init(peer, server.host, Slice<U8>(server_init_data));
-        if(rval != LUX_OK) return rval;
+        if(send_packet(peer, pack, INIT_CHANNEL) != LUX_OK) return LUX_FAIL;
     }
 
     Server::Client& client = server.clients.emplace_back();
@@ -168,20 +171,15 @@ LUX_MAY_FAIL send_map_load(ENetPeer* peer, Slice<ChkPos> requests) {
     SizeT constexpr out_static_sz = sizeof(NetServerSignal::MapLoad);
     SizeT out_dyn_sz = requests.len * sizeof(NetChunk);
 
-    //@TODO put into buffer
-    Slice<U8> out_data;
-    out_data.len = 1 + out_static_sz + out_dyn_sz;
-    out_data.beg = lux_alloc<U8>(out_data.len);
-    if(out_data.beg == nullptr) {
-        LUX_LOG("failed to allocate output packet of size %zuB", out_data.len);
+    ENetPacket* pack;
+    if(create_reliable_pack(pack, 1 + out_static_sz + out_dyn_sz) != LUX_OK) {
         return LUX_FAIL;
     }
-    LUX_DEFER { lux_free(out_data.beg); };
 
-    NetServerSignal* signal = (NetServerSignal*)out_data.beg;
+    NetServerSignal* signal = (NetServerSignal*)pack->data;
     signal->type = NetServerSignal::MAP_LOAD;
     signal->map_load.chunks.len = requests.len;
-    NetChunk* chunks = (NetChunk*)(out_data.beg + 1 + out_static_sz);
+    NetChunk* chunks = (NetChunk*)(pack->data + 1 + out_static_sz);
     for(Uns i = 0; i < requests.len; ++i) {
         ChkPos pos = net_order(requests[i]);
 
@@ -195,15 +193,12 @@ LUX_MAY_FAIL send_map_load(ENetPeer* peer, Slice<ChkPos> requests) {
             chunks[i].light_lvls[j] = net_order(chunk.light_lvls[j]);
         }
     }
-    LuxRval rval = send_signal(peer, server.host, out_data);
-    if(rval != LUX_OK) {
-        return rval;
-    }
+    if(send_packet(peer, pack, SIGNAL_CHANNEL) != LUX_OK) return LUX_FAIL;
     return LUX_OK;
 }
 
-void handle_tick(ENetPeer* peer, ENetPacket *pack) {
-
+LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *pack) {
+    return LUX_OK;
 }
 
 LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket *pack) {
@@ -273,10 +268,7 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket *pack) {
         switch(signal->type) {
             case NetClientSignal::MAP_REQUEST: {
                 Slice<ChkPos> requests = dynamic_segment;
-                LuxRval rval = send_map_load(peer, requests);
-                if(rval != LUX_OK) {
-                    return rval;
-                }
+                if(send_map_load(peer, requests) != LUX_OK) return LUX_FAIL;
             } break;
             default: LUX_ASSERT(false);
         }
@@ -285,8 +277,13 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket *pack) {
 }
 
 void server_tick() {
-    //@RESEARCH can we use our own packet to prevent copies?
+    //@CONSIDER moving to server_main
+    entities_tick();
+    map_tick();
+
     { ///handle events
+        //@RESEARCH can we use our own packet to prevent copies?
+        //@CONSIDER splitting this scope
         ENetEvent event;
         while(enet_host_service(server.host, &event, 0) > 0) {
             if(event.type == ENET_EVENT_TYPE_CONNECT) {
@@ -304,9 +301,13 @@ void server_tick() {
                     enet_peer_reset(event.peer);
                 } else {
                     if(event.channelID == TICK_CHANNEL) {
-                        handle_tick(event.peer, event.packet);
+                        if(handle_tick(event.peer, event.packet) != LUX_OK) {
+                            continue;
+                        }
                     } else if(event.channelID == SIGNAL_CHANNEL) {
-                        (void)handle_signal(event.peer, event.packet);
+                        if(handle_signal(event.peer, event.packet) != LUX_OK) {
+                            continue;
+                        }
                     } else {
                         auto const &name =
                             server.clients[(Uns)event.peer->data].name;
@@ -319,25 +320,16 @@ void server_tick() {
         }
     }
 
-    { ///world tick
-        entities_tick();
-        map_tick();
-    }
-
     { ///dispatch ticks
         for(Server::Client& client : server.clients) {
             //@CONSIDER a buffer
-            Slice<U8> data;
-            data.len = sizeof(NetServerTick);
-            data.beg = lux_alloc<U8>(data.len);
-            if(data.beg == nullptr) {
-                //@CONSDIER err msg
+            ENetPacket* pack;
+            if(create_unreliable_pack(pack, sizeof(NetServerTick)) != LUX_OK) {
                 continue;
             }
-            LUX_DEFER { lux_free(data.beg); };
-            NetServerTick* tick = (NetServerTick*)data.beg;
+            NetServerTick* tick = (NetServerTick*)pack->data;
             tick->player_pos = net_order(client.entity->pos);
-            (void)send_tick(client.peer, server.host, data);
+            (void)send_packet(client.peer, pack, TICK_CHANNEL);
         }
     }
 }
