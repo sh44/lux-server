@@ -148,7 +148,7 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
         }
         NetServerInit* init = (NetServerInit*)pack->data;
         init->name      = conf.name;
-        init->tick_rate = net_order(conf.tick_rate);
+        net_order(&init->tick_rate, &conf.tick_rate);
 
         if(send_packet(peer, pack, INIT_CHANNEL) != LUX_OK) return LUX_FAIL;
     }
@@ -179,16 +179,18 @@ LUX_MAY_FAIL send_map_load(ENetPeer* peer, Slice<ChkPos> requests) {
     signal->map_load.chunks.len = requests.len;
     NetChunk* chunks = (NetChunk*)(pack->data + 1 + out_static_sz);
     for(Uns i = 0; i < requests.len; ++i) {
-        ChkPos pos = net_order(requests[i]);
+        ChkPos pos;
+        net_order(&pos, &requests[i]);
 
         guarantee_chunk(pos);
         Chunk const& chunk = get_chunk(pos);
-        chunks[i].pos = net_order(pos);
+        ///yes we could use requests[i], but let's keep it readable
+        net_order(&chunks[i].pos, &pos);
         ///wish we could just cast the pointer to it, but we need to
         ///change the net order after all...
         for(Uns j = 0; j < CHK_VOL; ++j) {
-            chunks[i].voxels[j]     = net_order(chunk.voxels[j]);
-            chunks[i].light_lvls[j] = net_order(chunk.light_lvls[j]);
+            net_order(&chunks[i].voxels[j], &chunk.voxels[j]);
+            net_order(&chunks[i].light_lvls[j], &chunk.light_lvls[j]);
         }
     }
     if(send_packet(peer, pack, SIGNAL_CHANNEL) != LUX_OK) return LUX_FAIL;
@@ -247,8 +249,9 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket *pack) {
         SizeT needed_dynamic_size;
         switch(signal->type) {
             case NetClientSignal::MAP_REQUEST: {
-                needed_dynamic_size =
-                    net_order(signal->map_request.requests.len) * sizeof(ChkPos);
+                U32 requests_len;
+                net_order(&requests_len, &signal->map_request.requests.len);
+                needed_dynamic_size = requests_len * sizeof(ChkPos);
             } break;
             default: LUX_ASSERT(false);
         }
@@ -326,7 +329,7 @@ void server_tick() {
                 continue;
             }
             NetServerTick* tick = (NetServerTick*)pack->data;
-            tick->player_pos = net_order(client.entity->pos);
+            net_order(&tick->player_pos, &client.entity->pos);
             (void)send_packet(client.peer, pack, TICK_CHANNEL);
         }
     }
