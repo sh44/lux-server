@@ -20,8 +20,7 @@ Entity& create_player() {
 void entities_tick() {
     for(auto& entity : entities) {
         entity.pos += entity.vel;
-        entity.pos.x += 0.01f;
-        LUX_LOG("    pos: {%.2f}", entity.pos.x);
+        entity.pos.x += 0.1f;
     }
 }
 

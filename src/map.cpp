@@ -1,6 +1,8 @@
 #include <lux_shared/common.hpp>
 #include <lux_shared/util/packer.hpp>
 #include <lux_shared/map.hpp>
+//
+#include <db.hpp>
 #include "map.hpp"
 
 HashMap<ChkPos, Chunk, util::Packer<ChkPos>> chunks;
@@ -20,8 +22,14 @@ static Chunk& load_chunk(ChkPos const& pos) {
     ///@RESEARCH to do a better way to no-copy default construct
     Chunk& chunk = chunks[pos];
     for(Uns i = 0; i < CHK_VOL; ++i) {
-        ///@TODO actual generator here
-        chunk.voxels[i]     = i;
+        VoxelId voxel_id = db_voxel_id("void");
+        MapPos map_pos = to_map_pos(pos, i);
+        if(map_pos.x % 8 == 0 || map_pos.y % 8 == 0) {
+            voxel_id = db_voxel_id("stone_wall");
+        } else {
+            voxel_id = db_voxel_id("stone_floor");
+        }
+        chunk.voxels[i] = voxel_id;
         chunk.light_lvls[i] = 0;
     }
     return chunk;

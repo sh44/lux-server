@@ -14,6 +14,7 @@
 #include <lux_shared/net/enet.hpp>
 #include <lux_shared/util/tick_clock.hpp>
 //
+#include <db.hpp>
 #include <map.hpp>
 #include <entity.hpp>
 
@@ -352,6 +353,7 @@ void server_main(int argc, char** argv) {
         server_port = raw_server_port;
     }
 
+    db_init();
     LUX_LOG("initializing server");
     if(enet_initialize() != 0) {
         LUX_FATAL("couldn't initialize ENet");
