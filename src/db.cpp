@@ -10,12 +10,12 @@ void add_voxel(VoxelType &&voxel_type) {
 }
 
 void db_init() {
-    add_voxel({"void"});
-    add_voxel({"stone_floor"});
-    add_voxel({"stone_wall"});
-    add_voxel({"raw_stone"});
-    add_voxel({"dirt"});
-    add_voxel({"gravel"});
+    add_voxel({"void", VoxelType::EMPTY});
+    add_voxel({"stone_floor", VoxelType::FLOOR});
+    add_voxel({"stone_wall", VoxelType::BLOCK});
+    add_voxel({"raw_stone", VoxelType::BLOCK});
+    add_voxel({"dirt", VoxelType::BLOCK});
+    add_voxel({"gravel", VoxelType::BLOCK});
 }
 
 VoxelType const& db_voxel_type(VoxelId id) {

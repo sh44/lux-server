@@ -5,6 +5,12 @@
 
 struct VoxelType {
     String str_id;
+    enum Shape {
+        EMPTY,
+        FLOOR,
+        BLOCK,
+        HALF_BLOCK,
+    } shape;
 };
 
 void db_init();
