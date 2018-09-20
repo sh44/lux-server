@@ -198,7 +198,24 @@ LUX_MAY_FAIL send_map_load(ENetPeer* peer, Slice<ChkPos> requests) {
     return LUX_OK;
 }
 
-LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *pack) {
+LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
+    if(in_pack->dataLength != sizeof(NetClientTick)) {
+        LUX_LOG("received tick packet has unexpected size");
+        LUX_LOG("    expected size: %zuB", sizeof(NetClientTick));
+        LUX_LOG("    size: %zuB", in_pack->dataLength);
+        return LUX_FAIL;
+    }
+
+    LUX_ASSERT(is_client_connected((Uns)peer->data));
+    Entity& entity = *server.clients[(Uns)peer->data].entity;
+    NetClientTick *tick = (NetClientTick*)in_pack->data;
+    Vec2F player_dir;
+    net_order(&player_dir, &tick->player_dir);
+    if(player_dir.x != 0.f || player_dir.y != 0.f) {
+        player_dir = glm::normalize(player_dir);
+        entity.vel.x = player_dir.x * 0.1f;
+        entity.vel.y = player_dir.y * 0.1f;
+    }
     return LUX_OK;
 }
 

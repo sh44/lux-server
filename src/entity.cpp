@@ -20,7 +20,7 @@ Entity& create_player() {
 void entities_tick() {
     for(auto& entity : entities) {
         entity.pos += entity.vel;
-        entity.pos.x += 0.1f;
+        entity.vel += -entity.vel * 0.10f;
     }
 }
 

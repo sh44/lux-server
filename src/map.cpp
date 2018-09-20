@@ -5,14 +5,14 @@
 #include <db.hpp>
 #include "map.hpp"
 
-HashMap<ChkPos, Chunk, util::Packer<ChkPos>> chunks;
+VecMap<ChkPos, Chunk> chunks;
 
 struct LightNode {
     ChkIdx   idx;
     Vec3<U8> col;
 };
-HashSet<ChkPos, util::Packer<ChkPos>> lightning_updates;
-HashMap<ChkPos, Queue<LightNode>, util::Packer<ChkPos>> lightning_nodes;
+VecSet<ChkPos> lightning_updates;
+VecMap<ChkPos, Queue<LightNode>> lightning_nodes;
 
 static void update_lightning(ChkPos const &pos);
 static bool is_chunk_loaded(ChkPos const& pos) {
@@ -42,10 +42,12 @@ static Chunk& load_chunk(ChkPos const& pos) {
         } else {
             voxel_id = db_voxel_id("stone_floor");
         }
+        if(map_pos.x % 8 == 3 && map_pos.y % 8 == 3) {
+            add_light_node(to_map_pos(pos, i), {0xF, 0xF, 0xF});
+        }
         chunk.voxels[i] = voxel_id;
         chunk.light_lvls[i] = 0;
     }
-    add_light_node(to_map_pos(pos, 34), {0xF, 0xF, 0xF});
     return chunk;
 }
 
