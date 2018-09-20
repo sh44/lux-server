@@ -1,5 +1,6 @@
 #include <lux_shared/common.hpp>
 #include <lux_shared/util/packer.hpp>
+#include <lux_shared/vec_hash.hpp>
 #include <lux_shared/map.hpp>
 //
 #include <db.hpp>
@@ -37,12 +38,17 @@ static Chunk& load_chunk(ChkPos const& pos) {
     for(Uns i = 0; i < CHK_VOL; ++i) {
         VoxelId voxel_id = db_voxel_id("void");
         MapPos map_pos = to_map_pos(pos, i);
-        if(map_pos.x % 8 == 0 || map_pos.y % 8 == 0) {
+        Uns pos_hash = std::hash<MapPos>()(map_pos);
+        if((map_pos.x % 8 == 0 || map_pos.y % 8 == 0) && pos_hash % 5 != 0) {
             voxel_id = db_voxel_id("stone_wall");
         } else {
-            voxel_id = db_voxel_id("stone_floor");
+            if(pos_hash % 13 == 0) {
+                voxel_id = db_voxel_id("void");
+            } else {
+                voxel_id = db_voxel_id("stone_floor");
+            }
         }
-        if(map_pos.x % 8 == 3 && map_pos.y % 8 == 3) {
+        if((map_pos.x % 8 == 3 && map_pos.y % 8 == 3) && pos_hash % 20 == 0) {
             add_light_node(to_map_pos(pos, i), {0xF, 0xF, 0xF});
         }
         chunk.voxels[i] = voxel_id;
