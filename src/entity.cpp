@@ -39,6 +39,7 @@ void entities_tick() {
             entity.pos = new_pos;
         }
         entity.vel += -entity.vel * 0.10f;
+        add_light_node(entity.pos, {0xF, 0xF, 0xF});
     }
 }
 

@@ -198,6 +198,32 @@ LUX_MAY_FAIL send_map_load(ENetPeer* peer, Slice<ChkPos> requests) {
     return LUX_OK;
 }
 
+LUX_MAY_FAIL send_light_update(ENetPeer* peer, DynArr<ChkPos> const& updates) {
+    typedef NetServerSignal::LightUpdate::Chunk NetChunk;
+    SizeT constexpr out_static_sz = sizeof(NetServerSignal::LightUpdate);
+    SizeT out_dyn_sz = updates.size() * sizeof(NetChunk);
+
+    ENetPacket* pack;
+    if(create_reliable_pack(pack, 1 + out_static_sz + out_dyn_sz) != LUX_OK) {
+        return LUX_FAIL;
+    }
+
+    NetServerSignal* signal = (NetServerSignal*)pack->data;
+    signal->type = NetServerSignal::LIGHT_UPDATE;
+    signal->light_update.chunks.len = updates.size();
+    NetChunk* chunks = (NetChunk*)(pack->data + 1 + out_static_sz);
+    for(Uns i = 0; i < updates.size(); ++i) {
+        ChkPos const& pos = updates[i];
+        Chunk const& chunk = get_chunk(pos);
+        net_order(&chunks[i].pos, &pos);
+        for(Uns j = 0; j < CHK_VOL; ++j) {
+            net_order(&chunks[i].light_lvls[j], &chunk.light_lvls[j]);
+        }
+    }
+    if(send_packet(peer, pack, SIGNAL_CHANNEL) != LUX_OK) return LUX_FAIL;
+    return LUX_OK;
+}
+
 LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
     if(in_pack->dataLength != sizeof(NetClientTick)) {
         LUX_LOG("received tick packet has unexpected size");
@@ -298,7 +324,17 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket *pack) {
 void server_tick() {
     //@CONSIDER moving to server_main
     entities_tick();
-    map_tick();
+    ///update lightning and send light updates
+    {   static DynArr<ChkPos> light_updated_chunks;
+        map_tick(light_updated_chunks);
+
+        if(light_updated_chunks.size() > 0) {
+            for(Server::Client& client : server.clients) {
+                (void)send_light_update(client.peer, light_updated_chunks);
+            }
+            light_updated_chunks.clear();
+        }
+    }
 
     { ///handle events
         //@RESEARCH can we use our own packet to prevent copies?
@@ -341,7 +377,6 @@ void server_tick() {
 
     { ///dispatch ticks
         for(Server::Client& client : server.clients) {
-            //@CONSIDER a buffer
             ENetPacket* pack;
             if(create_unreliable_pack(pack, sizeof(NetServerTick)) != LUX_OK) {
                 continue;

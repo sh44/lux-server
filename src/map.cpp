@@ -20,12 +20,15 @@ static bool is_chunk_loaded(ChkPos const& pos) {
     return chunks.count(pos) > 0;
 }
 
-void map_tick() {
-    for(auto it = lightning_updates.begin(); it != lightning_updates.end();) {
+void map_tick(DynArr<ChkPos>& light_updated_chunks) {
+    ///we need to copy it, because update_lightning could add another updates
+    auto l_updates = lightning_updates;
+    for(auto it = l_updates.begin(); it != l_updates.end(); ++it) {
         if(is_chunk_loaded(*it)) {
             update_lightning(*it);
-            it = lightning_updates.erase(it);
-        } else it++;
+            lightning_updates.erase(*it);
+            light_updated_chunks.push_back(*it);
+        };
     }
 }
 
@@ -42,9 +45,9 @@ static Chunk& load_chunk(ChkPos const& pos) {
         if((map_pos.x % 8 == 0 || map_pos.y % 8 == 0) && pos_hash % 5 != 0) {
             voxel_id = db_voxel_id("stone_wall");
         } else {
-            if(pos_hash % 13 == 0) {
+            /*if(pos_hash % 13 == 0) {
                 voxel_id = db_voxel_id("void");
-            } else {
+            } else */{
                 voxel_id = db_voxel_id("stone_floor");
             }
         }
@@ -75,7 +78,6 @@ VoxelId get_voxel(MapPos const& pos) {
 
 void add_light_node(MapPos const& pos, Vec3<U8> col) {
     ChkPos chk_pos = to_chk_pos(pos);
-    LUX_LOG("%zd, %zd", pos.x, pos.y);
     lightning_nodes[chk_pos].push({to_chk_idx(pos), col});
     lightning_updates.insert(chk_pos);
 }
@@ -123,11 +125,15 @@ static void update_lightning(ChkPos const &pos)
                     MapPos map_pos = base_pos + offset;
                     ChkPos chk_pos = to_chk_pos(map_pos);
                     ChkIdx idx     = to_chk_idx(map_pos);
-                    if(chk_pos == pos) {
-                        nodes.push({idx, side_color});
-                    } else {
-                        lightning_nodes[chk_pos].push({idx, side_color});
-                        lightning_updates.insert(chk_pos);
+                    if((offset == MapPos(0, 0, -1) &&
+                        db_voxel_type(chunk.voxels[node.idx]).shape
+                        == VoxelType::EMPTY) || offset != MapPos(0, 0, -1)) {
+                        if(chk_pos == pos) {
+                            nodes.push({idx, side_color});
+                        } else {
+                            lightning_nodes[chk_pos].push({idx, side_color});
+                            lightning_updates.insert(chk_pos);
+                        }
                     }
                 }
             }
