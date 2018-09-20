@@ -63,6 +63,10 @@ Chunk const& get_chunk(ChkPos const& pos) {
     return chunks.at(pos);
 }
 
+VoxelId get_voxel(MapPos const& pos) {
+    return get_chunk(to_chk_pos(pos)).voxels[to_chk_idx(pos)];
+}
+
 void add_light_node(MapPos const& pos, Vec3<U8> col) {
     ChkPos chk_pos = to_chk_pos(pos);
     LUX_LOG("%zd, %zd", pos.x, pos.y);

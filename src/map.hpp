@@ -10,5 +10,6 @@ struct Chunk {
 void map_tick();
 void guarantee_chunk(ChkPos const& pos);
 Chunk const& get_chunk(ChkPos const& pos);
+VoxelId get_voxel(MapPos const& pos);
 
-void add_light_node(MapPos const&pos, Vec3<U8> col);
+void add_light_node(MapPos const& pos, Vec3<U8> col);
