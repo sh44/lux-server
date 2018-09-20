@@ -109,7 +109,7 @@ static void update_lightning(ChkPos const &pos)
         Vec3<U8> map_color = {(map_lvl & 0xF000) >> 12,
                               (map_lvl & 0x0F00) >>  8,
                               (map_lvl & 0x00F0) >>  4};
-        auto is_less = glm::lessThan(map_color + Vec3<U8>(1u), node.col);
+        auto is_less = glm::lessThan(map_color, node.col);
         auto atleast_two = glm::greaterThanEqual(node.col, Vec3<U8>(2u));
         if(glm::any(is_less)) {
             /* node.col is guaranteed to be non-zero when is_less is true */
