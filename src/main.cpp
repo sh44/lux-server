@@ -30,6 +30,7 @@ struct Server {
         ENetPeer* peer;
         String    name;
         Entity*   entity;
+        VecSet<ChkPos> loaded_chunks;
     };
     DynArr<Client> clients;
 
@@ -195,13 +196,30 @@ LUX_MAY_FAIL send_map_load(ENetPeer* peer, Slice<ChkPos> requests) {
         }
     }
     if(send_packet(peer, pack, SIGNAL_CHANNEL) != LUX_OK) return LUX_FAIL;
+    Server::Client& client = server.clients[(Uns)peer->data];
+    ///we need to do it outside, because we must be sure that the packet has
+    ///been received (i.e. sent in this case, enet guarantees that the peer will
+    ///either receive it or get disconnected
+    for(Uns i = 0; i < requests.len; ++i) {
+        ChkPos pos;
+        net_order(&pos, &requests[i]);
+        client.loaded_chunks.emplace(pos);
+    }
     return LUX_OK;
 }
 
 LUX_MAY_FAIL send_light_update(ENetPeer* peer, DynArr<ChkPos> const& updates) {
+    Server::Client& client = server.clients[(Uns)peer->data];
+    SizeT output_len = 0;
+    for(Uns i = 0; i < updates.size(); ++i) {
+        ChkPos const& pos = updates[i];
+        if(client.loaded_chunks.count(pos) > 0) {
+            ++output_len;
+        }
+    }
     typedef NetServerSignal::LightUpdate::Chunk NetChunk;
     SizeT constexpr out_static_sz = sizeof(NetServerSignal::LightUpdate);
-    SizeT out_dyn_sz = updates.size() * sizeof(NetChunk);
+    SizeT out_dyn_sz = output_len * sizeof(NetChunk);
 
     ENetPacket* pack;
     if(create_reliable_pack(pack, 1 + out_static_sz + out_dyn_sz) != LUX_OK) {
@@ -210,14 +228,16 @@ LUX_MAY_FAIL send_light_update(ENetPeer* peer, DynArr<ChkPos> const& updates) {
 
     NetServerSignal* signal = (NetServerSignal*)pack->data;
     signal->type = NetServerSignal::LIGHT_UPDATE;
-    signal->light_update.chunks.len = updates.size();
+    signal->light_update.chunks.len = output_len;
     NetChunk* chunks = (NetChunk*)(pack->data + 1 + out_static_sz);
     for(Uns i = 0; i < updates.size(); ++i) {
         ChkPos const& pos = updates[i];
-        Chunk const& chunk = get_chunk(pos);
-        net_order(&chunks[i].pos, &pos);
-        for(Uns j = 0; j < CHK_VOL; ++j) {
-            net_order(&chunks[i].light_lvls[j], &chunk.light_lvls[j]);
+        if(client.loaded_chunks.count(pos) > 0) {
+            Chunk const& chunk = get_chunk(pos);
+            net_order(&chunks[i].pos, &pos);
+            for(Uns j = 0; j < CHK_VOL; ++j) {
+                net_order(&chunks[i].light_lvls[j], &chunk.light_lvls[j]);
+            }
         }
     }
     if(send_packet(peer, pack, SIGNAL_CHANNEL) != LUX_OK) return LUX_FAIL;
