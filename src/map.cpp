@@ -103,8 +103,7 @@ static void update_lightning(ChkPos const &pos)
 
         constexpr Vec3I offsets[6] =
             {{-1,  0,  0}, { 1,  0,  0},
-             { 0, -1,  0}, { 0,  1,  0},
-             { 0,  0, -1}, { 0,  0,  1}};
+             { 0, -1,  0}, { 0,  1,  0}};
 
         MapPos base_pos = to_map_pos(pos, node.idx);
         //TODO bit-level parallelism
@@ -129,15 +128,11 @@ static void update_lightning(ChkPos const &pos)
                     MapPos map_pos = base_pos + offset;
                     ChkPos chk_pos = to_chk_pos(map_pos);
                     ChkIdx idx     = to_chk_idx(map_pos);
-                    if((offset == MapPos(0, 0, -1) &&
-                        db_voxel_type(chunk.voxels[node.idx]).shape
-                        == VoxelType::EMPTY) || offset != MapPos(0, 0, -1)) {
-                        if(chk_pos == pos) {
-                            nodes.push({idx, side_color});
-                        } else {
-                            lightning_nodes[chk_pos].push({idx, side_color});
-                            lightning_updates.insert(chk_pos);
-                        }
+                    if(chk_pos == pos) {
+                        nodes.push({idx, side_color});
+                    } else {
+                        lightning_nodes[chk_pos].push({idx, side_color});
+                        lightning_updates.insert(chk_pos);
                     }
                 }
             }
