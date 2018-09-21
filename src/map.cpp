@@ -76,6 +76,10 @@ VoxelId get_voxel(MapPos const& pos) {
     return get_chunk(to_chk_pos(pos)).voxels[to_chk_idx(pos)];
 }
 
+VoxelType const& get_voxel_type(MapPos const& pos) {
+    return db_voxel_type(get_voxel(pos));
+}
+
 void add_light_node(MapPos const& pos, Vec3<U8> col) {
     ChkPos chk_pos = to_chk_pos(pos);
     lightning_nodes[chk_pos].push({to_chk_idx(pos), col});
