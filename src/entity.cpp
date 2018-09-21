@@ -46,6 +46,14 @@ void entities_tick() {
                 entity.pos.y = new_pos.y;
             }
         }
+        //@TODO falling down causes a crash right now
+        {   VoxelType const& new_voxel =
+                get_voxel_type({entity.pos.x, entity.pos.y, new_pos.z});
+            if(new_voxel.shape      != VoxelType::BLOCK &&
+               standing_voxel.shape == VoxelType::EMPTY) {
+                entity.pos.z = new_pos.z;
+            }
+        }
         entity.vel += -entity.vel * 0.10f;
         add_light_node(entity.pos, {0xF, 0xF, 0xF});
     }
