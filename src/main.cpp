@@ -9,7 +9,6 @@
 //
 #include <lux_shared/common.hpp>
 #include <lux_shared/net/common.hpp>
-#include <lux_shared/net/net_order.hpp>
 #include <lux_shared/net/data.hpp>
 #include <lux_shared/net/enet.hpp>
 #include <lux_shared/net/serial.hpp>
