@@ -214,6 +214,7 @@ LUX_MAY_FAIL send_light_update(ENetPeer* peer, DynArr<ChkPos> const& updates) {
             ++output_len;
         }
     }
+    if(output_len == 0) return LUX_OK;
     typedef NetSsSgnl::LightUpdate::Chunk NetChunk;
     SizeT pack_sz = sizeof(NetSsSgnl::Header) + sizeof(NetSsSgnl::LightUpdate) +
         output_len * sizeof(NetChunk);
@@ -294,7 +295,7 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
         } break;
         default: LUX_UNREACHABLE();
     }
-    if(check_pack_size_atleast(expected_dyn_sz, iter, in_pack) != LUX_OK) {
+    if(check_pack_size(expected_dyn_sz, iter, in_pack) != LUX_OK) {
         LUX_LOG("couldn't read dynamic segment");
         return LUX_FAIL;
     }
