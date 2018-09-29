@@ -15,6 +15,7 @@ lux.make_admin = function(name)
     assert(type(name) == "string")
     lux_c.make_admin(name)
 end
+
 lux.place_light = function(x, y, z, r, g, b)
     assert(type(x) == "number")
     assert(type(y) == "number")
@@ -26,6 +27,11 @@ lux.place_light = function(x, y, z, r, g, b)
     assert(g >= 0 and g < 16);
     assert(b >= 0 and b < 16);
     lux_c.place_light(x, y, z, r, g, b);
+end
+
+lux.broadcast = function(str)
+    assert(type(str) == "string")
+    lux_c.broadcast(str)
 end
 
 lux.mt = {}

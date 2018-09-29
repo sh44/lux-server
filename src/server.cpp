@@ -277,6 +277,21 @@ LUX_MAY_FAIL send_light_update(ENetPeer* peer, DynArr<ChkPos> const& updates) {
     return LUX_OK;
 }
 
+LUX_MAY_FAIL static server_send_msg(Server::Client& client,
+                                    char const* beg, SizeT len) {
+    SizeT pack_sz = sizeof(NetSsSgnl::Header) + sizeof(NetSsSgnl::Msg) + len;
+    ENetPacket* out_pack;
+    if(create_reliable_pack(out_pack, pack_sz) != LUX_OK) {
+        return LUX_FAIL;
+    }
+    U8* iter = out_pack->data;
+    serialize(&iter, (U8 const&)NetSsSgnl::MSG);
+    serialize(&iter, (U32 const&)len);
+    serialize(&iter, beg, len);
+    LUX_ASSERT(iter == out_pack->data + out_pack->dataLength);
+    return send_packet(client.peer, out_pack, SIGNAL_CHANNEL);
+}
+
 LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
     U8 const* iter = in_pack->data;
     if(check_pack_size(sizeof(NetCsTick), iter, in_pack) != LUX_OK) {
@@ -357,6 +372,7 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
             if(send_map_load(peer, requests) != LUX_OK) return LUX_FAIL;
         } break;
         case NetCsSgnl::COMMAND: {
+            //@CONSIDER denying it on an earlier stage
             Slice<char> command;
             command.len = sgnl.command.contents.len;
             command.beg = lux_alloc<char>(command.len);
@@ -369,11 +385,16 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
                 LUX_LOG("client %s tried to execute command \"%s\""
                         " without admin rights",
                         server.clients[client_id].name.c_str(), command.beg);
+                char constexpr DENY_MSG[] = "you do not have admin rights, this"
+                    " incident will be reported";
+                (void)server_send_msg(server.clients[client_id], DENY_MSG,
+                                sizeof(DENY_MSG));
                 return LUX_FAIL;
             }
             LUX_LOG("[%s]: %s", server.clients[client_id].name.c_str(),
                     command.beg);
 
+            //@TODO we should redirect output somehow
             add_command(command.beg);
         } break;
         default: LUX_UNREACHABLE();
@@ -438,8 +459,15 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
     }
 }
 
-void server_broadcast(char const* str) {
-    LUX_LOG("unimplemented");
+void server_broadcast(char const* beg) {
+    char const* end = beg;
+    while(*end != '\0') ++end;
+    ///we count the null terminator
+    ++end;
+    SizeT len = end - beg;
+    for(Server::Client& client : server.clients) {
+        (void)server_send_msg(client, beg, len);
+    }
 }
 
 bool server_is_running() {
