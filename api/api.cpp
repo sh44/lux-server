@@ -14,6 +14,10 @@ void make_admin(char const* name) {
     }
 }
 
+void kick(char const* name, char const* reason) {
+    kick_client(name, reason);
+}
+
 void broadcast(char const* str) {
     server_broadcast(str);
 }

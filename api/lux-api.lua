@@ -16,6 +16,12 @@ lux.make_admin = function(name)
     lux_c.make_admin(name)
 end
 
+lux.kick = function(name, reason)
+    assert(type(name) == "string")
+    assert(type(reason) == "string")
+    lux_c.kick(name, reason)
+end
+
 lux.place_light = function(x, y, z, r, g, b)
     assert(type(x) == "number")
     assert(type(y) == "number")

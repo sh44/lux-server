@@ -86,6 +86,25 @@ void kick_peer(ENetPeer *peer) {
     enet_peer_disconnect_now(peer, 0);
 }
 
+LUX_MAY_FAIL static server_send_msg(Server::Client& client,
+                                    char const* beg, SizeT len) {
+    char constexpr prefix[] = "[SERVER]: ";
+    SizeT total_len = (sizeof(prefix) - 1) + len;
+    SizeT pack_sz = sizeof(NetSsSgnl::Header) +
+        sizeof(NetSsSgnl::Msg) + total_len;
+    ENetPacket* out_pack;
+    if(create_reliable_pack(out_pack, pack_sz) != LUX_OK) {
+        return LUX_FAIL;
+    }
+    U8* iter = out_pack->data;
+    serialize(&iter, (U8 const&)NetSsSgnl::MSG);
+    serialize(&iter, (U32 const&)total_len);
+    serialize(&iter, prefix, sizeof(prefix) - 1);
+    serialize(&iter, beg, len);
+    LUX_ASSERT(iter == out_pack->data + out_pack->dataLength);
+    return send_packet(client.peer, out_pack, SIGNAL_CHANNEL);
+}
+
 void kick_client(char const* name, char const* reason) {
     LUX_LOG("kicking client");
     LUX_LOG("    name: %s", name);
@@ -99,7 +118,9 @@ void kick_client(char const* name, char const* reason) {
         LUX_LOG("tried to kick non-existant client");
         return; //@CONSIDER return value for failure
     }
-    //@TODO kick message
+    String msg = String("you got kicked for: ") + String(reason);
+    (void)server_send_msg(server.clients[client_id], msg.c_str(), msg.size());
+    enet_host_flush(server.host);
     kick_peer(server.clients[client_id].peer);
     erase_client(client_id);
 }
@@ -275,25 +296,6 @@ LUX_MAY_FAIL send_light_update(ENetPeer* peer, DynArr<ChkPos> const& updates) {
     LUX_ASSERT(iter == out_pack->data + out_pack->dataLength);
     if(send_packet(peer, out_pack, SIGNAL_CHANNEL) != LUX_OK) return LUX_FAIL;
     return LUX_OK;
-}
-
-LUX_MAY_FAIL static server_send_msg(Server::Client& client,
-                                    char const* beg, SizeT len) {
-    char constexpr prefix[] = "[SERVER]: ";
-    SizeT total_len = (sizeof(prefix) - 1) + len;
-    SizeT pack_sz = sizeof(NetSsSgnl::Header) +
-        sizeof(NetSsSgnl::Msg) + total_len;
-    ENetPacket* out_pack;
-    if(create_reliable_pack(out_pack, pack_sz) != LUX_OK) {
-        return LUX_FAIL;
-    }
-    U8* iter = out_pack->data;
-    serialize(&iter, (U8 const&)NetSsSgnl::MSG);
-    serialize(&iter, (U32 const&)total_len);
-    serialize(&iter, prefix, sizeof(prefix) - 1);
-    serialize(&iter, beg, len);
-    LUX_ASSERT(iter == out_pack->data + out_pack->dataLength);
-    return send_packet(client.peer, out_pack, SIGNAL_CHANNEL);
 }
 
 LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
