@@ -22,7 +22,7 @@ void console_main() {
     std::string input;
     while(!exiting) {
         std::getline(std::cin, input);
-        if(input.size() > 2 && input[0] == '!') {
+        if(input.size() > 2 && input[0] == '/') {
             input.erase(0, 1);
             add_command(input.c_str());
         } else if(input.size() > 1) {
