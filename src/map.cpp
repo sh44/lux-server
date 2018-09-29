@@ -1,3 +1,5 @@
+#include <cstdlib>
+//
 #include <lux_shared/common.hpp>
 #include <lux_shared/util/packer.hpp>
 #include <lux_shared/vec_hash.hpp>
@@ -51,11 +53,13 @@ static Chunk& load_chunk(ChkPos const& pos) {
                 voxel_id = db_voxel_id("stone_floor");
             }
         }
-        if((map_pos.x % 8 == 3 && map_pos.y % 8 == 3) && pos_hash % 20 == 0) {
-            add_light_node(to_map_pos(pos, i), {0xF, 0xF, 0xF});
+        if((map_pos.x % 8 == 3 && map_pos.y % 8 == 3) && pos_hash % 5 == 0) {
+            U16 col = std::rand() % 0x1000;
+            add_light_node(to_map_pos(pos, i),
+                {col & 0x00F, (col & 0x0F0) >> 4, (col & 0xF00) >> 8});
         }
         chunk.voxels[i] = voxel_id;
-        chunk.light_lvls[i] = 0;
+        chunk.light_lvls[i] = 0x0000;
     }
     return chunk;
 }

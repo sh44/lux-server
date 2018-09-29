@@ -31,22 +31,17 @@ include_directories(SYSTEM "include")
 include_directories("deps/lux-shared/include"
                     "src" "${PROJECT_BINARY_DIR}/include")
 add_subdirectory("deps/lux-shared")
+add_subdirectory("api")
 
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 add_executable(lux-server ${SOURCES})
 
 find_package(Threads REQUIRED)
 find_library(ENET_LIB enet)
-find_library(BULLET_DYNAMICS_LIB  BulletDynamics)
-find_library(BULLET_COLLISION_LIB BulletCollision)
-find_library(BULLET_LINEAR_LIB    LinearMath)
-find_path(BULLET_INC bullet)
+find_library(LUAJIT_LIB luajit)
 
 target_link_libraries(lux-server lux)
 target_link_libraries(lux-server Threads::Threads)
 target_link_libraries(lux-server "${ENET_LIB}")
-target_link_libraries(lux-server "${BULLET_DYNAMICS_LIB}")
-target_link_libraries(lux-server "${BULLET_COLLISION_LIB}")
-target_link_libraries(lux-server "${BULLET_LINEAR_LIB}")
-target_include_directories(lux-server SYSTEM PUBLIC "${BULLET_INC}/bullet")
+target_link_libraries(lux-server "${LUAJIT_LIB}")
 
