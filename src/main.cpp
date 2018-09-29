@@ -60,7 +60,6 @@ int main(int argc, char** argv) {
             entities_tick();
             static DynArr<ChkPos> light_updated_chunks;
             map_tick(light_updated_chunks);
-
             server_tick(light_updated_chunks);
             light_updated_chunks.clear();
 

@@ -1,4 +1,6 @@
+#include <map.hpp>
 #include <server.hpp>
+#include "api.hpp"
 
 extern "C" {
 
@@ -10,6 +12,10 @@ void make_admin(char const* name) {
     if(server_make_admin(name) != LUX_OK) {
         LUX_LOG("failed to make player \"%s\" an admin", name);
     }
+}
+
+void place_light(ApiI64 x, ApiI64 y, ApiI64 z, ApiU8 r, ApiU8 g, ApiU8 b) {
+    add_light_node({x, y, z}, {r, g, b});
 }
 
 }
