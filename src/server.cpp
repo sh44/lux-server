@@ -11,6 +11,7 @@
 //
 #include <map.hpp>
 #include <entity.hpp>
+#include <command.hpp>
 #include "server.hpp"
 
 Uns constexpr MAX_CLIENTS  = 16;
@@ -22,6 +23,7 @@ struct Server {
         String    name;
         Entity*   entity;
         VecSet<ChkPos> loaded_chunks;
+        bool      admin = false;
     };
     DynArr<Client> clients;
 
@@ -312,6 +314,9 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
         case NetCsSgnl::MAP_REQUEST: {
             expected_stt_sz = sizeof(NetCsSgnl::MapRequest);
         } break;
+        case NetCsSgnl::COMMAND: {
+            expected_stt_sz = sizeof(NetCsSgnl::Command);
+        } break;
         default: LUX_UNREACHABLE();
     }
     if(check_pack_size_atleast(expected_stt_sz, iter, in_pack) != LUX_OK) {
@@ -324,6 +329,10 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
         case NetCsSgnl::MAP_REQUEST: {
             deserialize(&iter, &sgnl.map_request.requests.len);
             expected_dyn_sz = sgnl.map_request.requests.len * sizeof(ChkPos);
+        } break;
+        case NetCsSgnl::COMMAND: {
+            deserialize(&iter, &sgnl.command.contents.len);
+            expected_dyn_sz = sgnl.command.contents.len;
         } break;
         default: LUX_UNREACHABLE();
     }
@@ -343,6 +352,24 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
 
             //@CONSIDER, should we really fail here? perhaps split the func
             if(send_map_load(peer, requests) != LUX_OK) return LUX_FAIL;
+        } break;
+        case NetCsSgnl::COMMAND: {
+            Slice<char> command;
+            command.len = sgnl.command.contents.len;
+            command.beg = lux_alloc<char>(command.len);
+            LUX_DEFER { lux_free(command.beg); };
+
+            deserialize(&iter, &command.beg, command.len);
+
+            Uns client_id = (Uns)peer->data;
+            if(!server.clients[client_id].admin) {
+                //@TODO send msg
+                LUX_LOG("client %s tried to execute command \"%s\""
+                        " without admin rights",
+                        server.clients[client_id].name.c_str(), command.beg);
+                return LUX_FAIL;
+            }
+            add_command(command.beg);
         } break;
         default: LUX_UNREACHABLE();
     }
@@ -416,4 +443,17 @@ bool server_is_running() {
 
 void server_quit() {
     server.is_running = false;
+}
+
+LUX_MAY_FAIL server_make_admin(char const* name) {
+    String s_name(name);
+    auto it = std::find_if(server.clients.begin(), server.clients.end(),
+        [&] (Server::Client const& v) { return v.name == s_name; });
+    Uns client_id = it - server.clients.begin();
+    if(!is_client_connected(client_id)) {
+        LUX_LOG("client %s is not connected", name);
+        return LUX_FAIL;
+    }
+    server.clients[client_id].admin = true;
+    return LUX_OK;
 }

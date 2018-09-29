@@ -16,7 +16,7 @@ Entity& create_entity(EntityVec const& pos) {
 
 Entity& create_player() {
     LUX_LOG("creating new player");
-    return create_entity({3, 3, 0});
+    return create_entity({30, 40, 0});
 }
 
 void entities_tick() {
@@ -55,7 +55,7 @@ void entities_tick() {
             }
         }
         entity.vel += -entity.vel * 0.10f;
-        add_light_node(entity.pos, {0xF, 0xF, 0xF});
+        add_light_node(entity.pos, {0x8, 0x8, 0x8});
     }
 }
 

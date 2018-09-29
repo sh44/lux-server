@@ -12,3 +12,4 @@ void kick_client(char const* name, char const* reason);
 void server_broadcast(char const* str);
 bool server_is_running();
 void server_quit();
+LUX_MAY_FAIL server_make_admin(char const* name);
