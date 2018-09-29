@@ -24,6 +24,7 @@ void command_init() {
         case LUA_ERRMEM: LUX_FATAL("lua memory error");
         default: LUX_FATAL("lua unknown error");
     }
+    //@TODO minor memory leak here?
     switch(lua_pcall(lua_L, 0, 0, 0)) {
         case 0: break;
         case LUA_ERRRUN:

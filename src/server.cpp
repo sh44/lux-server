@@ -201,6 +201,9 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
 
     LUX_LOG("client connected successfully");
     LUX_LOG("    name: %s", client.name.c_str());
+#ifndef NDEBUG
+    (void)server_make_admin(client.name.c_str());
+#endif
     return LUX_OK;
 }
 
@@ -360,7 +363,6 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
             LUX_DEFER { lux_free(command.beg); };
 
             deserialize(&iter, &command.beg, command.len);
-
             Uns client_id = (Uns)peer->data;
             if(!server.clients[client_id].admin) {
                 //@TODO send msg
@@ -369,6 +371,9 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
                         server.clients[client_id].name.c_str(), command.beg);
                 return LUX_FAIL;
             }
+            LUX_LOG("[%s]: %s", server.clients[client_id].name.c_str(),
+                    command.beg);
+
             add_command(command.beg);
         } break;
         default: LUX_UNREACHABLE();
@@ -446,6 +451,7 @@ void server_quit() {
 }
 
 LUX_MAY_FAIL server_make_admin(char const* name) {
+    LUX_LOG("making %s an admin", name);
     String s_name(name);
     auto it = std::find_if(server.clients.begin(), server.clients.end(),
         [&] (Server::Client const& v) { return v.name == s_name; });
