@@ -279,14 +279,18 @@ LUX_MAY_FAIL send_light_update(ENetPeer* peer, DynArr<ChkPos> const& updates) {
 
 LUX_MAY_FAIL static server_send_msg(Server::Client& client,
                                     char const* beg, SizeT len) {
-    SizeT pack_sz = sizeof(NetSsSgnl::Header) + sizeof(NetSsSgnl::Msg) + len;
+    char constexpr prefix[] = "[SERVER]: ";
+    SizeT total_len = (sizeof(prefix) - 1) + len;
+    SizeT pack_sz = sizeof(NetSsSgnl::Header) +
+        sizeof(NetSsSgnl::Msg) + total_len;
     ENetPacket* out_pack;
     if(create_reliable_pack(out_pack, pack_sz) != LUX_OK) {
         return LUX_FAIL;
     }
     U8* iter = out_pack->data;
     serialize(&iter, (U8 const&)NetSsSgnl::MSG);
-    serialize(&iter, (U32 const&)len);
+    serialize(&iter, (U32 const&)total_len);
+    serialize(&iter, prefix, sizeof(prefix) - 1);
     serialize(&iter, beg, len);
     LUX_ASSERT(iter == out_pack->data + out_pack->dataLength);
     return send_packet(client.peer, out_pack, SIGNAL_CHANNEL);
