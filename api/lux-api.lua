@@ -22,9 +22,9 @@ lux.place_light = function(x, y, z, r, g, b)
     assert(type(r) == "number")
     assert(type(g) == "number")
     assert(type(b) == "number")
-    assert(r >= 0 and r < 256);
-    assert(g >= 0 and g < 256);
-    assert(b >= 0 and b < 256);
+    assert(r >= 0 and r < 16);
+    assert(g >= 0 and g < 16);
+    assert(b >= 0 and b < 16);
     lux_c.place_light(x, y, z, r, g, b);
 end
 
