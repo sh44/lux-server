@@ -191,6 +191,17 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
             LUX_LOG("    theirs: %u", cs_init.net_ver.minor);
             return LUX_FAIL;
         }
+
+        auto is_client_duplicate = [&](Server::Client const& client) -> bool {
+            return client.name == String((const char*)cs_init.name);
+        };
+
+        auto it = std::find_if(server.clients.cbegin(), server.clients.cend(),
+            is_client_duplicate);
+        if(it != server.clients.cend()) {
+            LUX_LOG("client already connected, kicking the old one");
+            kick_client(it->name.c_str(), "double-join");
+        }
     }
 
     { ///send init packet
