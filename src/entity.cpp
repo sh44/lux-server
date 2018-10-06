@@ -31,6 +31,7 @@ void entities_tick() {
         if(standing_voxel.shape == VoxelType::EMPTY) {
             entity.vel.z = -1.f;
         }
+        EntityVec old_pos = entity.pos;
         EntityVec new_pos = entity.pos + entity.vel;
         {   VoxelType const& new_voxel =
                 get_voxel_type({new_pos.x, entity.pos.y, entity.pos.z});
@@ -53,7 +54,10 @@ void entities_tick() {
             }
         }
         entity.vel += -entity.vel * 0.10f;
-        //add_light_node(entity.pos, {0x8, 0x8, 0x8});
+        if((MapPos)entity.pos != (MapPos)old_pos) {
+            //del_light_source(old_pos);
+            add_light_source(entity.pos, {0xF, 0xF, 0xF});
+        }
     }
 }
 

@@ -47,6 +47,7 @@ int main(int argc, char** argv) {
     db_init();
     command_init();
     LUX_DEFER { command_deinit(); };
+    map_init();
     constexpr F64 TICK_RATE = 64.0;
     server_init(server_port, TICK_RATE);
     LUX_DEFER { server_deinit(); };

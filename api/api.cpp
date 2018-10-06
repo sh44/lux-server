@@ -23,7 +23,7 @@ void broadcast(char const* str) {
 }
 
 void place_light(ApiI64 x, ApiI64 y, ApiI64 z, ApiU8 r, ApiU8 g, ApiU8 b) {
-    add_light_node({x, y, z}, {r, g, b});
+    add_light_source({x, y, z}, {r, g, b});
 }
 
 }
