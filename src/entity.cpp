@@ -22,13 +22,11 @@ Entity& create_player() {
 void entities_tick() {
     for(auto& entity : entities) {
         ChkPos chk_pos = to_chk_pos(entity.pos);
-        guarantee_chunk(chk_pos + ChkPos( 0,  0,  0));
-        guarantee_chunk(chk_pos + ChkPos(-1,  0,  0));
-        guarantee_chunk(chk_pos + ChkPos( 1,  0,  0));
-        guarantee_chunk(chk_pos + ChkPos( 0, -1,  0));
-        guarantee_chunk(chk_pos + ChkPos( 0,  1,  0));
-        guarantee_chunk(chk_pos + ChkPos( 0,  0, -1));
-        guarantee_chunk(chk_pos + ChkPos( 0,  0,  1));
+        constexpr ChkPos offsets[] = {{0, 0, 0}, {-1, 0, 0}, {1, 0, 0},
+            {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}};
+        for(auto const& offset : offsets) {
+            guarantee_chunk(chk_pos + offset);
+        }
         VoxelType const& standing_voxel = get_voxel_type(entity.pos);
         if(standing_voxel.shape == VoxelType::EMPTY) {
             entity.vel.z = -1.f;
