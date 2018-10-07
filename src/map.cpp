@@ -183,13 +183,6 @@ static void apply_light_source(MapPos const& src_pos, LightSource& light) {
             if(ray_mul_map[area_idx] <= 0.f) break;
         }
     }
-    for(Uns i = 0; i < RAY_AREA; ++i) {
-        printf("%d", shadow_map[i]);
-        if(i % (2 * LIGHTNING_RANGE - 1) == (2 * LIGHTNING_RANGE - 1) - 1) {
-            printf("\n");
-        }
-    }
-    printf("\n");
     Uns mul_idx = 0;
     Chunk& chunk = chunks.at(to_chk_pos(src_pos));
     Vec2I min_pos = (Vec2I)h_pos - (Int)(LIGHTNING_RANGE - 1);
@@ -199,7 +192,7 @@ static void apply_light_source(MapPos const& src_pos, LightSource& light) {
         for(; iter.x <= max_pos.x; ++iter.x) {
             LUX_ASSERT(mul_idx < RAY_AREA);
             if(to_chk_pos(iter) == to_chk_pos(src_pos)) {
-                Vec3<U8> col(0xF);
+                Vec3<U8> col = light.col;
                 col = (Vec3<U8>)glm::round((Vec3F)col * ray_mul_map[mul_idx]) *
                     Vec3<U8>(shadow_map[mul_idx]);
                 chunk.light_lvls[to_chk_idx(iter)] =
