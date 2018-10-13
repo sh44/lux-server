@@ -1,7 +1,11 @@
 #include <functional>
+//
+#include <lux_shared/common.hpp>
+//
 #include "db.hpp"
 
 static DynArr<VoxelType> voxels;
+//@CONSIDER use regular map?
 static HashMap<String, VoxelId, std::hash<String>> voxels_lookup;
 
 void add_voxel(VoxelType &&voxel_type) {
