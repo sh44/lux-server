@@ -4,8 +4,8 @@
 #include <map.hpp>
 #include <entity.hpp>
 
-EntityComponents comps;
-EntityComponents& entity_comps = comps;
+EntityComps comps;
+EntityComps& entity_comps = comps;
 static SparseDynArr<EntityHandle> entities;
 
 EntityHandle create_entity(EntityVec const& pos) {

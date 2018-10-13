@@ -5,9 +5,10 @@
 //
 #include <lux_shared/common.hpp>
 #include <lux_shared/net/common.hpp>
-#include <lux_shared/net/data.hpp>
-#include <lux_shared/net/enet.hpp>
 #include <lux_shared/net/serial.hpp>
+#include <lux_shared/net/data.hpp>
+#include <lux_shared/net/data.inl>
+#include <lux_shared/net/enet.hpp>
 //
 #include <map.hpp>
 #include <entity.hpp>
@@ -90,19 +91,12 @@ LUX_MAY_FAIL static server_send_msg(Server::Client& client,
                                     char const* beg, SizeT len) {
     char constexpr prefix[] = "[SERVER]: ";
     SizeT total_len = (sizeof(prefix) - 1) + len;
-    SizeT pack_sz = sizeof(NetSsSgnl::Header) +
-        sizeof(NetSsSgnl::Msg) + total_len;
-    ENetPacket* out_pack;
-    if(create_reliable_pack(out_pack, pack_sz) != LUX_OK) {
-        return LUX_FAIL;
-    }
-    U8* iter = out_pack->data;
-    serialize(&iter, (U8 const&)NetSsSgnl::MSG);
-    serialize(&iter, (U32 const&)total_len);
-    serialize(&iter, prefix, sizeof(prefix) - 1);
-    serialize(&iter, beg, len);
-    LUX_ASSERT(iter == out_pack->data + out_pack->dataLength);
-    return send_packet(client.peer, out_pack, SIGNAL_CHANNEL);
+    NetCsSgnl sgnl;
+    sgnl.header = NetCsSgnl::COMMAND;
+    sgnl.command.contents.resize(total_len);
+    std::memcpy(sgnl.command.contents.data(), prefix, sizeof(prefix) - 1);
+    std::memcpy(sgnl.command.contents.data() + (sizeof(prefix) - 1), beg, len);
+    return send_net_data(client.peer, sgnl, SIGNAL_CHANNEL);
 }
 
 void kick_client(char const* name, char const* reason) {
@@ -168,16 +162,7 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
 
     NetCsInit cs_init;
     { ///parse client init packet
-        U8 const* iter = in_pack->data;
-        if(check_pack_size(sizeof(NetCsInit), iter, in_pack) != LUX_OK) {
-            return LUX_FAIL;
-        }
-
-        deserialize(&iter, &cs_init.net_ver.major);
-        deserialize(&iter, &cs_init.net_ver.minor);
-        deserialize(&iter, &cs_init.net_ver.patch);
-        deserialize(&iter, &cs_init.name);
-        LUX_ASSERT(iter == in_pack->data + in_pack->dataLength);
+        if(deserialize_packet(in_pack, &cs_init) != LUX_OK) return LUX_FAIL;
 
         if(cs_init.net_ver.major != NET_VERSION_MAJOR) {
             LUX_LOG("client uses an incompatible major lux net api version");
@@ -205,24 +190,17 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
     }
 
     { ///send init packet
-        ENetPacket* out_pack;
-        if(create_reliable_pack(out_pack, sizeof(NetSsInit)) != LUX_OK) {
-            return LUX_FAIL;
-        }
-        U8* iter = out_pack->data;
-
+        NetSsInit ss_init;
         U8 constexpr server_name[] = "lux-server";
         static_assert(sizeof(server_name) <= SERVER_NAME_LEN);
-        Arr<char, SERVER_NAME_LEN> buff;
-        std::memcpy(buff, server_name, sizeof(server_name));
-        std::memset(buff + sizeof(server_name), 0,
+        std::memcpy(ss_init.name, server_name, sizeof(server_name));
+        std::memset(ss_init.name + sizeof(server_name), 0,
                     SERVER_NAME_LEN - sizeof(server_name));
-        U16 tick_rate = server.tick_rate;
-        serialize(&iter, buff);
-        serialize(&iter, tick_rate);
-        LUX_ASSERT(iter == out_pack->data + out_pack->dataLength);
+        ss_init.tick_rate = server.tick_rate;
 
-        if(send_packet(peer, out_pack, INIT_CHANNEL) != LUX_OK) return LUX_FAIL;
+        if(send_net_data(peer, ss_init, INIT_CHANNEL) != LUX_OK) {
+            return LUX_FAIL;
+        }
     }
 
     Server::Client& client = server.clients.emplace_back();
@@ -239,171 +217,84 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
     return LUX_OK;
 }
 
-LUX_MAY_FAIL send_map_load(ENetPeer* peer, Slice<ChkPos> const& requests) {
-    typedef NetSsSgnl::MapLoad::Chunk NetChunk;
-    SizeT pack_sz = sizeof(NetSsSgnl::Header) + sizeof(NetSsSgnl::MapLoad) +
-        requests.len * sizeof(NetChunk);
-
-    ENetPacket* out_pack;
-    if(create_reliable_pack(out_pack, pack_sz) != LUX_OK) {
-        return LUX_FAIL;
+LUX_MAY_FAIL send_map_load(ENetPeer* peer, VecSet<ChkPos> const& requests) {
+    NetSsSgnl sgnl;
+    sgnl.header = NetSsSgnl::MAP_LOAD;
+    for(auto const& pos : requests) {
+        guarantee_chunk(pos);
+        Chunk const& chunk = get_chunk(pos);
+        std::memcpy(sgnl.map_load.chunks[pos].voxels, chunk.voxels,
+                    CHK_VOL);
+        std::memcpy(sgnl.map_load.chunks[pos].light_lvls, chunk.light_lvls,
+                    CHK_VOL);
     }
 
-    U8* iter = out_pack->data;
-    serialize(&iter, (U8 const&)NetSsSgnl::MAP_LOAD);
-    serialize(&iter, (U32 const&)requests.len);
-    for(Uns i = 0; i < requests.len; ++i) {
-        guarantee_chunk(requests[i]);
-        Chunk const& chunk = get_chunk(requests[i]);
-
-        serialize(&iter, requests[i]);
-        serialize(&iter, chunk.voxels);
-        serialize(&iter, chunk.light_lvls);
-    }
-    LUX_ASSERT(iter == out_pack->data + out_pack->dataLength);
-    if(send_packet(peer, out_pack, SIGNAL_CHANNEL) != LUX_OK) return LUX_FAIL;
+    if(send_net_data(peer, sgnl, SIGNAL_CHANNEL) != LUX_OK) return LUX_FAIL;
 
     ///we need to do it outside, because we must be sure that the packet has
     ///been received (i.e. sent in this case, enet guarantees that the peer will
     ///either receive it or get disconnected
     Server::Client& client = server.clients[(Uns)peer->data];
-    for(Uns i = 0; i < requests.len; ++i) {
-        client.loaded_chunks.emplace(requests[i]);
+    for(auto const& pos : requests) {
+        client.loaded_chunks.emplace(pos);
     }
     return LUX_OK;
 }
 
 //@TODO use slice
 LUX_MAY_FAIL send_light_update(ENetPeer* peer, DynArr<ChkPos> const& updates) {
+    NetSsSgnl sgnl;
+    sgnl.header = NetSsSgnl::LIGHT_UPDATE;
+
     Server::Client& client = server.clients[(Uns)peer->data];
-    SizeT output_len = 0;
-    for(Uns i = 0; i < updates.size(); ++i) {
-        ChkPos const& pos = updates[i];
-        if(client.loaded_chunks.count(pos) > 0) {
-            ++output_len;
-        }
-    }
-    if(output_len == 0) return LUX_OK;
-    typedef NetSsSgnl::LightUpdate::Chunk NetChunk;
-    SizeT pack_sz = sizeof(NetSsSgnl::Header) + sizeof(NetSsSgnl::LightUpdate) +
-        output_len * sizeof(NetChunk);
-
-    ENetPacket* out_pack;
-    if(create_reliable_pack(out_pack, pack_sz) != LUX_OK) {
-        return LUX_FAIL;
-    }
-
-    U8* iter = out_pack->data;
-    serialize(&iter, (U8 const&)NetSsSgnl::LIGHT_UPDATE);
-    serialize(&iter, (U32 const&)output_len);
     for(Uns i = 0; i < updates.size(); ++i) {
         ChkPos const& pos = updates[i];
         if(client.loaded_chunks.count(pos) > 0) {
             Chunk const& chunk = get_chunk(pos);
-            serialize(&iter, pos);
-            serialize(&iter, chunk.light_lvls);
+            std::memcpy(sgnl.light_update.chunks[pos].light_lvls,
+                        chunk.light_lvls, CHK_VOL);
         }
     }
-    LUX_ASSERT(iter == out_pack->data + out_pack->dataLength);
-    if(send_packet(peer, out_pack, SIGNAL_CHANNEL) != LUX_OK) return LUX_FAIL;
-    return LUX_OK;
+    if(sgnl.light_update.chunks.size() == 0) return LUX_OK;
+    return send_net_data(peer, sgnl, SIGNAL_CHANNEL);
 }
 
 LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
-    U8 const* iter = in_pack->data;
-    if(check_pack_size(sizeof(NetCsTick), iter, in_pack) != LUX_OK) {
-        return LUX_FAIL;
-    }
-
+    NetCsTick tick;
     LUX_ASSERT(is_client_connected((Uns)peer->data));
+    if(deserialize_packet(in_pack, &tick) != LUX_OK) return LUX_FAIL;
+
     EntityHandle entity = server.clients[(Uns)peer->data].entity;
-    Vec2F player_dir;
-    deserialize(&iter, &player_dir);
-    LUX_ASSERT(iter == in_pack->data + in_pack->dataLength);
     if(entity_comps.vel.count(entity) > 0) {
-        if(player_dir.x != 0.f || player_dir.y != 0.f) {
-            player_dir = glm::normalize(player_dir);
-            entity_comps.vel.at(entity).x = player_dir.x * 0.1f;
-            entity_comps.vel.at(entity).y = player_dir.y * 0.1f;
+        if(tick.player_dir.x != 0.f || tick.player_dir.y != 0.f) {
+            tick.player_dir = glm::normalize(tick.player_dir);
+            entity_comps.vel.at(entity).x = tick.player_dir.x * 0.1f;
+            entity_comps.vel.at(entity).y = tick.player_dir.y * 0.1f;
         }
     }
     return LUX_OK;
 }
 
 LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
-    U8 const* iter = in_pack->data;
-    if(check_pack_size_atleast(sizeof(NetCsSgnl::Header), iter, in_pack)
-           != LUX_OK) {
-        LUX_LOG("couldn't read signal header");
-        return LUX_FAIL;
-    }
-
     NetCsSgnl sgnl;
-    deserialize(&iter, (U8*)&sgnl.header);
-
-    if(sgnl.header >= NetCsSgnl::HEADER_MAX) {
-        LUX_LOG("unexpected signal header %u", sgnl.header);
-        return LUX_FAIL;
-    }
-
-    SizeT expected_stt_sz;
-    switch(sgnl.header) {
-        case NetCsSgnl::MAP_REQUEST: {
-            expected_stt_sz = sizeof(NetCsSgnl::MapRequest);
-        } break;
-        case NetCsSgnl::COMMAND: {
-            expected_stt_sz = sizeof(NetCsSgnl::Command);
-        } break;
-        default: LUX_UNREACHABLE();
-    }
-    if(check_pack_size_atleast(expected_stt_sz, iter, in_pack) != LUX_OK) {
-        LUX_LOG("couldn't read static segment");
-        return LUX_FAIL;
-    }
-
-    SizeT expected_dyn_sz;
-    switch(sgnl.header) {
-        case NetCsSgnl::MAP_REQUEST: {
-            deserialize(&iter, &sgnl.map_request.requests.len);
-            expected_dyn_sz = sgnl.map_request.requests.len * sizeof(ChkPos);
-        } break;
-        case NetCsSgnl::COMMAND: {
-            deserialize(&iter, &sgnl.command.contents.len);
-            expected_dyn_sz = sgnl.command.contents.len;
-        } break;
-        default: LUX_UNREACHABLE();
-    }
-    if(check_pack_size(expected_dyn_sz, iter, in_pack) != LUX_OK) {
-        LUX_LOG("couldn't read dynamic segment");
-        return LUX_FAIL;
-    }
+    if(deserialize_packet(in_pack, &sgnl) != LUX_OK) return LUX_FAIL;
 
     switch(sgnl.header) {
         case NetCsSgnl::MAP_REQUEST: {
-            Slice<ChkPos> requests;
-            requests.len = sgnl.map_request.requests.len;
-            requests.beg = lux_alloc<ChkPos>(requests.len);
-            LUX_DEFER { lux_free(requests.beg); };
-
-            deserialize(&iter, &requests.beg, requests.len);
-
             //@CONSIDER, should we really fail here? perhaps split the func
-            if(send_map_load(peer, requests) != LUX_OK) return LUX_FAIL;
+            if(send_map_load(peer, sgnl.map_request.requests) != LUX_OK) {
+                return LUX_FAIL;
+            }
         } break;
         case NetCsSgnl::COMMAND: {
-            //@CONSIDER denying it on an earlier stage
-            Slice<char> command;
-            command.len = sgnl.command.contents.len;
-            command.beg = lux_alloc<char>(command.len);
-            LUX_DEFER { lux_free(command.beg); };
-
-            deserialize(&iter, &command.beg, command.len);
             Uns client_id = (Uns)peer->data;
             if(!server.clients[client_id].admin) {
                 //@TODO send msg
+                //@TODO is this null terminated?
                 LUX_LOG("client %s tried to execute command \"%s\""
                         " without admin rights",
-                        server.clients[client_id].name.c_str(), command.beg);
+                        server.clients[client_id].name.c_str(),
+                        sgnl.command.contents.data());
                 char constexpr DENY_MSG[] = "you do not have admin rights, this"
                     " incident will be reported";
                 (void)server_send_msg(server.clients[client_id], DENY_MSG,
@@ -411,10 +302,10 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
                 return LUX_FAIL;
             }
             LUX_LOG("[%s]: %s", server.clients[client_id].name.c_str(),
-                    command.beg);
+                    sgnl.command.contents.data());
 
             //@TODO we should redirect output somehow
-            add_command(command.beg);
+            add_command(sgnl.command.contents.data());
         } break;
         default: LUX_UNREACHABLE();
     }
@@ -426,7 +317,6 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
         (void)send_light_update(client.peer, light_updated_chunks);
     }
     { ///handle events
-        //@RESEARCH can we use our own packet to prevent copies?
         //@CONSIDER splitting this scope
         ENetEvent event;
         while(enet_host_service(server.host, &event, 0) > 0) {
@@ -466,37 +356,22 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
 
     { ///dispatch ticks
         for(Server::Client& client : server.clients) {
+            NetSsTick tick;
+            tick.player_id = client.entity;
+
             EntityVec player_pos = {0, 0, 0};
             if(entity_comps.pos.count(client.entity) > 0) {
                 player_pos = entity_comps.pos.at(client.entity);
             }
-            U32 output_len = 0;
             for(auto const& pos : entity_comps.pos) {
                 //@TODO fast distance function
                 //@TODO calculate max distance
+                //@TODO copy_if
                 if(glm::distance(pos.second, player_pos) < 64.f) {
-                    output_len += 1;
+                    tick.comps.pos[pos.first] = pos.second;
                 }
             }
-            SizeT pack_sz = output_len * sizeof(NetSsTick::EntityComps::Pos) +
-                sizeof(NetSsTick);
-            ENetPacket* out_pack;
-            if(create_unreliable_pack(out_pack, pack_sz) != LUX_OK) {
-                continue;
-            }
-            U8* iter = out_pack->data;
-            serialize(&iter, client.entity);
-            serialize(&iter, output_len);
-            for(auto const& pos : entity_comps.pos) {
-                //@TODO fast distance function
-                //@TODO calculate max distance
-                if(glm::distance(pos.second, player_pos) < 64.f) {
-                    serialize(&iter, pos.first);
-                    serialize(&iter, pos.second);
-                }
-            }
-            LUX_ASSERT(iter == out_pack->data + out_pack->dataLength);
-            (void)send_packet(client.peer, out_pack, TICK_CHANNEL);
+            (void)send_net_data(client.peer, tick, TICK_CHANNEL);
         }
     }
 }
