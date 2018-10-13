@@ -2,6 +2,8 @@
 
 #include <lux_shared/common.hpp>
 #include <lux_shared/map.hpp>
+//
+#include <entity.hpp>
 
 struct VoxelType {
     String str_id;

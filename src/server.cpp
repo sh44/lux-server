@@ -19,11 +19,11 @@ Uns constexpr MAX_CLIENTS  = 16;
 struct Server {
     F64 tick_rate = 0.0;
     struct Client {
-        ENetPeer* peer;
-        String    name;
-        Entity*   entity;
+        ENetPeer*      peer;
+        String         name;
+        EntityHandle   entity;
         VecSet<ChkPos> loaded_chunks;
-        bool      admin = false;
+        bool           admin = false;
     };
     DynArr<Client> clients;
 
@@ -75,7 +75,7 @@ void erase_client(Uns id) {
     LUX_LOG("client disconnected");
     LUX_LOG("    id: %zu" , id);
     LUX_LOG("    name: %s", server.clients[id].name.c_str());
-    remove_entity(*server.clients[id].entity);
+    remove_entity(server.clients[id].entity);
     server.clients.erase(server.clients.begin() + id);
 }
 
@@ -229,7 +229,7 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
     client.peer = peer;
     client.peer->data = (void*)(server.clients.size() - 1);
     client.name = String((char const*)cs_init.name);
-    client.entity = &create_player();
+    client.entity = create_player();
 
     LUX_LOG("client connected successfully");
     LUX_LOG("    name: %s", client.name.c_str());
@@ -316,14 +316,16 @@ LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
     }
 
     LUX_ASSERT(is_client_connected((Uns)peer->data));
-    Entity& entity = *server.clients[(Uns)peer->data].entity;
+    EntityHandle entity = server.clients[(Uns)peer->data].entity;
     Vec2F player_dir;
     deserialize(&iter, &player_dir);
     LUX_ASSERT(iter == in_pack->data + in_pack->dataLength);
-    if(player_dir.x != 0.f || player_dir.y != 0.f) {
-        player_dir = glm::normalize(player_dir);
-        entity.vel.x = player_dir.x * 0.1f;
-        entity.vel.y = player_dir.y * 0.1f;
+    if(entity_comps.vel.count(entity) > 0) {
+        if(player_dir.x != 0.f || player_dir.y != 0.f) {
+            player_dir = glm::normalize(player_dir);
+            entity_comps.vel.at(entity).x = player_dir.x * 0.1f;
+            entity_comps.vel.at(entity).y = player_dir.y * 0.1f;
+        }
     }
     return LUX_OK;
 }
@@ -469,7 +471,12 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
                 continue;
             }
             U8* iter = out_pack->data;
-            serialize(&iter, client.entity->pos);
+            if(entity_comps.pos.count(client.entity) > 0) {
+                serialize(&iter, entity_comps.pos.at(client.entity));
+            } else {
+                EntityComponents::Pos dummy = {0, 0, 0};
+                serialize(&iter, dummy);
+            }
             LUX_ASSERT(iter == out_pack->data + out_pack->dataLength);
             (void)send_packet(client.peer, out_pack, TICK_CHANNEL);
         }

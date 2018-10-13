@@ -3,13 +3,21 @@
 #include <lux_shared/common.hpp>
 #include <lux_shared/entity.hpp>
 
-struct Entity {
-    EntityVec pos;
-    EntityVec vel = {0, 0, 0};
-    U8        flags = 0;
-    U32       id;
+typedef U32 EntityHandle;
+
+struct EntityComponents {
+    typedef EntityVec Pos;
+    typedef EntityVec Vel;
+    struct Shape {
+        F32 rad;
+    };
+
+    HashTable<EntityHandle, Pos>     pos;
+    HashTable<EntityHandle, Vel>     vel;
+    HashTable<EntityHandle, Shape> shape;
 };
 
-Entity& create_player();
+extern EntityComponents& entity_comps;
+EntityHandle create_player();
 void entities_tick();
-void remove_entity(Entity& entity);
+void remove_entity(EntityHandle entity);
