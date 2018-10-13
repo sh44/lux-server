@@ -224,9 +224,9 @@ LUX_MAY_FAIL send_map_load(ENetPeer* peer, VecSet<ChkPos> const& requests) {
         guarantee_chunk(pos);
         Chunk const& chunk = get_chunk(pos);
         std::memcpy(sgnl.map_load.chunks[pos].voxels, chunk.voxels,
-                    CHK_VOL);
+                    CHK_VOL * sizeof(VoxelId));
         std::memcpy(sgnl.map_load.chunks[pos].light_lvls, chunk.light_lvls,
-                    CHK_VOL);
+                    CHK_VOL * sizeof(LightLvl));
     }
 
     if(send_net_data(peer, sgnl, SIGNAL_CHANNEL) != LUX_OK) return LUX_FAIL;
@@ -252,7 +252,7 @@ LUX_MAY_FAIL send_light_update(ENetPeer* peer, DynArr<ChkPos> const& updates) {
         if(client.loaded_chunks.count(pos) > 0) {
             Chunk const& chunk = get_chunk(pos);
             std::memcpy(sgnl.light_update.chunks[pos].light_lvls,
-                        chunk.light_lvls, CHK_VOL);
+                        chunk.light_lvls, CHK_VOL * sizeof(LightLvl));
         }
     }
     if(sgnl.light_update.chunks.size() == 0) return LUX_OK;
