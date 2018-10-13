@@ -466,16 +466,34 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
 
     { ///dispatch ticks
         for(Server::Client& client : server.clients) {
+            EntityVec player_pos = {0, 0, 0};
+            if(entity_comps.pos.count(client.entity) > 0) {
+                player_pos = entity_comps.pos.at(client.entity);
+            }
+            U32 output_len = 0;
+            for(auto const& pos : entity_comps.pos) {
+                //@TODO fast distance function
+                //@TODO calculate max distance
+                if(glm::distance(pos.second, player_pos) < 64.f) {
+                    output_len += 1;
+                }
+            }
+            SizeT pack_sz = output_len * sizeof(NetSsTick::EntityComps::Pos) +
+                sizeof(NetSsTick);
             ENetPacket* out_pack;
-            if(create_unreliable_pack(out_pack, sizeof(NetSsTick)) != LUX_OK) {
+            if(create_unreliable_pack(out_pack, pack_sz) != LUX_OK) {
                 continue;
             }
             U8* iter = out_pack->data;
-            if(entity_comps.pos.count(client.entity) > 0) {
-                serialize(&iter, entity_comps.pos.at(client.entity));
-            } else {
-                EntityComponents::Pos dummy = {0, 0, 0};
-                serialize(&iter, dummy);
+            serialize(&iter, client.entity);
+            serialize(&iter, output_len);
+            for(auto const& pos : entity_comps.pos) {
+                //@TODO fast distance function
+                //@TODO calculate max distance
+                if(glm::distance(pos.second, player_pos) < 64.f) {
+                    serialize(&iter, pos.first);
+                    serialize(&iter, pos.second);
+                }
             }
             LUX_ASSERT(iter == out_pack->data + out_pack->dataLength);
             (void)send_packet(client.peer, out_pack, TICK_CHANNEL);
