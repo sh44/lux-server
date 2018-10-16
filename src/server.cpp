@@ -33,6 +33,12 @@ struct Server {
     ENetHost*  host;
 } server;
 
+NetCsSgnl cs_sgnl;
+NetCsTick cs_tick;
+NetSsInit ss_init;
+NetSsSgnl ss_sgnl;
+NetSsTick ss_tick;
+
 void server_init(U16 port, F64 tick_rate) {
     server.tick_rate = tick_rate;
 
@@ -91,12 +97,11 @@ LUX_MAY_FAIL static server_send_msg(Server::Client& client,
                                     char const* beg, SizeT len) {
     char constexpr prefix[] = "[SERVER]: ";
     SizeT total_len = (sizeof(prefix) - 1) + len;
-    NetCsSgnl sgnl;
-    sgnl.tag = NetCsSgnl::COMMAND;
-    sgnl.command.contents.resize(total_len);
-    std::memcpy(sgnl.command.contents.data(), prefix, sizeof(prefix) - 1);
-    std::memcpy(sgnl.command.contents.data() + (sizeof(prefix) - 1), beg, len);
-    return send_net_data(client.peer, sgnl, SIGNAL_CHANNEL);
+    ss_sgnl.tag = NetSsSgnl::MSG;
+    ss_sgnl.msg.contents.resize(total_len);
+    std::memcpy(ss_sgnl.msg.contents.data(), prefix, sizeof(prefix) - 1);
+    std::memcpy(ss_sgnl.msg.contents.data() + (sizeof(prefix) - 1), beg, len);
+    return send_net_data(client.peer, &ss_sgnl, SIGNAL_CHANNEL);
 }
 
 void kick_client(char const* name, char const* reason) {
@@ -190,7 +195,6 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
     }
 
     { ///send init packet
-        NetSsInit ss_init;
         U8 constexpr server_name[] = "lux-server";
         static_assert(sizeof(server_name) <= SERVER_NAME_LEN);
         std::memcpy(ss_init.name, server_name, sizeof(server_name));
@@ -198,7 +202,7 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
                     SERVER_NAME_LEN - sizeof(server_name));
         ss_init.tick_rate = server.tick_rate;
 
-        if(send_net_data(peer, ss_init, INIT_CHANNEL) != LUX_OK) {
+        if(send_net_data(peer, &ss_init, INIT_CHANNEL) != LUX_OK) {
             return LUX_FAIL;
         }
     }
@@ -218,18 +222,17 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
 }
 
 LUX_MAY_FAIL send_map_load(ENetPeer* peer, VecSet<ChkPos> const& requests) {
-    NetSsSgnl sgnl;
-    sgnl.tag = NetSsSgnl::MAP_LOAD;
+    ss_sgnl.tag = NetSsSgnl::MAP_LOAD;
     for(auto const& pos : requests) {
         guarantee_chunk(pos);
         Chunk const& chunk = get_chunk(pos);
-        std::memcpy(sgnl.map_load.chunks[pos].voxels, chunk.voxels,
+        std::memcpy(ss_sgnl.map_load.chunks[pos].voxels, chunk.voxels,
                     CHK_VOL * sizeof(VoxelId));
-        std::memcpy(sgnl.map_load.chunks[pos].light_lvls, chunk.light_lvls,
+        std::memcpy(ss_sgnl.map_load.chunks[pos].light_lvls, chunk.light_lvls,
                     CHK_VOL * sizeof(LightLvl));
     }
 
-    if(send_net_data(peer, sgnl, SIGNAL_CHANNEL) != LUX_OK) return LUX_FAIL;
+    if(send_net_data(peer, &ss_sgnl, SIGNAL_CHANNEL) != LUX_OK) return LUX_FAIL;
 
     ///we need to do it outside, because we must be sure that the packet has
     ///been received (i.e. sent in this case, enet guarantees that the peer will
@@ -243,33 +246,30 @@ LUX_MAY_FAIL send_map_load(ENetPeer* peer, VecSet<ChkPos> const& requests) {
 
 //@TODO use slice
 LUX_MAY_FAIL send_light_update(ENetPeer* peer, DynArr<ChkPos> const& updates) {
-    NetSsSgnl sgnl;
-    sgnl.tag = NetSsSgnl::LIGHT_UPDATE;
+    ss_sgnl.tag = NetSsSgnl::LIGHT_UPDATE;
 
     Server::Client& client = server.clients[(Uns)peer->data];
     for(Uns i = 0; i < updates.size(); ++i) {
         ChkPos const& pos = updates[i];
         if(client.loaded_chunks.count(pos) > 0) {
             Chunk const& chunk = get_chunk(pos);
-            std::memcpy(sgnl.light_update.chunks[pos].light_lvls,
+            std::memcpy(ss_sgnl.light_update.chunks[pos].light_lvls,
                         chunk.light_lvls, CHK_VOL * sizeof(LightLvl));
         }
     }
-    if(sgnl.light_update.chunks.size() == 0) return LUX_OK;
-    return send_net_data(peer, sgnl, SIGNAL_CHANNEL);
+    if(ss_sgnl.light_update.chunks.size() == 0) return LUX_OK;
+    return send_net_data(peer, &ss_sgnl, SIGNAL_CHANNEL);
 }
 
 LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
-    NetCsTick tick;
     LUX_ASSERT(is_client_connected((Uns)peer->data));
-    if(deserialize_packet(in_pack, &tick) != LUX_OK) return LUX_FAIL;
+    if(deserialize_packet(in_pack, &cs_tick) != LUX_OK) return LUX_FAIL;
 
     EntityHandle entity = server.clients[(Uns)peer->data].entity;
     if(entity_comps.vel.count(entity) > 0) {
-        if(tick.player_dir.x != 0.f || tick.player_dir.y != 0.f) {
-            tick.player_dir = glm::normalize(tick.player_dir);
-            entity_comps.vel.at(entity).x = tick.player_dir.x * 0.1f;
-            entity_comps.vel.at(entity).y = tick.player_dir.y * 0.1f;
+        if(f32_cmp(glm::length(cs_tick.player_dir), 1.f)) {
+            entity_comps.vel.at(entity).x = cs_tick.player_dir.x * 0.1f;
+            entity_comps.vel.at(entity).y = cs_tick.player_dir.y * 0.1f;
         }
     }
     return LUX_OK;
@@ -356,8 +356,7 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
 
     { ///dispatch ticks
         for(Server::Client& client : server.clients) {
-            NetSsTick tick;
-            tick.player_id = client.entity;
+            ss_tick.player_id = client.entity;
 
             EntityVec player_pos = {0, 0, 0};
             if(entity_comps.pos.count(client.entity) > 0) {
@@ -368,10 +367,10 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
                 //@TODO calculate max distance
                 //@TODO copy_if
                 if(glm::distance(pos.second, player_pos) < 64.f) {
-                    tick.comps.pos[pos.first] = pos.second;
+                    ss_tick.comps.pos[pos.first] = pos.second;
                 }
             }
-            (void)send_net_data(client.peer, tick, TICK_CHANNEL);
+            (void)send_net_data(client.peer, &ss_tick, TICK_CHANNEL);
         }
     }
 }
