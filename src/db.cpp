@@ -6,7 +6,7 @@
 
 static DynArr<VoxelType> voxels;
 //@CONSIDER use regular map?
-static HashMap<String, VoxelId, std::hash<String>> voxels_lookup;
+static HashMap<DynStr, VoxelId, std::hash<DynStr>> voxels_lookup;
 
 void add_voxel(VoxelType &&voxel_type) {
     auto &voxel = voxels.emplace_back(voxel_type);
@@ -27,11 +27,11 @@ VoxelType const& db_voxel_type(VoxelId id) {
     return voxels[id];
 }
 
-VoxelType const& db_voxel_type(String const& str_id) {
+VoxelType const& db_voxel_type(DynStr const& str_id) {
     return db_voxel_type(db_voxel_id(str_id));
 }
 
-VoxelId const& db_voxel_id(String const& str_id) {
+VoxelId const& db_voxel_id(DynStr const& str_id) {
     LUX_ASSERT(voxels_lookup.count(str_id) > 0);
     return voxels_lookup.at(str_id);
 }

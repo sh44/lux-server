@@ -11,7 +11,7 @@ static SparseDynArr<EntityHandle> entities;
 EntityHandle create_entity(EntityVec const& pos) {
     LUX_LOG("creating new entity");
     LUX_LOG("    pos: {%.2f, %.2f, %.2f}", pos.x, pos.y, pos.z);
-    EntityHandle id = entities.emplace();
+    EntityHandle id     = entities.emplace();
     comps.pos[id]       = pos;
     comps.vel[id]       = {0, 0, 0};
     comps.shape[id].rad = 1.0;

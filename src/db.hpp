@@ -6,7 +6,7 @@
 #include <entity.hpp>
 
 struct VoxelType {
-    String str_id;
+    DynStr str_id;
     enum Shape {
         EMPTY,
         FLOOR,
@@ -17,5 +17,5 @@ struct VoxelType {
 
 void db_init();
 VoxelType const& db_voxel_type(VoxelId id);
-VoxelType const& db_voxel_type(String const& str_id);
-VoxelId   const& db_voxel_id(String const& str_id);
+VoxelType const& db_voxel_type(DynStr const& str_id);
+VoxelId   const& db_voxel_id(DynStr const& str_id);

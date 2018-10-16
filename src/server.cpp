@@ -21,7 +21,7 @@ struct Server {
     F64 tick_rate = 0.0;
     struct Client {
         ENetPeer*      peer;
-        String         name;
+        DynStr         name;
         EntityHandle   entity;
         VecSet<ChkPos> loaded_chunks;
         bool           admin = false;
@@ -92,7 +92,7 @@ LUX_MAY_FAIL static server_send_msg(Server::Client& client,
     char constexpr prefix[] = "[SERVER]: ";
     SizeT total_len = (sizeof(prefix) - 1) + len;
     NetCsSgnl sgnl;
-    sgnl.header = NetCsSgnl::COMMAND;
+    sgnl.tag = NetCsSgnl::COMMAND;
     sgnl.command.contents.resize(total_len);
     std::memcpy(sgnl.command.contents.data(), prefix, sizeof(prefix) - 1);
     std::memcpy(sgnl.command.contents.data() + (sizeof(prefix) - 1), beg, len);
@@ -103,7 +103,7 @@ void kick_client(char const* name, char const* reason) {
     LUX_LOG("kicking client");
     LUX_LOG("    name: %s", name);
     LUX_LOG("    reason: %s", reason);
-    String s_name(name);
+    DynStr s_name(name);
     auto it = std::find_if(server.clients.begin(), server.clients.end(),
         [&] (Server::Client const& v) { return v.name == s_name; });
     Uns client_id = it - server.clients.begin();
@@ -112,7 +112,7 @@ void kick_client(char const* name, char const* reason) {
         LUX_LOG("tried to kick non-existant client");
         return; //@CONSIDER return value for failure
     }
-    String msg = String("you got kicked for: ") + String(reason);
+    DynStr msg = DynStr("you got kicked for: ") + DynStr(reason);
     (void)server_send_msg(server.clients[client_id], msg.c_str(), msg.size());
     enet_host_flush(server.host);
     kick_peer(server.clients[client_id].peer);
@@ -178,7 +178,7 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
         }
 
         auto is_client_duplicate = [&](Server::Client const& client) -> bool {
-            return client.name == String((const char*)cs_init.name);
+            return client.name == DynStr((const char*)cs_init.name);
         };
 
         auto it = std::find_if(server.clients.cbegin(), server.clients.cend(),
@@ -206,7 +206,7 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
     Server::Client& client = server.clients.emplace_back();
     client.peer = peer;
     client.peer->data = (void*)(server.clients.size() - 1);
-    client.name = String((char const*)cs_init.name);
+    client.name = DynStr((char const*)cs_init.name);
     client.entity = create_player();
 
     LUX_LOG("client connected successfully");
@@ -219,7 +219,7 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
 
 LUX_MAY_FAIL send_map_load(ENetPeer* peer, VecSet<ChkPos> const& requests) {
     NetSsSgnl sgnl;
-    sgnl.header = NetSsSgnl::MAP_LOAD;
+    sgnl.tag = NetSsSgnl::MAP_LOAD;
     for(auto const& pos : requests) {
         guarantee_chunk(pos);
         Chunk const& chunk = get_chunk(pos);
@@ -244,7 +244,7 @@ LUX_MAY_FAIL send_map_load(ENetPeer* peer, VecSet<ChkPos> const& requests) {
 //@TODO use slice
 LUX_MAY_FAIL send_light_update(ENetPeer* peer, DynArr<ChkPos> const& updates) {
     NetSsSgnl sgnl;
-    sgnl.header = NetSsSgnl::LIGHT_UPDATE;
+    sgnl.tag = NetSsSgnl::LIGHT_UPDATE;
 
     Server::Client& client = server.clients[(Uns)peer->data];
     for(Uns i = 0; i < updates.size(); ++i) {
@@ -279,7 +279,7 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
     NetCsSgnl sgnl;
     if(deserialize_packet(in_pack, &sgnl) != LUX_OK) return LUX_FAIL;
 
-    switch(sgnl.header) {
+    switch(sgnl.tag) {
         case NetCsSgnl::MAP_REQUEST: {
             //@CONSIDER, should we really fail here? perhaps split the func
             if(send_map_load(peer, sgnl.map_request.requests) != LUX_OK) {
@@ -397,7 +397,7 @@ void server_quit() {
 
 LUX_MAY_FAIL server_make_admin(char const* name) {
     LUX_LOG("making %s an admin", name);
-    String s_name(name);
+    DynStr s_name(name);
     auto it = std::find_if(server.clients.begin(), server.clients.end(),
         [&] (Server::Client const& v) { return v.name == s_name; });
     Uns client_id = it - server.clients.begin();

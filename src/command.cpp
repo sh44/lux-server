@@ -8,7 +8,7 @@
 
 lua_State* lua_L;
 
-Queue<String> command_queue;
+Queue<DynStr> command_queue;
 std::mutex command_queue_mutex;
 
 void command_init() {
