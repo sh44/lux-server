@@ -29,7 +29,8 @@ configure_file("${PROJECT_SOURCE_DIR}/config.h.in"
 
 include_directories(SYSTEM "include")
 include_directories("deps/lux-shared/include"
-                    "src" "${PROJECT_BINARY_DIR}/include")
+                    "src" "${PROJECT_BINARY_DIR}/include"
+                    "${PROJECT_BINARY_DIR}/deps/lux-shared/include")
 add_subdirectory("deps/lux-shared")
 add_subdirectory("api")
 
