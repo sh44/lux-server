@@ -26,7 +26,7 @@ struct Server {
         VecSet<ChkPos> loaded_chunks;
         bool           admin = false;
     };
-    DynArr<Client> clients;
+    SparseDynArr<Client> clients;
 
     bool is_running = false;
 
@@ -63,10 +63,9 @@ void server_deinit() {
 
     { ///kick all
         LUX_LOG("kicking all clients");
-        auto it = server.clients.begin();
-        while(it != server.clients.end()) {
-            kick_client(it->name.c_str(), "server stopping");
-            it = server.clients.begin();
+        for(auto beg = server.clients.begin(), end = server.clients.end();
+            beg != end; beg = server.clients.begin()) {
+            kick_client(beg.idx, "server stopping");
         }
     }
     enet_host_destroy(server.host);
@@ -74,7 +73,7 @@ void server_deinit() {
 }
 
 bool is_client_connected(Uns id) {
-    return id < server.clients.size();
+    return server.clients.contains(id);
 }
 
 void erase_client(Uns id) {
@@ -83,7 +82,7 @@ void erase_client(Uns id) {
     LUX_LOG("    id: %zu" , id);
     LUX_LOG("    name: %s", server.clients[id].name.c_str());
     remove_entity(server.clients[id].entity);
-    server.clients.erase(server.clients.begin() + id);
+    server.clients.erase(id);
 }
 
 void kick_peer(ENetPeer *peer) {
@@ -93,35 +92,29 @@ void kick_peer(ENetPeer *peer) {
     enet_peer_disconnect_now(peer, 0);
 }
 
-LUX_MAY_FAIL static server_send_msg(Server::Client& client,
-                                    char const* beg, SizeT len) {
+LUX_MAY_FAIL static server_send_msg(ClientId id, char const* beg, SizeT len) {
     char constexpr prefix[] = "[SERVER]: ";
     SizeT total_len = (sizeof(prefix) - 1) + len;
     ss_sgnl.tag = NetSsSgnl::MSG;
     ss_sgnl.msg.contents.resize(total_len);
     std::memcpy(ss_sgnl.msg.contents.data(), prefix, sizeof(prefix) - 1);
     std::memcpy(ss_sgnl.msg.contents.data() + (sizeof(prefix) - 1), beg, len);
-    return send_net_data(client.peer, &ss_sgnl, SIGNAL_CHANNEL);
+    LUX_ASSERT(is_client_connected(id));
+    return send_net_data(server.clients[id].peer, &ss_sgnl, SIGNAL_CHANNEL);
 }
 
-void kick_client(char const* name, char const* reason) {
+void kick_client(ClientId id, char const* reason) {
+    LUX_ASSERT(is_client_connected(id));
+    DynStr name = server.clients[id].name;
     LUX_LOG("kicking client");
-    LUX_LOG("    name: %s", name);
+    LUX_LOG("    name: %s", name.c_str());
     LUX_LOG("    reason: %s", reason);
-    DynStr s_name(name);
-    auto it = std::find_if(server.clients.begin(), server.clients.end(),
-        [&] (Server::Client const& v) { return v.name == s_name; });
-    Uns client_id = it - server.clients.begin();
-    LUX_LOG("    id: %zu", client_id);
-    if(!is_client_connected(client_id)) {
-        LUX_LOG("tried to kick non-existant client");
-        return; //@CONSIDER return value for failure
-    }
+    LUX_LOG("    id: %zu", id);
     DynStr msg = DynStr("you got kicked for: ") + DynStr(reason);
-    (void)server_send_msg(server.clients[client_id], msg.c_str(), msg.size());
+    (void)server_send_msg(id, msg.c_str(), msg.size());
     enet_host_flush(server.host);
-    kick_peer(server.clients[client_id].peer);
-    erase_client(client_id);
+    kick_peer(server.clients[id].peer);
+    erase_client(id);
 }
 
 LUX_MAY_FAIL add_client(ENetPeer* peer) {
@@ -167,7 +160,8 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
 
     NetCsInit cs_init;
     { ///parse client init packet
-        if(deserialize_packet(in_pack, &cs_init) != LUX_OK) return LUX_FAIL;
+        LUX_RETHROW(deserialize_packet(in_pack, &cs_init),
+            "failed to deserialize init packet from client");
 
         if(cs_init.net_ver.major != NET_VERSION_MAJOR) {
             LUX_LOG("client uses an incompatible major lux net api version");
@@ -182,15 +176,11 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
             return LUX_FAIL;
         }
 
-        auto is_client_duplicate = [&](Server::Client const& client) -> bool {
-            return client.name == DynStr((const char*)cs_init.name);
-        };
-
-        auto it = std::find_if(server.clients.cbegin(), server.clients.cend(),
-            is_client_duplicate);
-        if(it != server.clients.cend()) {
+        ClientId duplicate_id;
+        if(get_client_id(&duplicate_id, (const char*)cs_init.name) == true) {
+            //@CONSIDER kicking the new one instead
             LUX_LOG("client already connected, kicking the old one");
-            kick_client(it->name.c_str(), "double-join");
+            kick_client(duplicate_id, "double-join");
         }
     }
 
@@ -202,21 +192,21 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
                     SERVER_NAME_LEN - sizeof(server_name));
         ss_init.tick_rate = server.tick_rate;
 
-        if(send_net_data(peer, &ss_init, INIT_CHANNEL) != LUX_OK) {
-            return LUX_FAIL;
-        }
+        LUX_RETHROW(send_net_data(peer, &ss_init, INIT_CHANNEL),
+            "failed to send init data to client");
     }
 
-    Server::Client& client = server.clients.emplace_back();
+    ClientId id = server.clients.emplace();
+    Server::Client& client = server.clients[id];
     client.peer = peer;
-    client.peer->data = (void*)(server.clients.size() - 1);
+    client.peer->data = (void*)id;
     client.name = DynStr((char const*)cs_init.name);
     client.entity = create_player();
 
     LUX_LOG("client connected successfully");
     LUX_LOG("    name: %s", client.name.c_str());
 #ifndef NDEBUG
-    (void)server_make_admin(client.name.c_str());
+    (void)server_make_admin(id);
 #endif
     return LUX_OK;
 }
@@ -232,12 +222,13 @@ LUX_MAY_FAIL send_map_load(ENetPeer* peer, VecSet<ChkPos> const& requests) {
                     CHK_VOL * sizeof(LightLvl));
     }
 
-    if(send_net_data(peer, &ss_sgnl, SIGNAL_CHANNEL) != LUX_OK) return LUX_FAIL;
+    LUX_RETHROW(send_net_data(peer, &ss_sgnl, SIGNAL_CHANNEL),
+        "failed to send map load data to client");
 
     ///we need to do it outside, because we must be sure that the packet has
     ///been received (i.e. sent in this case, enet guarantees that the peer will
     ///either receive it or get disconnected
-    Server::Client& client = server.clients[(Uns)peer->data];
+    Server::Client& client = server.clients[(ClientId)peer->data];
     for(auto const& pos : requests) {
         client.loaded_chunks.emplace(pos);
     }
@@ -248,7 +239,7 @@ LUX_MAY_FAIL send_map_load(ENetPeer* peer, VecSet<ChkPos> const& requests) {
 LUX_MAY_FAIL send_light_update(ENetPeer* peer, DynArr<ChkPos> const& updates) {
     ss_sgnl.tag = NetSsSgnl::LIGHT_UPDATE;
 
-    Server::Client& client = server.clients[(Uns)peer->data];
+    Server::Client& client = server.clients[(ClientId)peer->data];
     for(Uns i = 0; i < updates.size(); ++i) {
         ChkPos const& pos = updates[i];
         if(client.loaded_chunks.count(pos) > 0) {
@@ -263,9 +254,10 @@ LUX_MAY_FAIL send_light_update(ENetPeer* peer, DynArr<ChkPos> const& updates) {
 
 LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
     LUX_ASSERT(is_client_connected((Uns)peer->data));
-    if(deserialize_packet(in_pack, &cs_tick) != LUX_OK) return LUX_FAIL;
+    LUX_RETHROW(deserialize_packet(in_pack, &cs_tick),
+        "failed to deserialize tick from client")
 
-    EntityHandle entity = server.clients[(Uns)peer->data].entity;
+    EntityHandle entity = server.clients[(ClientId)peer->data].entity;
     if(entity_comps.vel.count(entity) > 0) {
         if(f32_cmp(glm::length(cs_tick.player_dir), 1.f)) {
             entity_comps.vel.at(entity).x = cs_tick.player_dir.x * 0.1f;
@@ -277,17 +269,15 @@ LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
 
 LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
     NetCsSgnl sgnl;
-    if(deserialize_packet(in_pack, &sgnl) != LUX_OK) return LUX_FAIL;
+    LUX_RETHROW(deserialize_packet(in_pack, &sgnl),
+        "failed to deserialize signal from client");
 
     switch(sgnl.tag) {
         case NetCsSgnl::MAP_REQUEST: {
-            //@CONSIDER, should we really fail here? perhaps split the func
-            if(send_map_load(peer, sgnl.map_request.requests) != LUX_OK) {
-                return LUX_FAIL;
-            }
+            (void)send_map_load(peer, sgnl.map_request.requests);
         } break;
         case NetCsSgnl::COMMAND: {
-            Uns client_id = (Uns)peer->data;
+            Uns client_id = (ClientId)peer->data;
             if(!server.clients[client_id].admin) {
                 //@TODO send msg
                 //@TODO is this null terminated?
@@ -297,7 +287,7 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
                         sgnl.command.contents.data());
                 char constexpr DENY_MSG[] = "you do not have admin rights, this"
                     " incident will be reported";
-                (void)server_send_msg(server.clients[client_id], DENY_MSG,
+                (void)server_send_msg(client_id, DENY_MSG,
                                 sizeof(DENY_MSG));
                 return LUX_FAIL;
             }
@@ -325,10 +315,10 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
                     kick_peer(event.peer);
                 }
             } else if(event.type == ENET_EVENT_TYPE_DISCONNECT) {
-                erase_client((Uns)event.peer->data);
+                erase_client((ClientId)event.peer->data);
             } else if(event.type == ENET_EVENT_TYPE_RECEIVE) {
                 LUX_DEFER { enet_packet_destroy(event.packet); };
-                if(!is_client_connected((Uns)event.peer->data)) {
+                if(!is_client_connected((ClientId)event.peer->data)) {
                     U8 *ip = get_ip(event.peer->address);
                     LUX_LOG("ignoring packet from not connected peer");
                     LUX_LOG("    ip: %u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
@@ -340,11 +330,14 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
                         }
                     } else if(event.channelID == SIGNAL_CHANNEL) {
                         if(handle_signal(event.peer, event.packet) != LUX_OK) {
+                            LUX_LOG("failed to handle signal from client");
+                            kick_client((ClientId)event.peer->data,
+                                        "lost signal packet");
                             continue;
                         }
                     } else {
                         auto const &name =
-                            server.clients[(Uns)event.peer->data].name;
+                            server.clients[(ClientId)event.peer->data].name;
                         LUX_LOG("ignoring unexpected packet");
                         LUX_LOG("    channel: %u", event.channelID);
                         LUX_LOG("    from: %s", name.c_str());
@@ -381,8 +374,8 @@ void server_broadcast(char const* beg) {
     ///we count the null terminator
     ++end;
     SizeT len = end - beg;
-    for(Server::Client& client : server.clients) {
-        (void)server_send_msg(client, beg, len);
+    for(auto it = server.clients.begin(); it != server.clients.end(); ++it) {
+        (void)server_send_msg(it.idx, beg, len);
     }
 }
 
@@ -394,16 +387,18 @@ void server_quit() {
     server.is_running = false;
 }
 
-LUX_MAY_FAIL server_make_admin(char const* name) {
-    LUX_LOG("making %s an admin", name);
-    DynStr s_name(name);
-    auto it = std::find_if(server.clients.begin(), server.clients.end(),
-        [&] (Server::Client const& v) { return v.name == s_name; });
-    Uns client_id = it - server.clients.begin();
-    if(!is_client_connected(client_id)) {
-        LUX_LOG("client %s is not connected", name);
-        return LUX_FAIL;
+bool get_client_id(ClientId* id, char const* name) {
+    for(auto it = server.clients.cbegin(); it != server.clients.cend(); ++it) {
+        if(std::strcmp((*it).name.c_str(), name) == 0) {
+            *id = it.idx;
+            return true;
+        }
     }
-    server.clients[client_id].admin = true;
-    return LUX_OK;
+    return false;
+}
+
+void server_make_admin(ClientId id) {
+    LUX_LOG("making client %zu an admin", id);
+    LUX_ASSERT(is_client_connected(id));
+    server.clients[id].admin = true;
 }

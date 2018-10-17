@@ -9,13 +9,21 @@ void quit() {
 }
 
 void make_admin(char const* name) {
-    if(server_make_admin(name) != LUX_OK) {
+    ClientId id;
+    if(!get_client_id(&id, name)) {
         LUX_LOG("failed to make player \"%s\" an admin", name);
+        return;
     }
+    server_make_admin(id);
 }
 
 void kick(char const* name, char const* reason) {
-    kick_client(name, reason);
+    ClientId id;
+    if(!get_client_id(&id, name)) {
+        LUX_LOG("failed to kick player \"%s\"", name);
+        return;
+    }
+    kick_client(id, reason);
 }
 
 void broadcast(char const* str) {
