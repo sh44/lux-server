@@ -202,7 +202,8 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
     Server::Client& client = server.clients[id];
     client.peer = peer;
     client.peer->data = (void*)id;
-    client.name = DynStr((char const*)cs_init.name);
+    client.name = DynStr((char const*)cs_init.name,
+        strnlen((char const*)cs_init.name, CLIENT_NAME_LEN));
     client.entity = create_player();
     auto& entity_name = entity_comps.name[client.entity];
     entity_name.resize(client.name.size());
