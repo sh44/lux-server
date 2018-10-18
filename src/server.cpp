@@ -2,6 +2,8 @@
 #include <algorithm>
 //
 #include <enet/enet.h>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/fast_square_root.hpp>
 //
 #include <lux_shared/common.hpp>
 #include <lux_shared/net/common.hpp>
@@ -235,7 +237,6 @@ LUX_MAY_FAIL send_map_load(ENetPeer* peer, VecSet<ChkPos> const& requests) {
     return LUX_OK;
 }
 
-//@TODO use slice
 LUX_MAY_FAIL send_light_update(ENetPeer* peer, DynArr<ChkPos> const& updates) {
     ss_sgnl.tag = NetSsSgnl::LIGHT_UPDATE;
 
@@ -279,11 +280,10 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
         case NetCsSgnl::COMMAND: {
             Uns client_id = (ClientId)peer->data;
             if(!server.clients[client_id].admin) {
-                //@TODO send msg
-                //@TODO is this null terminated?
-                LUX_LOG("client %s tried to execute command \"%s\""
+                LUX_LOG("client %s tried to execute command \"%*s\""
                         " without admin rights",
                         server.clients[client_id].name.c_str(),
+                        (int)sgnl.command.contents.size(),
                         sgnl.command.contents.data());
                 char constexpr DENY_MSG[] = "you do not have admin rights, this"
                     " incident will be reported";
@@ -332,7 +332,7 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
                         if(handle_signal(event.peer, event.packet) != LUX_OK) {
                             LUX_LOG("failed to handle signal from client");
                             kick_client((ClientId)event.peer->data,
-                                        "lost signal packet");
+                                        "corrupted signal packet");
                             continue;
                         }
                     } else {
@@ -356,10 +356,8 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
                 player_pos = entity_comps.pos.at(client.entity);
             }
             for(auto const& pos : entity_comps.pos) {
-                //@TODO fast distance function
                 //@TODO calculate max distance
-                //@TODO copy_if
-                if(glm::distance(pos.second, player_pos) < 64.f) {
+                if(glm::fastDistance(pos.second, player_pos) < 64.f) {
                     ss_tick.comps.pos[pos.first] = pos.second;
                 }
             }

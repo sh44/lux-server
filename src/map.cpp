@@ -157,7 +157,7 @@ void add_light_source(MapPos const& pos, Vec3<U8> col) {
 
 void del_light_source(MapPos const& pos) {
     //@TODO
-    LUX_LOG("unimplemented");
+    LUX_UNIMPLEMENTED();
     //awaiting_light_updates.insert(to_chk_pos(pos));
 }
 
