@@ -16,13 +16,36 @@ EntityHandle create_entity(EntityVec const& pos) {
     entities[id] = id;
     comps.pos[id]       = pos;
     comps.vel[id]       = {0, 0, 0};
-    comps.shape[id].rad = 1.0;
+    comps.shape[id].rad = 0.8;
     return id;
 }
 
 EntityHandle create_player() {
     LUX_LOG("creating new player");
     return create_entity({1, 1, 0});
+}
+
+static bool check_collision(EntityVec const& pos, F32 rad) {
+    MapPos map_pos = (MapPos)pos;
+    Int bound = std::ceil(rad);
+    for(MapCoord y = map_pos.y - bound; y <= map_pos.y + bound; ++y) {
+        for(MapCoord x = map_pos.x - bound; x <= map_pos.x + bound; ++x) {
+            guarantee_chunk(to_chk_pos({x, y, pos.z}));
+            VoxelType const& vox = get_voxel_type({x, y, pos.z});
+            F32 sq_dst = 0.0f;
+            Vec2F min = {x, y};
+            Vec2F max = min + Vec2F(1.f, 1.f);
+            for(Uns i = 0; i < 2; i++) {
+                float v = Vec2F(pos)[i];
+                if(v < min[i]) sq_dst += (min[i] - v) * (min[i] - v);
+                if(v > max[i]) sq_dst += (v - max[i]) * (v - max[i]);
+            }
+            if(vox.shape == VoxelType::BLOCK && sq_dst <= rad) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 void entities_tick() {
@@ -40,23 +63,17 @@ void entities_tick() {
                 EntityVec old_pos = pos;
                 EntityVec new_pos = pos + vel;
                 if(comps.shape.count(id) > 0) {
-                    //@TODO
                     auto& rad = comps.shape.at(id).rad;
                     VoxelType const& standing_voxel = get_voxel_type(pos);
                     if(standing_voxel.shape == VoxelType::EMPTY) {
                         vel.z = -1.f;
                     }
-                    {   VoxelType const& new_voxel =
-                            get_voxel_type({new_pos.x, pos.y, pos.z});
-                        if(new_voxel.shape != VoxelType::BLOCK) {
-                            pos.x = new_pos.x;
-                        }
+                    //@TODO fix negative axis
+                    if(!check_collision({new_pos.x, pos.y, pos.z}, rad)) {
+                        pos.x = new_pos.x;
                     }
-                    {   VoxelType const& new_voxel =
-                            get_voxel_type({pos.x, new_pos.y, pos.z});
-                        if(new_voxel.shape != VoxelType::BLOCK) {
-                            pos.y = new_pos.y;
-                        }
+                    if(!check_collision({pos.x, new_pos.y, pos.z}, rad)) {
+                        pos.y = new_pos.y;
                     }
                 } else {
                     pos += vel;
