@@ -36,7 +36,10 @@ void place_light(ApiI64 x, ApiI64 y, ApiI64 z, ApiU8 r, ApiU8 g, ApiU8 b) {
 }
 
 void new_entity(ApiF32 x, ApiF32 y, ApiF32 z) {
-    create_entity({x, y, z});
+    EntityHandle id            = entities.emplace();
+    entity_comps.pos[id]       = {x, y, z};
+    entity_comps.vel[id]       = {0, 0, 0};
+    entity_comps.shape[id].rad = 0.8;
 }
 
 }

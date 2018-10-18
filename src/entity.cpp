@@ -4,25 +4,17 @@
 #include <map.hpp>
 #include <entity.hpp>
 
+DynSlotArr entities;
 EntityComps comps;
 EntityComps& entity_comps = comps;
-static SparseDynArr<EntityHandle> entities;
-
-EntityHandle create_entity(EntityVec const& pos) {
-    LUX_LOG("creating new entity");
-    LUX_LOG("    pos: {%.2f, %.2f, %.2f}", pos.x, pos.y, pos.z);
-    EntityHandle id     = entities.emplace();
-    //@TODO
-    entities[id] = id;
-    comps.pos[id]       = pos;
-    comps.vel[id]       = {0, 0, 0};
-    comps.shape[id].rad = 0.8;
-    return id;
-}
 
 EntityHandle create_player() {
     LUX_LOG("creating new player");
-    return create_entity({1, 1, 0});
+    EntityHandle id     = entities.emplace();
+    comps.pos[id]       = {2, 2, 0};
+    comps.vel[id]       = {0, 0, 0};
+    comps.shape[id].rad = 0.8;
+    return id;
 }
 
 static bool check_collision(EntityVec const& pos, F32 rad) {
@@ -49,7 +41,8 @@ static bool check_collision(EntityVec const& pos, F32 rad) {
 }
 
 void entities_tick() {
-    for(auto const& id : entities) {
+    for(auto it = entities.begin(); it != entities.end(); ++it) {
+        auto const& id = it.idx;
         if(comps.pos.count(id) > 0) {
             auto& pos = comps.pos.at(id);
             ChkPos chk_pos = to_chk_pos(pos);
