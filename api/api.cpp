@@ -1,5 +1,6 @@
 #include <map.hpp>
 #include <server.hpp>
+#include <entity.hpp>
 #include "api.hpp"
 
 extern "C" {
@@ -32,6 +33,10 @@ void broadcast(char const* str) {
 
 void place_light(ApiI64 x, ApiI64 y, ApiI64 z, ApiU8 r, ApiU8 g, ApiU8 b) {
     add_light_source({x, y, z}, {r, g, b});
+}
+
+void new_entity(ApiF32 x, ApiF32 y, ApiF32 z) {
+    create_entity({x, y, z});
 }
 
 }
