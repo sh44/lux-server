@@ -204,6 +204,9 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
     client.peer->data = (void*)id;
     client.name = DynStr((char const*)cs_init.name);
     client.entity = create_player();
+    auto& entity_name = entity_comps.name[client.entity];
+    entity_name.resize(client.name.size());
+    std::memcpy(entity_name.data(), client.name.data(), client.name.size());
 
     LUX_LOG("client connected successfully");
     LUX_LOG("    name: %s", client.name.c_str());
@@ -254,7 +257,7 @@ LUX_MAY_FAIL send_light_update(ENetPeer* peer, DynArr<ChkPos> const& updates) {
 }
 
 LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
-    LUX_ASSERT(is_client_connected((Uns)peer->data));
+    LUX_ASSERT(is_client_connected((ClientId)peer->data));
     LUX_RETHROW(deserialize_packet(in_pack, &cs_tick),
         "failed to deserialize tick from client")
 
@@ -350,17 +353,8 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
     { ///dispatch ticks
         for(Server::Client& client : server.clients) {
             ss_tick.player_id = client.entity;
+            ss_tick.comps = entity_comps;
 
-            EntityVec player_pos = {0, 0, 0};
-            if(entity_comps.pos.count(client.entity) > 0) {
-                player_pos = entity_comps.pos.at(client.entity);
-            }
-            for(auto const& pos : entity_comps.pos) {
-                //@TODO calculate max distance
-                if(glm::fastDistance(pos.second, player_pos) < 64.f) {
-                    ss_tick.comps.pos[pos.first] = pos.second;
-                }
-            }
             (void)send_net_data(client.peer, &ss_tick, TICK_CHANNEL);
         }
     }
