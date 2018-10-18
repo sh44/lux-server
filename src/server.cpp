@@ -74,11 +74,11 @@ void server_deinit() {
     enet_deinitialize();
 }
 
-bool is_client_connected(Uns id) {
+bool is_client_connected(ClientId id) {
     return server.clients.contains(id);
 }
 
-void erase_client(Uns id) {
+void erase_client(ClientId id) {
     LUX_ASSERT(is_client_connected(id));
     LUX_LOG("client disconnected");
     LUX_LOG("    id: %zu" , id);
@@ -281,7 +281,7 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
             (void)send_map_load(peer, sgnl.map_request.requests);
         } break;
         case NetCsSgnl::COMMAND: {
-            Uns client_id = (ClientId)peer->data;
+            ClientId client_id = (ClientId)peer->data;
             if(!server.clients[client_id].admin) {
                 LUX_LOG("client %s tried to execute command \"%*s\""
                         " without admin rights",
