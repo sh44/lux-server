@@ -1,6 +1,8 @@
 #define GLM_FORCE_PURE
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/fast_square_root.hpp>
+#include <glm/gtx/component_wise.hpp>
+//
 #include <lux_shared/containers.hpp>
 //
 #include <db.hpp>
@@ -27,23 +29,64 @@ EntityHandle create_player() {
     return id;
 }
 
-static bool check_collision(EntityVec const& pos, F32 rad) {
-    MapPos map_pos = (MapPos)pos;
-    Int bound = std::ceil(rad);
+struct CollisionSphere {
+    EntityComps::Sphere const& shape;
+    Vec2F               const& pos;
+};
+struct CollisionAabb {
+    EntityComps::Rect const& shape;
+    Vec2F             const& pos;
+};
+struct CollisionRect {
+    EntityComps::Rect        const& shape;
+    Vec2F                    const& pos;
+    EntityComps::Orientation const& orientation;
+};
+
+static bool broad_phase(EntityVec const& a, EntityVec const& b) {
+    constexpr F32 max_distance = (F32)CHK_SIZE;
+    return glm::fastDistance(a, b) <= max_distance;
+}
+
+static bool narrow_phase(CollisionSphere const& a,
+                         CollisionSphere const& b) {
+    return glm::distance(a.pos, b.pos) <= a.shape.rad + b.shape.rad;
+}
+
+static bool narrow_phase(CollisionSphere const& a,
+                         CollisionAabb   const& b) {
+    F32 sq_dst = 0.0f;
+    Vec2F min = {b.pos.x, b.pos.y};
+    Vec2F max = min + b.shape.sz;
+    for(Uns i = 0; i < 2; i++) {
+        float v = Vec2F(a.pos)[i];
+        if(v < min[i]) sq_dst += (min[i] - v) * (min[i] - v);
+        if(v > max[i]) sq_dst += (v - max[i]) * (v - max[i]);
+    }
+    return sq_dst <= a.shape.rad;
+}
+
+static MapCoord get_map_bound(CollisionSphere const& a) {
+    return glm::ceil(a.shape.rad);
+}
+
+static MapCoord get_map_bound(CollisionAabb const& a) {
+    return glm::ceil(glm::compMax(a.shape.sz));
+}
+
+template<typename A>
+static bool check_map_collision(A const& a, MapCoord z) {
+    constexpr EntityComps::Rect block_shape = {{1.f, 1.f}};
+    MapPos map_pos = MapPos(a.pos, z);
+    MapCoord bound = get_map_bound(a);
     for(MapCoord y = map_pos.y - bound; y <= map_pos.y + bound; ++y) {
         for(MapCoord x = map_pos.x - bound; x <= map_pos.x + bound; ++x) {
-            guarantee_chunk(to_chk_pos({x, y, pos.z}));
-            VoxelType const& vox = get_voxel_type({x, y, pos.z});
-            F32 sq_dst = 0.0f;
-            Vec2F min = {x, y};
-            Vec2F max = min + Vec2F(1.f, 1.f);
-            for(Uns i = 0; i < 2; i++) {
-                float v = Vec2F(pos)[i];
-                if(v < min[i]) sq_dst += (min[i] - v) * (min[i] - v);
-                if(v > max[i]) sq_dst += (v - max[i]) * (v - max[i]);
-            }
-            if(vox.shape == VoxelType::BLOCK && sq_dst <= rad) {
-                return true;
+            guarantee_chunk(to_chk_pos({x, y, z}));
+            VoxelType const& vox = get_voxel_type({x, y, z});
+            Vec2F h_pos = {x, y};
+            if(vox.shape == VoxelType::BLOCK) {
+                CollisionAabb block_aabb = {block_shape, h_pos};
+                if(narrow_phase(a, block_aabb)) return true;
             }
         }
     }
@@ -65,22 +108,21 @@ void entities_tick() {
                 auto& vel = comps.vel.at(id);
                 EntityVec old_pos = pos;
                 EntityVec new_pos = pos + vel;
-                /*if(comps.shape.count(id) > 0) {
-                    auto& rad = comps.shape.at(id).rad;
-                    VoxelType const& standing_voxel = get_voxel_type(pos);
-                    if(standing_voxel.shape == VoxelType::EMPTY) {
-                        vel.z = -1.f;
-                    }
+                if(comps.sphere.count(id) > 0) {
+                    Vec2F h_pos = (Vec2F)old_pos;
+                    CollisionSphere sphere = {comps.sphere.at(id), h_pos};
+                    h_pos = {new_pos.x, old_pos.y};
                     //@TODO fix negative axis
-                    if(!check_collision({new_pos.x, pos.y, pos.z}, rad)) {
+                    if(!check_map_collision(sphere, pos.z)) {
                         pos.x = new_pos.x;
                     }
-                    if(!check_collision({pos.x, new_pos.y, pos.z}, rad)) {
+                    h_pos = {old_pos.x, new_pos.y};
+                    if(!check_map_collision(sphere, pos.z)) {
                         pos.y = new_pos.y;
                     }
-                } else {*/
+                } else {
                     pos += vel;
-                //}
+                }
                 vel *= 0.9f;
                 if((MapPos)pos != (MapPos)old_pos) {
                     //del_light_source(old_pos);
