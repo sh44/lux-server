@@ -269,6 +269,9 @@ LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
             entity_comps.vel.at(entity).y = cs_tick.player_dir.y * 0.1f;
         }
     }
+    if(entity_comps.orientation.count(entity) > 0) {
+        entity_comps.orientation.at(entity).angle = cs_tick.player_aim_angle;
+    }
     return LUX_OK;
 }
 
@@ -352,9 +355,16 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
     }
 
     { ///dispatch ticks
+        //@IMPROVE we might want to turn this into a differential transfer,
+        //instead of resending the whole state all the time
+        NetSsTick::EntityComps net_comps;
+        get_net_entity_comps(&net_comps);
+        ss_tick.entity_comps = net_comps;
+        for(auto it = entities.begin(); it != entities.end(); ++it) {
+            ss_tick.entities.emplace_back(it.idx);
+        }
         for(Server::Client& client : server.clients) {
             ss_tick.player_id = client.entity;
-            ss_tick.comps = entity_comps;
 
             (void)send_net_data(client.peer, &ss_tick, TICK_CHANNEL);
         }
@@ -362,6 +372,8 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
 }
 
 void server_broadcast(char const* beg) {
+    //@TODO use strlen, also should we really send the null terminator as well?
+    //we send the length anyway
     char const* end = beg;
     while(*end != '\0') ++end;
     ///we count the null terminator

@@ -1,19 +1,29 @@
+#define GLM_FORCE_PURE
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/fast_square_root.hpp>
 #include <lux_shared/containers.hpp>
 //
 #include <db.hpp>
 #include <map.hpp>
 #include <entity.hpp>
 
-DynSlotArr entities;
-EntityComps comps;
+static EntityComps          comps;
+SparseDynArr<Entity>        entities;
 EntityComps& entity_comps = comps;
+
+EntityHandle create_entity() {
+    EntityHandle id = entities.emplace();
+    return id;
+}
 
 EntityHandle create_player() {
     LUX_LOG("creating new player");
-    EntityHandle id     = entities.emplace();
-    comps.pos[id]       = {2, 2, 0};
-    comps.vel[id]       = {0, 0, 0};
-    comps.shape[id].rad = 0.8;
+    EntityHandle id       = create_entity();
+    comps.pos[id]         = {2, 2, 0};
+    comps.vel[id]         = {0, 0, 0};
+    comps.sphere[id]      = {0.8f};
+    comps.visible[id]     = {0};
+    comps.orientation[id] = {0.f};
     return id;
 }
 
@@ -55,7 +65,7 @@ void entities_tick() {
                 auto& vel = comps.vel.at(id);
                 EntityVec old_pos = pos;
                 EntityVec new_pos = pos + vel;
-                if(comps.shape.count(id) > 0) {
+                /*if(comps.shape.count(id) > 0) {
                     auto& rad = comps.shape.at(id).rad;
                     VoxelType const& standing_voxel = get_voxel_type(pos);
                     if(standing_voxel.shape == VoxelType::EMPTY) {
@@ -68,13 +78,13 @@ void entities_tick() {
                     if(!check_collision({pos.x, new_pos.y, pos.z}, rad)) {
                         pos.y = new_pos.y;
                     }
-                } else {
+                } else {*/
                     pos += vel;
-                }
+                //}
                 vel *= 0.9f;
                 if((MapPos)pos != (MapPos)old_pos) {
                     //del_light_source(old_pos);
-                    add_light_source(pos, {0xF, 0xF, 0xF});
+                    //add_light_source(pos, {0xF, 0xF, 0xF});
                 }
             }
         }
@@ -84,4 +94,59 @@ void entities_tick() {
 void remove_entity(EntityHandle entity) {
     LUX_ASSERT(entities.contains(entity));
     entities.erase(entity);
+    ///this is only gonna grow longer...
+    if(comps.pos.count(entity)          > 0) comps.pos.erase(entity);
+    if(comps.vel.count(entity)          > 0) comps.vel.erase(entity);
+    if(comps.name.count(entity)         > 0) comps.name.erase(entity);
+    if(comps.sphere.count(entity)       > 0) comps.sphere.erase(entity);
+    if(comps.rect.count(entity)         > 0) comps.rect.erase(entity);
+    if(comps.visible.count(entity)      > 0) comps.visible.erase(entity);
+    if(comps.item.count(entity)         > 0) comps.item.erase(entity);
+    if(comps.destructible.count(entity) > 0) comps.destructible.erase(entity);
+    if(comps.health.count(entity)       > 0) comps.health.erase(entity);
+    if(comps.container.count(entity)    > 0) comps.container.erase(entity);
+    if(comps.orientation.count(entity)  > 0) comps.orientation.erase(entity);
+}
+
+void get_net_entity_comps(NetSsTick::EntityComps* net_comps) {
+    //@TODO figure out a way to reduce the verbosity of this function
+    for(auto const& pos : comps.pos) {
+        net_comps->pos[pos.first] = pos.second;
+    }
+    for(auto const& name : comps.name) {
+        net_comps->name[name.first] = name.second;
+    }
+    ///we infer the size of a sprite from the shape of an entity
+    for(auto const& visible : comps.visible) {
+        Vec2F quad_sz = {0.f, 0.f};
+        if(comps.sphere.count(visible.first) > 0) {
+            auto const& comp = comps.sphere.at(visible.first);
+            quad_sz = glm::max(quad_sz, Vec2F(comp.rad * 2.f));
+        } else if(comps.rect.count(visible.first) > 0) {
+            auto const& comp = comps.rect.at(visible.first);
+            quad_sz = glm::max(quad_sz, comp.sz);
+        } else {
+            LUX_LOG("entity %u has a visible component, but no shape to"
+                    "infer the size from", visible.first);
+        }
+        net_comps->visible[visible.first] =
+            {visible.second.visible_id, quad_sz};
+    }
+    for(auto const& item : comps.item) {
+        net_comps->item[item.first] = {item.second.weight};
+    }
+    for(auto const& destructible : comps.destructible) {
+        net_comps->destructible[destructible.first] =
+            {destructible.second.dur, destructible.second.dur_max};
+    }
+    for(auto const& health : comps.health) {
+        net_comps->health[health.first] =
+            {health.second.hp, health.second.hp_max};
+    }
+    for(auto const& container : comps.container) {
+        net_comps->container[container.first] = {container.second.items};
+    }
+    for(auto const& orientation : comps.orientation) {
+        net_comps->orientation[orientation.first] = {orientation.second.angle};
+    }
 }
