@@ -77,7 +77,7 @@ static MapCoord get_map_bound(CollisionAabb const& a) {
 template<typename A>
 static bool check_map_collision(A const& a) {
     constexpr EntityComps::Rect block_shape = {{1.f, 1.f}};
-    MapPos map_pos = (MapPos)a.pos;
+    MapPos map_pos = (MapPos)glm::floor(a.pos);
     MapCoord bound = get_map_bound(a);
     for(MapCoord y = map_pos.y - bound; y <= map_pos.y + bound; ++y) {
         for(MapCoord x = map_pos.x - bound; x <= map_pos.x + bound; ++x) {
@@ -112,7 +112,6 @@ void entities_tick() {
                     Vec2F h_pos = (Vec2F)old_pos;
                     CollisionSphere sphere = {comps.sphere.at(id), h_pos};
                     h_pos = {new_pos.x, old_pos.y};
-                    //@TODO fix negative axis
                     if(!check_map_collision(sphere)) {
                         pos.x = new_pos.x;
                     }
