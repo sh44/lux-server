@@ -63,12 +63,9 @@ void server_deinit() {
     server.is_running = false;
     LUX_LOG("deinitializing server");
 
-    { ///kick all
-        LUX_LOG("kicking all clients");
-        for(auto beg = server.clients.begin(), end = server.clients.end();
-            beg != end; beg = server.clients.begin()) {
-            kick_client(beg.idx, "server stopping");
-        }
+    LUX_LOG("kicking all clients");
+    for(auto it = server.clients.begin(); it != server.clients.end(); ++it) {
+        kick_client(it.idx, "server stopping");
     }
     enet_host_destroy(server.host);
     enet_deinitialize();
@@ -366,7 +363,7 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
         for(Server::Client& client : server.clients) {
             ss_tick.player_id = client.entity;
 
-            (void)send_net_data(client.peer, &ss_tick, TICK_CHANNEL);
+            (void)send_net_data(client.peer, &ss_tick, TICK_CHANNEL, false);
         }
     }
 }
