@@ -21,8 +21,8 @@ EntityHandle create_entity() {
 EntityHandle create_player() {
     LUX_LOG("creating new player");
     EntityHandle id       = create_entity();
-    comps.pos[id]         = {2, 2, 0};
-    comps.vel[id]         = {0, 0, 0};
+    comps.pos[id]         = {2, 2};
+    comps.vel[id]         = {0, 0};
     comps.sphere[id]      = {0.8f};
     comps.visible[id]     = {0};
     comps.orientation[id] = {0.f};
@@ -75,14 +75,14 @@ static MapCoord get_map_bound(CollisionAabb const& a) {
 }
 
 template<typename A>
-static bool check_map_collision(A const& a, MapCoord z) {
+static bool check_map_collision(A const& a) {
     constexpr EntityComps::Rect block_shape = {{1.f, 1.f}};
-    MapPos map_pos = MapPos(a.pos, z);
+    MapPos map_pos = (MapPos)a.pos;
     MapCoord bound = get_map_bound(a);
     for(MapCoord y = map_pos.y - bound; y <= map_pos.y + bound; ++y) {
         for(MapCoord x = map_pos.x - bound; x <= map_pos.x + bound; ++x) {
-            guarantee_chunk(to_chk_pos({x, y, z}));
-            VoxelType const& vox = get_voxel_type({x, y, z});
+            guarantee_chunk(to_chk_pos({x, y}));
+            VoxelType const& vox = get_voxel_type({x, y});
             Vec2F h_pos = {x, y};
             if(vox.shape == VoxelType::BLOCK) {
                 CollisionAabb block_aabb = {block_shape, h_pos};
@@ -99,8 +99,8 @@ void entities_tick() {
         if(comps.pos.count(id) > 0) {
             auto& pos = comps.pos.at(id);
             ChkPos chk_pos = to_chk_pos(pos);
-            constexpr ChkPos offsets[] = {{0, 0, 0}, {-1, 0, 0}, {1, 0, 0},
-                {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}};
+            constexpr ChkPos offsets[] =
+                {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}};
             for(auto const& offset : offsets) {
                 guarantee_chunk(chk_pos + offset);
             }
@@ -113,11 +113,11 @@ void entities_tick() {
                     CollisionSphere sphere = {comps.sphere.at(id), h_pos};
                     h_pos = {new_pos.x, old_pos.y};
                     //@TODO fix negative axis
-                    if(!check_map_collision(sphere, pos.z)) {
+                    if(!check_map_collision(sphere)) {
                         pos.x = new_pos.x;
                     }
                     h_pos = {old_pos.x, new_pos.y};
-                    if(!check_map_collision(sphere, pos.z)) {
+                    if(!check_map_collision(sphere)) {
                         pos.y = new_pos.y;
                     }
                 } else {

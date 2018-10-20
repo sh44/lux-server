@@ -28,7 +28,7 @@ static bool is_chunk_loaded(ChkPos const& pos) {
 static Chunk& load_chunk(ChkPos const& pos) {
     LUX_ASSERT(!is_chunk_loaded(pos));
     LUX_LOG("loading chunk");
-    LUX_LOG("    pos: {%zd, %zd, %zd}", pos.x, pos.y, pos.z);
+    LUX_LOG("    pos: {%zd, %zd}", pos.x, pos.y);
     ///@RESEARCH to do a better way to no-copy default construct
     Chunk& chunk = chunks[pos];
     for(Uns i = 0; i < CHK_VOL; ++i) {
