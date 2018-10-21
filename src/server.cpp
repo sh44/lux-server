@@ -365,6 +365,7 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
 
             (void)send_net_data(client.peer, &ss_tick, TICK_CHANNEL, false);
         }
+        clear_net_data(&ss_tick);
     }
 }
 
