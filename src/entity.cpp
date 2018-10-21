@@ -93,6 +93,36 @@ static bool check_map_collision(A const& a) {
     return false;
 }
 
+template<typename A>
+static bool check_entities_collision(A const& a, EntityHandle a_id) {
+    //@IMPROVE very slow! O(n^2)!
+    //perhaps check neighboring chunks only
+    for(auto it = entities.begin(); it != entities.end(); ++it) {
+        auto const& id = it.idx;
+        if(id == a_id) continue;
+        if(comps.pos.count(id) > 0) {
+            if(broad_phase(comps.pos.at(id), a.pos)) {
+                if(comps.sphere.count(id) > 0) {
+                    CollisionSphere sphere = {
+                        comps.sphere.at(id),
+                        comps.pos.at(id),
+                    };
+                    if(narrow_phase(a, sphere)) return true;
+                }
+                if(comps.rect.count(id) > 0) {
+                    CollisionAabb aabb = {
+                        comps.rect.at(id),
+                        comps.pos.at(id),
+                    };
+                    if(narrow_phase(a, aabb)) return true;
+                    //TODO orientation
+                }
+            }
+        }
+    }
+    return false;
+}
+
 void entities_tick() {
     for(auto it = entities.begin(); it != entities.end(); ++it) {
         auto const& id = it.idx;
@@ -112,11 +142,14 @@ void entities_tick() {
                     Vec2F h_pos = (Vec2F)old_pos;
                     CollisionSphere sphere = {comps.sphere.at(id), h_pos};
                     h_pos = {new_pos.x, old_pos.y};
-                    if(!check_map_collision(sphere)) {
+                    //@IMPROVE, don't check for entity-entity collision twice
+                    if(!check_map_collision(sphere) &&
+                       !check_entities_collision(sphere, id)) {
                         pos.x = new_pos.x;
                     }
                     h_pos = {old_pos.x, new_pos.y};
-                    if(!check_map_collision(sphere)) {
+                    if(!check_map_collision(sphere) &&
+                       !check_entities_collision(sphere, id)) {
                         pos.y = new_pos.y;
                     }
                 } else {
