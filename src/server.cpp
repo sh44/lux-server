@@ -24,7 +24,7 @@ struct Server {
     struct Client {
         ENetPeer*      peer;
         DynStr         name;
-        EntityHandle   entity;
+        EntityId       entity;
         VecSet<ChkPos> loaded_chunks;
         bool           admin = false;
     };
@@ -64,9 +64,9 @@ void server_deinit() {
     LUX_LOG("deinitializing server");
 
     LUX_LOG("kicking all clients");
-    for(auto it = server.clients.begin(); it != server.clients.end(); ++it) {
-        kick_client(it.idx, "server stopping");
-    }
+    server.clients.foreach([](ClientId id) {
+        kick_client(id, "server stopping");
+    });
     enet_host_destroy(server.host);
     enet_deinitialize();
 }
@@ -175,8 +175,8 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
             return LUX_FAIL;
         }
 
-        ClientId duplicate_id;
-        if(get_client_id(&duplicate_id, (const char*)cs_init.name) == true) {
+        ClientId duplicate_id = get_client_id((const char*)cs_init.name);
+        if(duplicate_id != server.clients.end()) {
             //@CONSIDER kicking the new one instead
             LUX_LOG("client already connected, kicking the old one");
             kick_client(duplicate_id, "double-join");
@@ -202,6 +202,9 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
     client.name = DynStr((char const*)cs_init.name,
         strnlen((char const*)cs_init.name, CLIENT_NAME_LEN));
     client.entity = create_player();
+    entity_comps.sphere[client.entity] = {0.8f}; //@TODO
+    entity_comps.container[client.entity].items =
+        {create_item("dong"), create_item("bong"), create_item("levi's head")};
     auto& entity_name = entity_comps.name[client.entity];
     entity_name.resize(client.name.size());
     std::memcpy(entity_name.data(), client.name.data(), client.name.size());
@@ -259,7 +262,7 @@ LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
     LUX_RETHROW(deserialize_packet(in_pack, &cs_tick),
         "failed to deserialize tick from client")
 
-    EntityHandle entity = server.clients[(ClientId)peer->data].entity;
+    EntityId entity = server.clients[(ClientId)peer->data].entity;
     if(entity_comps.vel.count(entity) > 0) {
         if(f32_cmp(glm::length(cs_tick.player_dir), 1.f)) {
             entity_comps.vel.at(entity).x = cs_tick.player_dir.x * 0.1f;
@@ -307,9 +310,9 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
 }
 
 void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
-    for(Server::Client& client : server.clients) {
-        (void)send_light_update(client.peer, light_updated_chunks);
-    }
+    server.clients.foreach([&](ClientId id) {
+        (void)send_light_update(server.clients[id].peer, light_updated_chunks);
+    });
     { ///handle events
         //@CONSIDER splitting this scope
         ENetEvent event;
@@ -357,14 +360,15 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
         NetSsTick::EntityComps net_comps;
         get_net_entity_comps(&net_comps);
         ss_tick.entity_comps = net_comps;
-        for(auto it = entities.begin(); it != entities.end(); ++it) {
-            ss_tick.entities.emplace_back(it.idx);
-        }
-        for(Server::Client& client : server.clients) {
+        entities.foreach([&](EntityId id) {
+            ss_tick.entities.emplace_back(id);
+        });
+        server.clients.foreach([&](ClientId id) {
+            auto const& client = server.clients[id];
             ss_tick.player_id = client.entity;
 
             (void)send_net_data(client.peer, &ss_tick, TICK_CHANNEL, false);
-        }
+        });
         clear_net_data(&ss_tick);
     }
 }
@@ -377,9 +381,9 @@ void server_broadcast(char const* beg) {
     ///we count the null terminator
     ++end;
     SizeT len = end - beg;
-    for(auto it = server.clients.begin(); it != server.clients.end(); ++it) {
-        (void)server_send_msg(it.idx, beg, len);
-    }
+    server.clients.foreach([&](ClientId id) {
+        (void)server_send_msg(id, beg, len);
+    });
 }
 
 bool server_is_running() {
@@ -390,14 +394,17 @@ void server_quit() {
     server.is_running = false;
 }
 
-bool get_client_id(ClientId* id, char const* name) {
-    for(auto it = server.clients.cbegin(); it != server.clients.cend(); ++it) {
-        if(std::strcmp((*it).name.c_str(), name) == 0) {
-            *id = it.idx;
-            return true;
+ClientId get_client_id(char const* name) {
+    ClientId rval = server.clients.end();
+    server.clients.foreach_while([&](ClientId id) {
+        auto const& client = server.clients[id];
+        if(std::strcmp(client.name.c_str(), name) == 0) {
+            rval = id;
+            return false;
         }
-    }
-    return false;
+        return true;
+    });
+    return rval;
 }
 
 void server_make_admin(ClientId id) {

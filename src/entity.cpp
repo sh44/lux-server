@@ -1,3 +1,4 @@
+#include <cstring>
 #define GLM_FORCE_PURE
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/fast_square_root.hpp>
@@ -13,17 +14,25 @@ static EntityComps          comps;
 SparseDynArr<Entity>        entities;
 EntityComps& entity_comps = comps;
 
-EntityHandle create_entity() {
-    EntityHandle id = entities.emplace();
+EntityId create_entity() {
+    EntityId id = entities.emplace();
     return id;
 }
 
-EntityHandle create_player() {
+EntityId create_item(const char* name) {
+    EntityId id = create_entity();
+    SizeT len = std::strlen(name);
+    comps.name[id].resize(len);
+    std::memcpy(comps.name[id].data(), name, len);
+    return id;
+}
+
+EntityId create_player() {
     LUX_LOG("creating new player");
-    EntityHandle id       = create_entity();
+    EntityId id           = create_entity();
     comps.pos[id]         = {2, 2};
     comps.vel[id]         = {0, 0};
-    comps.sphere[id]      = {0.8f};
+    comps.sphere[id]      = {0.4f};
     comps.visible[id]     = {0};
     comps.orientation[id] = {0.f};
     return id;
@@ -63,7 +72,8 @@ static bool narrow_phase(CollisionSphere const& a,
         if(v < min[i]) sq_dst += (min[i] - v) * (min[i] - v);
         if(v > max[i]) sq_dst += (v - max[i]) * (v - max[i]);
     }
-    return sq_dst <= a.shape.rad;
+    ///dunno if the pow is needed, but seems to fix the issue with rad > 1
+    return sq_dst <= std::pow(a.shape.rad, 2);
 }
 
 static MapCoord get_map_bound(CollisionSphere const& a) {
@@ -94,12 +104,12 @@ static bool check_map_collision(A const& a) {
 }
 
 template<typename A>
-static bool check_entities_collision(A const& a, EntityHandle a_id) {
+static EntityId check_entities_collision(A const& a, EntityId a_id) {
     //@IMPROVE very slow! O(n^2)!
     //perhaps check neighboring chunks only
-    for(auto it = entities.begin(); it != entities.end(); ++it) {
-        auto const& id = it.idx;
-        if(id == a_id) continue;
+    EntityId rval = entities.end();
+    entities.foreach_while([&](EntityId id) -> bool {
+        if(id == a_id) return true;
         if(comps.pos.count(id) > 0) {
             if(broad_phase(comps.pos.at(id), a.pos)) {
                 if(comps.sphere.count(id) > 0) {
@@ -107,32 +117,38 @@ static bool check_entities_collision(A const& a, EntityHandle a_id) {
                         comps.sphere.at(id),
                         comps.pos.at(id),
                     };
-                    if(narrow_phase(a, sphere)) return true;
+                    if(narrow_phase(a, sphere)) {
+                        rval = id;
+                        return false;
+                    }
                 }
                 if(comps.rect.count(id) > 0) {
                     CollisionAabb aabb = {
                         comps.rect.at(id),
                         comps.pos.at(id),
                     };
-                    if(narrow_phase(a, aabb)) return true;
+                    if(narrow_phase(a, aabb)) {
+                        rval = id;
+                        return false;
+                    }
                     //TODO orientation
                 }
             }
         }
-    }
-    return false;
+        return true;
+    });
+    return rval;
 }
 
 void entities_tick() {
-    for(auto it = entities.begin(); it != entities.end(); ++it) {
-        auto const& id = it.idx;
+    entities.foreach([](EntityId id) {
         if(comps.pos.count(id) > 0) {
             auto& pos = comps.pos.at(id);
             ChkPos chk_pos = to_chk_pos(pos);
             constexpr ChkPos offsets[] =
                 {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}};
             for(auto const& offset : offsets) {
-                guarantee_chunk(chk_pos + offset);
+                //guarantee_chunk(chk_pos + offset);
             }
             if(comps.vel.count(id) > 0) {
                 auto& vel = comps.vel.at(id);
@@ -143,15 +159,33 @@ void entities_tick() {
                     CollisionSphere sphere = {comps.sphere.at(id), h_pos};
                     h_pos = {new_pos.x, old_pos.y};
                     //@IMPROVE, don't check for entity-entity collision twice
+                    EntityId x_col = check_entities_collision(sphere, id);
                     if(!check_map_collision(sphere) &&
-                       !check_entities_collision(sphere, id)) {
+                       x_col == entities.end()) {
                         pos.x = new_pos.x;
                     }
+                    if(x_col != entities.end() && comps.vel.count(x_col) > 0) {
+                        comps.vel.at(x_col).x += vel.x * 0.1f;
+                    }
                     h_pos = {old_pos.x, new_pos.y};
+                    EntityId y_col = check_entities_collision(sphere, id);
                     if(!check_map_collision(sphere) &&
-                       !check_entities_collision(sphere, id)) {
+                       y_col == entities.end()) {
                         pos.y = new_pos.y;
                     }
+                    if(y_col != entities.end() && comps.vel.count(y_col) > 0) {
+                        comps.vel.at(y_col).y += vel.y * 0.1f;
+                    }
+                    EntityId col = entities.end();
+                    if(x_col != entities.end()) col = x_col;
+                    if(y_col != entities.end()) col = y_col;
+                    if(comps.container.count(id) > 0) {
+                        if(col != entities.end() && comps.item.count(col) > 0) {
+                            comps.pos.erase(col);
+                            comps.container.at(id).items.emplace_back(col);
+                        }
+                    }
+                    //@TODO other shapes
                 } else {
                     pos += vel;
                 }
@@ -162,10 +196,10 @@ void entities_tick() {
                 }
             }
         }
-    }
+    });
 }
 
-void remove_entity(EntityHandle entity) {
+void remove_entity(EntityId entity) {
     LUX_ASSERT(entities.contains(entity));
     entities.erase(entity);
     ///this is only gonna grow longer...

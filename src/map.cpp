@@ -1,3 +1,4 @@
+#include <cstring>
 #include <cstdlib>
 //
 #include <lux_shared/common.hpp>
@@ -6,11 +7,12 @@
 #include <lux_shared/map.hpp>
 //
 #include <db.hpp>
+#include <entity.hpp>
 #include "map.hpp"
 
 static VecMap<ChkPos, Chunk> chunks;
 
-constexpr Uns LIGHTNING_BITS_PER_COLOR = 4;
+constexpr Uns LIGHTNING_BITS_PER_COLOR = 5;
 static_assert(LIGHTNING_BITS_PER_COLOR * 3 <= sizeof(LightLvl) * 8);
 constexpr Uns LIGHTNING_RANGE          = std::exp2(LIGHTNING_BITS_PER_COLOR);
 constexpr Uns RAY_NUM  = 4 * (2 * LIGHTNING_RANGE - 2);
@@ -42,6 +44,23 @@ static Chunk& load_chunk(ChkPos const& pos) {
                 voxel_id = db_voxel_id("stone_wall");
             } else {
                 voxel_id = db_voxel_id("stone_floor");
+                if(rand() % 30 == 0 && entities.size() < 20) {
+                    auto id = create_player();
+                    entity_comps.pos[id] = map_pos;
+                    if(rand() % 10 != 0) {
+                        entity_comps.item[id] = {1.f};
+                        constexpr char default_name[] = "donger man";
+                        entity_comps.name[id].resize(sizeof(default_name) - 1);
+                        std::memcpy(entity_comps.name[id].data(),
+                                    default_name, sizeof(default_name) - 1);
+                    } else {
+                        entity_comps.sphere[id] = {2.f};
+                        constexpr char default_name[] = "Big Bob";
+                        entity_comps.name[id].resize(sizeof(default_name) - 1);
+                        std::memcpy(entity_comps.name[id].data(),
+                                    default_name, sizeof(default_name) - 1);
+                    }
+                }
             }
         }
         /*if((map_pos.x % 16 != 0 && map_pos.y % 16 != 0) && pos_hash % 30 == 0) {

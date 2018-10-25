@@ -10,8 +10,8 @@ void quit() {
 }
 
 void make_admin(char const* name) {
-    ClientId id;
-    if(!get_client_id(&id, name)) {
+    ClientId id = get_client_id(name);
+    if(!is_client_connected(id)) {
         LUX_LOG("failed to make player \"%s\" an admin", name);
         return;
     }
@@ -19,8 +19,8 @@ void make_admin(char const* name) {
 }
 
 void kick(char const* name, char const* reason) {
-    ClientId id;
-    if(!get_client_id(&id, name)) {
+    ClientId id = get_client_id(name);
+    if(!is_client_connected(id)) {
         LUX_LOG("failed to kick player \"%s\"", name);
         return;
     }
