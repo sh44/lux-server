@@ -31,7 +31,7 @@ static Chunk& load_chunk(ChkPos const& pos) {
         VoxelId voxel_id = db_voxel_id("void");
         MapPos map_pos = to_map_pos(pos, i);
         Uns pos_hash = std::hash<MapPos>()(map_pos / 2l);
-        if((map_pos.x % 16 == 0 || map_pos.y % 16 == 0) && pos_hash % 3 != 0) {
+        if((map_pos.x % 16 == 0 || map_pos.y % 16 == 0) && pos_hash % 7 != 0) {
             voxel_id = db_voxel_id("stone_wall");
         } else {
             if(pos_hash % 13 == 0) {
@@ -59,8 +59,8 @@ static Chunk& load_chunk(ChkPos const& pos) {
         }
         chunk.light_lvls[i] = 0x0000;
         chunk.voxels[i] = voxel_id;
-        if((map_pos.x % 16 != 0 && map_pos.y % 16 != 0) && rand() % 1000 == 0) {
-            add_light_node(to_map_pos(pos, i), {1.f, 1.f, 1.f});
+        if((map_pos.x % 16 != 0 && map_pos.y % 16 != 0) && rand() % 750 == 0) {
+            add_light_node(to_map_pos(pos, i), {0.75f, 0.75f, 0.75f});
         }
     }
     return chunk;
@@ -142,7 +142,7 @@ static void update_chunk_light(ChkPos const &pos, Chunk& chunk) {
                               (map_lvl & 0x07C0) >>  6,
                               (map_lvl & 0x003E) >>  1};
         if(db_voxel_type(chunk.voxels[node.idx]).shape == VoxelType::BLOCK) {
-            node.col = (Vec3<U8>)glm::round(Vec3F(node.col) * 0.25f);
+            node.col = (Vec3<U8>)glm::round(Vec3F(node.col) * 0.5f);
         }
         auto is_less = glm::lessThan(map_color, node.col);
         auto atleast_two = glm::greaterThanEqual(node.col, Vec3<U8>(2u));
@@ -153,6 +153,9 @@ static void update_chunk_light(ChkPos const &pos, Chunk& chunk) {
             chunk.light_lvls[node.idx] = (new_color.r << 11) |
                                          (new_color.g <<  6) |
                                          (new_color.b <<  1);
+            if(db_voxel_type(chunk.voxels[node.idx]).shape == VoxelType::BLOCK) {
+                node.col = Vec3<U8>(1);
+            }
             if(glm::any(atleast_two)) {
                 Vec3<U8> side_color = node.col - (Vec3<U8>)atleast_two;
                 for(auto const &offset : offsets) {
