@@ -197,6 +197,7 @@ void entities_tick() {
             }
         }
     });
+    entities.free_slots();
 }
 
 void remove_entity(EntityId entity) {

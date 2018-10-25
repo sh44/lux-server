@@ -371,6 +371,7 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
         });
         clear_net_data(&ss_tick);
     }
+    server.clients.free_slots();
 }
 
 void server_broadcast(char const* beg) {
