@@ -15,9 +15,6 @@ struct EntityComps {
     struct Shape {
         union {
             struct {
-                F32 len;
-            } line;
-            struct {
                 F32 rad;
             } sphere;
             struct {
@@ -25,8 +22,6 @@ struct EntityComps {
             } rect;
         };
         enum Tag : U8 {
-            POINT,
-            LINE,
             SPHERE,
             RECT,
         } tag;

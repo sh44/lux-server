@@ -41,7 +41,7 @@ EntityId create_player() {
     return id;
 }
 
-static VecMap<ChkPos, HashSet<EntityId, util::Identity<EntityId>>> collision_sectors;
+static VecMap<ChkPos, SortSet<EntityId>> collision_sectors;
 
 struct CollisionShape {
     EntityComps::Shape shape;
@@ -49,55 +49,68 @@ struct CollisionShape {
     Vec2F pos;
 };
 
-static bool broad_phase(EntityVec const& a, EntityVec const& b) {
-    constexpr F32 max_distance = (F32)CHK_SIZE;
-    return glm::fastDistance(a, b) <= max_distance;
+struct Line {
+    EntityVec beg;
+    EntityVec end;
+};
+
+static F32 get_map_bound(CollisionShape const& a) {
+    switch(a.shape.tag) {
+        case EntityComps::Shape::SPHERE: return a.shape.sphere.rad;
+        case EntityComps::Shape::RECT:
+            return glm::length(Vec2F(a.shape.rect.sz.x, a.shape.rect.sz.y));
+        default: LUX_UNREACHABLE();
+    }
 }
 
-static bool point_point_intersect(CollisionShape const&,
+static bool broad_phase(CollisionShape const& a,
+                        CollisionShape const& b) {
+    return glm::distance(a.pos, b.pos) <= get_map_bound(a) + get_map_bound(b);
+}
+
+static bool point_point_intersect(EntityVec const&,
                                   CollisionShape const&) {
     return false;
 }
 
-static bool point_line_intersect(CollisionShape const&,
+static bool point_line_intersect(EntityVec const&,
                                  CollisionShape const&) {
     return false;
 }
 
-static bool point_sphere_intersect(CollisionShape const& a,
+static bool point_sphere_intersect(EntityVec const& a,
                                    CollisionShape const& b) {
-    return glm::distance(a.pos, b.pos) <= b.shape.sphere.rad;
+    return glm::distance(a, b.pos) <= b.shape.sphere.rad;
 }
 
 static Vec2F rect_point(CollisionShape const& a, Vec2F point) {
     return glm::rotate(point * a.shape.rect.sz, a.angle) + a.pos;
 }
 
-static bool point_rect_intersect(CollisionShape const& a,
+static bool point_rect_intersect(EntityVec const& a,
                                  CollisionShape const& b) {
     if(b.angle == 0.f) {
-        return a.pos.x >= b.pos.x - b.shape.rect.sz.x &&
-               a.pos.x <= b.pos.x + b.shape.rect.sz.x &&
-               a.pos.y >= b.pos.y - b.shape.rect.sz.y &&
-               a.pos.y <= b.pos.y + b.shape.rect.sz.y;
+        return a.x >= b.pos.x - b.shape.rect.sz.x &&
+               a.x <= b.pos.x + b.shape.rect.sz.x &&
+               a.y >= b.pos.y - b.shape.rect.sz.y &&
+               a.y <= b.pos.y + b.shape.rect.sz.y;
     } else {
         EntityVec b00 = rect_point(b, {-1.f, -1.f});
         EntityVec b10 = rect_point(b, { 1.f, -1.f});
         EntityVec b01 = rect_point(b, {-1.f,  1.f});
-        F32 p0 = glm::dot(b00 - a.pos, b00 - b10);
-        F32 p1 = glm::dot(b00 - a.pos, b00 - b01);
+        F32 p0 = glm::dot(b00 - a, b00 - b10);
+        F32 p1 = glm::dot(b00 - a, b00 - b01);
         return p0 > 0.f && p0 < glm::dot(b00 - b10, b00 - b10) &&
                p1 > 0.f && p1 < glm::dot(b00 - b01, b00 - b01);
     }
 }
 
-static bool line_line_intersect(CollisionShape const& a,
-                                CollisionShape const& b) {
+static bool line_line_intersect(Line const& a, Line const& b) {
     ///probably slow?
-    Vec2F ab = a.pos;
-    Vec2F ae = glm::rotate(Vec2F(1.f, 0.f), a.angle) * a.shape.line.len + a.pos;
-    Vec2F bb = b.pos;
-    Vec2F be = glm::rotate(Vec2F(1.f, 0.f), b.angle) * b.shape.line.len + b.pos;
+    Vec2F ab = a.beg;
+    Vec2F ae = a.end;
+    Vec2F bb = b.beg;
+    Vec2F be = b.end;
     F32 t0 = (-(ae.y - ab.y) * (ab.x - bb.x) + (ae.x - ab.x) * (ab.y - bb.y)) /
              (-(be.x - bb.x) * (ae.y - ab.y) + (ae.x - ab.x) * (be.y - bb.y));
     F32 t1 = ( (be.x - bb.x) * (ab.y - bb.y) - (be.y - bb.y) * (ab.x - bb.x)) /
@@ -110,35 +123,31 @@ static bool line_line_intersect(CollisionShape const& a,
            (t1 >= 0.f && t1 <= 1.f);
 }
 
-static bool line_sphere_intersect(CollisionShape const& a,
+static bool line_sphere_intersect(Line const& a,
                                   CollisionShape const& b) {
-    Vec2F d = a.pos - b.pos;
-    F32 k = 2.f * (std::cos(a.angle) * d.x + std::sin(a.angle) * d.y);
+    //@TODO might not work
+    Vec2F ray = a.end - a.beg;
+    Vec2F d = a.beg - b.pos;
+    F32 k = 2.f * (ray.x * d.x + ray.y * d.y);
     F32 l = glm::length2(d) - std::pow(b.shape.sphere.rad, 2);
     F32 delta = std::pow(k, 2) - 4.f * l;
     if(delta < 0.f) return false;
     F32 t0 = ((-k) - std::sqrt(delta)) / 2.f;
     F32 t1 = ((-k) + std::sqrt(delta)) / 2.f;
-    return (t0 >= 0.f && t0 <= a.shape.line.len) ||
-           (t1 >= 0.f && t1 <= a.shape.line.len);
+    return (t0 >= 0.f && t0 <= 1.f) ||
+           (t1 >= 0.f && t1 <= 1.f);
 }
 
-static CollisionShape get_line(Vec2F beg, Vec2F end) {
-    Vec2F ray = end - beg;
-    return {{{.line = {glm::length(ray)}}, EntityComps::Shape::LINE},
-            std::atan2(ray.y, ray.x), beg};
-}
-
-static bool line_rect_intersect(CollisionShape const& a,
+static bool line_rect_intersect(Line const& a,
                                 CollisionShape const& b) {
     EntityVec b00 = rect_point(b, {-1.f, -1.f});
     EntityVec b10 = rect_point(b, { 1.f, -1.f});
     EntityVec b01 = rect_point(b, {-1.f,  1.f});
     EntityVec b11 = rect_point(b, { 1.f,  1.f});
-    CollisionShape d0 = get_line(b00, b10);
-    CollisionShape d1 = get_line(b10, b11);
-    CollisionShape d2 = get_line(b11, b01);
-    CollisionShape d3 = get_line(b01, b00);
+    Line d0 = {b00, b10};
+    Line d1 = {b10, b11};
+    Line d2 = {b11, b01};
+    Line d3 = {b01, b00};
     return line_line_intersect(a, d0) || line_line_intersect(a, d1) ||
            line_line_intersect(a, d2) || line_line_intersect(a, d3);
 }
@@ -153,8 +162,8 @@ static bool sphere_rect_intersect(CollisionShape const& a,
                                   CollisionShape const& b) {
     if(b.angle == 0.f) {
         F32 sq_dst = 0.0f;
-        Vec2F min = b.pos;
-        Vec2F max = min + b.shape.rect.sz;
+        Vec2F min = b.pos - b.shape.rect.sz;
+        Vec2F max = b.pos + b.shape.rect.sz;
         for(Uns i = 0; i < 2; i++) {
             F32 v = a.pos[i];
             if(v < min[i]) sq_dst += (min[i] - v) * (min[i] - v);
@@ -166,11 +175,11 @@ static bool sphere_rect_intersect(CollisionShape const& a,
         EntityVec b10 = rect_point(b, { 1.f, -1.f});
         EntityVec b01 = rect_point(b, {-1.f,  1.f});
         EntityVec b11 = rect_point(b, { 1.f,  1.f});
-        CollisionShape jk = get_line(b00, b10);
-        CollisionShape kl = get_line(b10, b11);
-        CollisionShape lm = get_line(b11, b01);
-        CollisionShape mj = get_line(b01, b00);
-        CollisionShape center = {{{}, EntityComps::Shape::POINT}, 0.f, a.pos};
+        Line jk = {b00, b10};
+        Line kl = {b10, b11};
+        Line lm = {b11, b01};
+        Line mj = {b01, b00};
+        EntityVec center = a.pos;
         return point_rect_intersect(center, b) ||
             line_sphere_intersect(jk, a) || line_sphere_intersect(kl, a) ||
             line_sphere_intersect(lm, a) || line_sphere_intersect(mj, a);
@@ -187,17 +196,19 @@ static bool rect_rect_intersect(CollisionShape const& a,
         }
         return true;
     } else {
+        if(point_rect_intersect(a.pos, b) ||
+           point_rect_intersect(b.pos, a)) return true;
         Vec2F constexpr corners[4] =
             {{-1.f, -1.f}, {-1.f, 1.f}, {1.f, 1.f}, {1.f, -1.f}};
         //@TODO this must be soooooo slooow
         for(Uns i = 0; i < 4; ++i) {
             Vec2F ip0 = rect_point(a, corners[i]);
             Vec2F ip1 = rect_point(a, corners[(i + 1) % 4]);
-            CollisionShape ie = get_line(ip0, ip1);
+            Line ie = {ip0, ip1};
             for(Uns j = 0; j < 4; ++j) {
                 Vec2F jp0 = rect_point(b, corners[j]);
                 Vec2F jp1 = rect_point(b, corners[(j + 1) % 4]);
-                CollisionShape je = get_line(jp0, jp1);
+                Line je = {jp0, jp1};
                 if(line_line_intersect(ie, je)) return true;
             }
         }
@@ -209,26 +220,6 @@ static bool narrow_phase(CollisionShape const& a, CollisionShape const& b) {
     CollisionShape const& first  = a.shape.tag < b.shape.tag ? a : b;
     CollisionShape const& second = a.shape.tag < b.shape.tag ? b : a;
     switch(first.shape.tag) {
-        case EntityComps::Shape::POINT: switch(second.shape.tag) {
-            case EntityComps::Shape::POINT:
-                return point_point_intersect(first, second);
-            case EntityComps::Shape::LINE:
-                return point_line_intersect(first, second);
-            case EntityComps::Shape::SPHERE:
-                return point_sphere_intersect(first, second);
-            case EntityComps::Shape::RECT:
-                return point_rect_intersect(first, second);
-            default: LUX_UNREACHABLE();
-        }
-        case EntityComps::Shape::LINE: switch(second.shape.tag) {
-            case EntityComps::Shape::LINE:
-                return line_line_intersect(first, second);
-            case EntityComps::Shape::SPHERE:
-                return line_sphere_intersect(first, second);
-            case EntityComps::Shape::RECT:
-                return line_rect_intersect(first, second);
-            default: LUX_UNREACHABLE();
-        }
         case EntityComps::Shape::SPHERE: switch(second.shape.tag) {
             case EntityComps::Shape::SPHERE:
                 return sphere_sphere_intersect(first, second);
@@ -244,20 +235,13 @@ static bool narrow_phase(CollisionShape const& a, CollisionShape const& b) {
     LUX_UNREACHABLE();
 }
 
-/*
-static MapCoord get_map_bound(CollisionShape const& a) {
-    return glm::ceil(a.shape.rad);
-}
-
-static MapCoord get_map_bound(CollisionAabb const& a) {
-    return glm::ceil(glm::compMax(a.shape.sz));
-}*/
-
 static bool check_map_collision(CollisionShape const& a) {
     CollisionShape block_shape =
         {{{.rect = {{0.5f, 0.5f}}}, EntityComps::Shape::RECT}, 0.f, {0.5f, 0.5f}};
     MapPos map_pos = (MapPos)glm::floor(a.pos);
-    MapCoord bound = 1;//get_map_bound(a);
+    //@IMPROVE we might optimize for situations with a single point, we would
+    //need to check if the map bound has a chance to cross the tile boundary
+    MapCoord bound = std::ceil(get_map_bound(a));
     for(MapCoord y = map_pos.y - bound; y <= map_pos.y + bound; ++y) {
         for(MapCoord x = map_pos.x - bound; x <= map_pos.x + bound; ++x) {
             guarantee_chunk(to_chk_pos({x, y}));
@@ -265,14 +249,6 @@ static bool check_map_collision(CollisionShape const& a) {
             if(vox.shape == VoxelType::BLOCK) {
                 block_shape.pos = Vec2F(0.5f, 0.5f) + Vec2F(x, y);
                 switch(a.shape.tag) {
-                    case EntityComps::Shape::POINT:
-                        if(point_rect_intersect(a, block_shape)) {
-                            return true;
-                        } break;
-                    case EntityComps::Shape::LINE:
-                        if(line_rect_intersect(a, block_shape)) {
-                            return true;
-                        } break;
                     case EntityComps::Shape::SPHERE:
                         if(sphere_rect_intersect(a, block_shape)) {
                             return true;
@@ -302,15 +278,13 @@ static EntityId check_entities_collision(CollisionShape const& a, EntityId a_id)
                 if(id == a_id) continue;
                 if(comps.pos.count(id) > 0 && comps.shape.count(id) > 0) {
                     auto const& pos = comps.pos.at(id);
-                    if(broad_phase(pos, a.pos)) {
-                        F32 angle = 0.f;
-                        if(comps.orientation.count(id) > 0) {
-                            angle = comps.orientation.at(id).angle;
-                        }
-                        CollisionShape shape = {comps.shape.at(id), angle, pos};
-                        if(narrow_phase(a, shape)) {
-                            return id;
-                        }
+                    F32 angle = 0.f;
+                    if(comps.orientation.count(id) > 0) {
+                        angle = comps.orientation.at(id).angle;
+                    }
+                    CollisionShape shape = {comps.shape.at(id), angle, pos};
+                    if(broad_phase(a, shape) && narrow_phase(a, shape)) {
+                        return id;
                     }
                 }
             }
@@ -351,46 +325,52 @@ void entities_tick() {
                 EntityVec new_pos = pos + vel;
                 if(comps.shape.count(id) > 0) {
                     collision_sectors[to_chk_pos(old_pos)].insert(id);
-                    F32 angle = 0.f;
-                    if(comps.orientation.count(id) > 0) {
-                        angle = comps.orientation.at(id).angle;
-                    }
-                    CollisionShape shape = {comps.shape.at(id), angle, pos};
-                    shape.pos = {new_pos.x, old_pos.y};
-                    //@IMPROVE, don't check for entity-entity collision twice,
-                    //if possible
-                    EntityId x_col = check_entities_collision(shape, id);
-                    if(!check_map_collision(shape) &&
-                       x_col == entities.end()) {
-                        pos.x = new_pos.x;
-                        if(to_chk_pos(old_pos) != to_chk_pos(pos)) {
-                            collision_sectors.at(to_chk_pos(old_pos)).erase(id);
-                            collision_sectors[to_chk_pos(pos)].insert(id);
+                    if(glm::length(vel) < 0.01f) {
+                        vel = {0.f, 0.f};
+                    } else {
+                        F32 angle = 0.f;
+                        if(comps.orientation.count(id) > 0) {
+                            angle = comps.orientation.at(id).angle;
                         }
-                    }
-                    if(x_col != entities.end() && comps.vel.count(x_col) > 0) {
-                        comps.vel.at(x_col).x += vel.x * 0.1f;
-                    }
-                    shape.pos = {old_pos.x, new_pos.y};
-                    EntityId y_col = check_entities_collision(shape, id);
-                    if(!check_map_collision(shape) &&
-                       y_col == entities.end()) {
-                        pos.y = new_pos.y;
-                        if(to_chk_pos(old_pos) != to_chk_pos(pos)) {
-                            collision_sectors.at(to_chk_pos(old_pos)).erase(id);
-                            collision_sectors[to_chk_pos(pos)].insert(id);
+                        CollisionShape shape = {comps.shape.at(id), angle, pos};
+                        shape.pos = {new_pos.x, old_pos.y};
+                        //@IMPROVE, don't check for entity-entity collision twice,
+                        //if possible
+                        EntityId x_col = check_entities_collision(shape, id);
+                        if(!check_map_collision(shape) &&
+                           x_col == entities.end()) {
+                            pos.x = new_pos.x;
+                            if(to_chk_pos(old_pos) != to_chk_pos(pos)) {
+                                collision_sectors.at(to_chk_pos(old_pos)).erase(id);
+                                collision_sectors[to_chk_pos(pos)].insert(id);
+                            }
                         }
-                    }
-                    if(y_col != entities.end() && comps.vel.count(y_col) > 0) {
-                        comps.vel.at(y_col).y += vel.y * 0.1f;
-                    }
-                    EntityId col = entities.end();
-                    if(x_col != entities.end()) col = x_col;
-                    if(y_col != entities.end()) col = y_col;
-                    if(comps.container.count(id) > 0) {
-                        if(col != entities.end() && comps.item.count(col) > 0) {
-                            comps.pos.erase(col);
-                            comps.container.at(id).items.emplace_back(col);
+                        if(x_col != entities.end() && comps.vel.count(x_col) > 0) {
+                            comps.vel.at(x_col).x =
+                                (comps.vel.at(x_col).x + vel.x) / 2.f;
+                        }
+                        shape.pos = {old_pos.x, new_pos.y};
+                        EntityId y_col = check_entities_collision(shape, id);
+                        if(!check_map_collision(shape) &&
+                           y_col == entities.end()) {
+                            pos.y = new_pos.y;
+                            if(to_chk_pos(old_pos) != to_chk_pos(pos)) {
+                                collision_sectors.at(to_chk_pos(old_pos)).erase(id);
+                                collision_sectors[to_chk_pos(pos)].insert(id);
+                            }
+                        }
+                        if(y_col != entities.end() && comps.vel.count(y_col) > 0) {
+                            comps.vel.at(y_col).y =
+                                (comps.vel.at(y_col).y + vel.y) / 2.f;
+                        }
+                        EntityId col = entities.end();
+                        if(x_col != entities.end()) col = x_col;
+                        if(y_col != entities.end()) col = y_col;
+                        if(comps.container.count(id) > 0) {
+                            if(col != entities.end() && comps.item.count(col) > 0) {
+                                comps.pos.erase(col);
+                                comps.container.at(id).items.emplace_back(col);
+                            }
                         }
                     }
                 } else {
@@ -436,13 +416,6 @@ void get_net_entity_comps(NetSsTick::EntityComps* net_comps) {
         if(comps.shape.count(visible.first) > 0) {
             auto const& shape = comps.shape.at(visible.first);
             switch(shape.tag) {
-                case EntityComps::Shape::POINT: {
-                    quad_sz = {0.f, 0.f};
-                } break;
-                case EntityComps::Shape::LINE: {
-                    //@TODO thickness magic number
-                    quad_sz = {0.1f, shape.line.len / 2.f};
-                } break;
                 case EntityComps::Shape::SPHERE: {
                     quad_sz = Vec2F(shape.sphere.rad);
                 } break;
