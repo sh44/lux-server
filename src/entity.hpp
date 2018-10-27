@@ -12,25 +12,30 @@ struct EntityComps {
     typedef EntityVec    Pos;
     typedef EntityVec    Vel;
     typedef DynArr<char> Name;
-    struct Sphere {
-        F32 rad;
-    };
-    struct Rect {
-        Vec2F sz;
+    struct Shape {
+        union {
+            struct {
+                F32 len;
+            } line;
+            struct {
+                F32 rad;
+            } sphere;
+            struct {
+                Vec2F sz;
+            } rect;
+        };
+        enum Tag : U8 {
+            POINT,
+            LINE,
+            SPHERE,
+            RECT,
+        } tag;
     };
     struct Visible {
         U32 visible_id;
     };
     struct Item {
         F32 weight;
-    };
-    struct Destructible {
-        F32 dur;
-        F32 dur_max;
-    };
-    struct Health {
-        F32 hp;
-        F32 hp_max;
     };
     struct Container {
         DynArr<EntityId> items;
@@ -43,12 +48,9 @@ struct EntityComps {
     HashTable<EntityId, Pos>          pos;
     HashTable<EntityId, Vel>          vel;
     HashTable<EntityId, Name>         name;
-    HashTable<EntityId, Sphere>       sphere;
-    HashTable<EntityId, Rect>         rect;
+    HashTable<EntityId, Shape>        shape;
     HashTable<EntityId, Visible>      visible;
     HashTable<EntityId, Item>         item;
-    HashTable<EntityId, Destructible> destructible;
-    HashTable<EntityId, Health>       health;
     HashTable<EntityId, Container>    container;
     HashTable<EntityId, Orientation>  orientation;
 };
@@ -59,6 +61,7 @@ struct Entity {
 
 extern EntityComps&         entity_comps;
 
+void entity_rotate_to(EntityId id, F32 angle);
 EntityId create_entity();
 EntityId create_item(const char* name);
 EntityId create_player();

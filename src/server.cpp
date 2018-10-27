@@ -202,9 +202,12 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
     client.name = DynStr((char const*)cs_init.name,
         strnlen((char const*)cs_init.name, CLIENT_NAME_LEN));
     client.entity = create_player();
-    entity_comps.sphere[client.entity] = {0.8f}; //@TODO
+    //@TODO
+    entity_comps.shape[client.entity] = EntityComps::Shape
+        {{.rect = {{0.8f, 0.4f}}}, EntityComps::Shape::RECT};
     entity_comps.container[client.entity].items =
         {create_item("dong"), create_item("bong"), create_item("levi's head")};
+    entity_comps.visible[client.entity] = {0};
     auto& entity_name = entity_comps.name[client.entity];
     entity_name.resize(client.name.size());
     std::memcpy(entity_name.data(), client.name.data(), client.name.size());
@@ -270,7 +273,7 @@ LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
         }
     }
     if(entity_comps.orientation.count(entity) > 0) {
-        entity_comps.orientation.at(entity).angle = cs_tick.player_aim_angle;
+        entity_rotate_to(entity, cs_tick.player_aim_angle);
     }
     return LUX_OK;
 }

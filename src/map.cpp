@@ -38,7 +38,7 @@ static Chunk& load_chunk(ChkPos const& pos) {
                 voxel_id = db_voxel_id("stone_wall");
             } else {
                 voxel_id = db_voxel_id("stone_floor");
-                if(rand() % 30 == 0 && entities.size() < 20) {
+                if(rand() % 50 == 0 && entities.size() < 20000) {
                     auto id = create_player();
                     entity_comps.pos[id] = map_pos;
                     if(rand() % 10 != 0) {
@@ -48,7 +48,8 @@ static Chunk& load_chunk(ChkPos const& pos) {
                         std::memcpy(entity_comps.name[id].data(),
                                     default_name, sizeof(default_name) - 1);
                     } else {
-                        entity_comps.sphere[id] = {2.f};
+                        entity_comps.shape[id] = EntityComps::Shape
+                            {{.sphere = {2.f}}, EntityComps::Shape::SPHERE};
                         constexpr char default_name[] = "Big Bob";
                         entity_comps.name[id].resize(sizeof(default_name) - 1);
                         std::memcpy(entity_comps.name[id].data(),
@@ -59,7 +60,7 @@ static Chunk& load_chunk(ChkPos const& pos) {
         }
         chunk.light_lvls[i] = 0x0000;
         chunk.voxels[i] = voxel_id;
-        if((map_pos.x % 16 != 0 && map_pos.y % 16 != 0) && rand() % 750 == 0) {
+        if((map_pos.x % 16 != 0 && map_pos.y % 16 != 0) && rand() % 200 == 0) {
             add_light_node(to_map_pos(pos, i), {0.75f, 0.75f, 0.75f});
         }
     }
