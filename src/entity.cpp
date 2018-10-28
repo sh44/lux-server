@@ -50,9 +50,27 @@ struct CollisionShape {
     Vec2F pos;
 };
 
+typedef EntityVec Point;
+
 struct Line {
-    EntityVec beg;
-    EntityVec end;
+    Point beg;
+    Point end;
+};
+
+struct Sphere {
+    Point pos;
+    F32   rad;
+};
+
+struct Aabb {
+    Point pos;
+    Vec2F sz;
+};
+
+struct Rect {
+    Point pos;
+    Vec2F sz;
+    F32   angle;
 };
 
 static Vec2F get_aabb_sz(CollisionShape const& a) {
@@ -65,66 +83,54 @@ static Vec2F get_aabb_sz(CollisionShape const& a) {
     }
 }
 
-static CollisionShape get_aabb(CollisionShape const& a) {
-    return {{{.rect = {get_aabb_sz(a)}}, EntityComps::Shape::RECT}, 0.f, a.pos};
+static Aabb get_aabb(CollisionShape const& a) {
+    return {a.pos, get_aabb_sz(a)};
 }
 
-static bool point_point_intersect(EntityVec const&,
-                                  CollisionShape const&) {
-    return false;
+static bool point_sphere_intersect(Point const& a, Sphere const& b) {
+    return glm::distance(a, b.pos) <= b.rad;
 }
 
-static bool point_line_intersect(EntityVec const&,
-                                 CollisionShape const&) {
-    return false;
+static Vec2F rect_point(Rect const& a, Vec2F point) {
+    return glm::rotate(point * a.sz, a.angle) + a.pos;
 }
 
-static bool point_sphere_intersect(EntityVec const& a,
-                                   CollisionShape const& b) {
-    return glm::distance(a, b.pos) <= b.shape.sphere.rad;
+static bool point_aabb_intersect(Point const& a, Aabb const& b) {
+    return a.x >= b.pos.x - b.sz.x &&
+           a.x <= b.pos.x + b.sz.x &&
+           a.y >= b.pos.y - b.sz.y &&
+           a.y <= b.pos.y + b.sz.y;
 }
 
-static Vec2F rect_point(CollisionShape const& a, Vec2F point) {
-    return glm::rotate(point * a.shape.rect.sz, a.angle) + a.pos;
-}
-
-static bool point_rect_intersect(EntityVec const& a,
-                                 CollisionShape const& b) {
-    if(b.angle == 0.f) {
-        return a.x >= b.pos.x - b.shape.rect.sz.x &&
-               a.x <= b.pos.x + b.shape.rect.sz.x &&
-               a.y >= b.pos.y - b.shape.rect.sz.y &&
-               a.y <= b.pos.y + b.shape.rect.sz.y;
-    } else {
-        EntityVec b00 = rect_point(b, {-1.f, -1.f});
-        EntityVec b10 = rect_point(b, { 1.f, -1.f});
-        EntityVec b01 = rect_point(b, {-1.f,  1.f});
-        F32 p0 = glm::dot(b00 - a, b00 - b10);
-        F32 p1 = glm::dot(b00 - a, b00 - b01);
-        return p0 > 0.f && p0 < glm::dot(b00 - b10, b00 - b10) &&
-               p1 > 0.f && p1 < glm::dot(b00 - b01, b00 - b01);
-    }
+static bool point_rect_intersect(Point const& a, Rect const& b) {
+    EntityVec b00 = rect_point(b, {-1.f, -1.f});
+    EntityVec b10 = rect_point(b, { 1.f, -1.f});
+    EntityVec b01 = rect_point(b, {-1.f,  1.f});
+    F32 p0 = glm::dot(b00 - a, b00 - b10);
+    F32 p1 = glm::dot(b00 - a, b00 - b01);
+    return p0 > 0.f && p0 < glm::dot(b00 - b10, b00 - b10) &&
+           p1 > 0.f && p1 < glm::dot(b00 - b01, b00 - b01);
 }
 
 static bool line_line_intersect(Line const& a, Line const& b) {
+    //@TODO something slightly off here
     Vec2F ab = a.beg;
     Vec2F bb = b.beg;
     Vec2F ad = a.end - a.beg;
     Vec2F bd = b.end - b.beg;
-    Vec2F diff = bb - ab;
+    Vec2F df = bb - ab;
     F32 t0 = -(df.x * ad.y + -(df.y * ad.x)) / ((bd.x * ad.y) - (ad.x * bd.y));
     F32 t1 = (bd.x * t0 + df.x) / ad.x;
     return (t0 >= 0.f && t0 <= 1.f) &&
            (t1 >= 0.f && t1 <= 1.f);
 }
 
-static bool line_sphere_intersect(Line const& a,
-                                  CollisionShape const& b) {
+static bool line_sphere_intersect(Line const& a, Sphere const& b) {
     //@TODO might not work
     Vec2F ray = a.end - a.beg;
     Vec2F d = a.beg - b.pos;
     F32 k = 2.f * (ray.x * d.x + ray.y * d.y);
-    F32 l = glm::length2(d) - std::pow(b.shape.sphere.rad, 2);
+    F32 l = glm::length2(d) - std::pow(b.rad, 2);
     F32 delta = std::pow(k, 2) - 4.f * l;
     if(delta < 0.f) return false;
     F32 t0 = ((-k) - std::sqrt(delta)) / 2.f;
@@ -133,8 +139,20 @@ static bool line_sphere_intersect(Line const& a,
            (t1 >= 0.f && t1 <= 1.f);
 }
 
-static bool line_rect_intersect(Line const& a,
-                                CollisionShape const& b) {
+static bool line_aabb_intersect(Line const& a, Aabb const& b) {
+    EntityVec b00 = b.pos + b.sz * Vec2F(-1.f, -1.f);
+    EntityVec b10 = b.pos + b.sz * Vec2F( 1.f, -1.f);
+    EntityVec b01 = b.pos + b.sz * Vec2F(-1.f,  1.f);
+    EntityVec b11 = b.pos + b.sz * Vec2F( 1.f,  1.f);
+    Line d0 = {b00, b10};
+    Line d1 = {b10, b11};
+    Line d2 = {b11, b01};
+    Line d3 = {b01, b00};
+    return line_line_intersect(a, d0) || line_line_intersect(a, d1) ||
+           line_line_intersect(a, d2) || line_line_intersect(a, d3);
+}
+
+static bool line_rect_intersect(Line const& a, Rect const& b) {
     EntityVec b00 = rect_point(b, {-1.f, -1.f});
     EntityVec b10 = rect_point(b, { 1.f, -1.f});
     EntityVec b01 = rect_point(b, {-1.f,  1.f});
@@ -147,98 +165,156 @@ static bool line_rect_intersect(Line const& a,
            line_line_intersect(a, d2) || line_line_intersect(a, d3);
 }
 
-static bool sphere_sphere_intersect(CollisionShape const& a,
-                                    CollisionShape const& b) {
-    return glm::distance(a.pos, b.pos) <=
-        a.shape.sphere.rad + b.shape.sphere.rad;
+static bool sphere_sphere_intersect(Sphere const& a, Sphere const& b) {
+    return glm::distance(a.pos, b.pos) <= a.rad + b.rad;
 }
 
-static bool sphere_rect_intersect(CollisionShape const& a,
-                                  CollisionShape const& b) {
-    if(b.angle == 0.f) {
-        F32 sq_dst = 0.0f;
-        Vec2F min = b.pos - b.shape.rect.sz;
-        Vec2F max = b.pos + b.shape.rect.sz;
-        for(Uns i = 0; i < 2; i++) {
-            F32 v = a.pos[i];
-            if(v < min[i]) sq_dst += (min[i] - v) * (min[i] - v);
-            if(v > max[i]) sq_dst += (v - max[i]) * (v - max[i]);
+static bool sphere_aabb_intersect(Sphere const& a, Aabb const& b) {
+    F32 sq_dst = 0.0f;
+    Vec2F min = b.pos - b.sz;
+    Vec2F max = b.pos + b.sz;
+    for(Uns i = 0; i < 2; i++) {
+        F32 v = a.pos[i];
+        if(v < min[i]) sq_dst += (min[i] - v) * (min[i] - v);
+        if(v > max[i]) sq_dst += (v - max[i]) * (v - max[i]);
+    }
+    return sq_dst <= std::pow(a.rad, 2);
+}
+
+static bool sphere_rect_intersect(Sphere const& a, Rect const& b) {
+    //@IMPROVE, we could calculate cos/sin once, among other things
+    EntityVec b00 = rect_point(b, {-1.f, -1.f});
+    EntityVec b10 = rect_point(b, { 1.f, -1.f});
+    EntityVec b01 = rect_point(b, {-1.f,  1.f});
+    EntityVec b11 = rect_point(b, { 1.f,  1.f});
+    Line jk = {b00, b10};
+    Line kl = {b10, b11};
+    Line lm = {b11, b01};
+    Line mj = {b01, b00};
+    return point_rect_intersect(a.pos, b) ||
+        line_sphere_intersect(jk, a) || line_sphere_intersect(kl, a) ||
+        line_sphere_intersect(lm, a) || line_sphere_intersect(mj, a);
+}
+
+static bool aabb_aabb_intersect(Aabb const& a, Aabb const& b) {
+    return glm::all(glm::lessThanEqual(glm::abs(a.pos - b.pos), a.sz + b.sz));
+}
+
+static bool rect_rect_intersect(Rect const& a, Rect const& b) {
+    if(point_rect_intersect(a.pos, b) ||
+       point_rect_intersect(b.pos, a)) return true;
+    Vec2F constexpr corners[4] =
+        {{-1.f, -1.f}, {-1.f, 1.f}, {1.f, 1.f}, {1.f, -1.f}};
+    //@TODO this must be soooooo slooow
+    for(Uns i = 0; i < 4; ++i) {
+        Vec2F ip0 = rect_point(a, corners[i]);
+        Vec2F ip1 = rect_point(a, corners[(i + 1) % 4]);
+        Line ie = {ip0, ip1};
+        for(Uns j = 0; j < 4; ++j) {
+            Vec2F jp0 = rect_point(b, corners[j]);
+            Vec2F jp1 = rect_point(b, corners[(j + 1) % 4]);
+            Line je = {jp0, jp1};
+            if(line_line_intersect(ie, je)) return true;
         }
-        return sq_dst <= std::pow(a.shape.sphere.rad, 2);
-    } else {
-        //@IMPROVE, we could calculate cos/sin once, among other things
-        EntityVec b00 = rect_point(b, {-1.f, -1.f});
-        EntityVec b10 = rect_point(b, { 1.f, -1.f});
-        EntityVec b01 = rect_point(b, {-1.f,  1.f});
-        EntityVec b11 = rect_point(b, { 1.f,  1.f});
-        Line jk = {b00, b10};
-        Line kl = {b10, b11};
-        Line lm = {b11, b01};
-        Line mj = {b01, b00};
-        EntityVec center = a.pos;
-        return point_rect_intersect(center, b) ||
-            line_sphere_intersect(jk, a) || line_sphere_intersect(kl, a) ||
-            line_sphere_intersect(lm, a) || line_sphere_intersect(mj, a);
+    }
+    return false;
+}
+
+static bool aabb_rect_intersect(Aabb const& a, Rect const& b) {
+    //@TODO
+    return rect_rect_intersect({a.pos, a.sz, 0.f}, b);
+}
+
+static bool sphere_shape_intersect(Sphere const& a, CollisionShape const& b) {
+    switch(b.shape.tag) {
+    case EntityComps::Shape::SPHERE: {
+        Sphere b_sphere = {b.pos, b.shape.sphere.rad};
+        return sphere_sphere_intersect(a, b_sphere);
+    }
+    case EntityComps::Shape::RECT:
+        if(b.angle == 0.f) {
+            Aabb b_aabb = {b.pos, b.shape.rect.sz};
+            return sphere_aabb_intersect(a, b_aabb);
+        } else {
+            Rect b_rect = {b.pos, b.shape.rect.sz, b.angle};
+            return sphere_rect_intersect(a, b_rect);
+        }
+    default: LUX_UNREACHABLE();
     }
 }
 
-static bool rect_rect_intersect(CollisionShape const& a,
-                                CollisionShape const& b) {
-    if(a.angle == 0.f && b.angle == 0.f) {
-        //@TODO dunno if this works at all
-        if(glm::any(glm::greaterThan(glm::abs(a.pos - b.pos),
-                                     a.shape.rect.sz + b.shape.rect.sz))) {
-            return false;
+static bool aabb_shape_intersect(Aabb const& a, CollisionShape const& b) {
+    switch(b.shape.tag) {
+    case EntityComps::Shape::SPHERE: {
+        Sphere b_sphere = {b.pos, b.shape.sphere.rad};
+        return sphere_aabb_intersect(b_sphere, a);
+    }
+    case EntityComps::Shape::RECT:
+        if(b.angle == 0.f) {
+            Aabb b_aabb = {b.pos, b.shape.rect.sz};
+            return aabb_aabb_intersect(a, b_aabb);
+        } else {
+            Rect b_rect = {b.pos, b.shape.rect.sz, b.angle};
+            return aabb_rect_intersect(a, b_rect);
         }
-        return true;
-    } else {
-        if(point_rect_intersect(a.pos, b) ||
-           point_rect_intersect(b.pos, a)) return true;
-        Vec2F constexpr corners[4] =
-            {{-1.f, -1.f}, {-1.f, 1.f}, {1.f, 1.f}, {1.f, -1.f}};
-        //@TODO this must be soooooo slooow
-        for(Uns i = 0; i < 4; ++i) {
-            Vec2F ip0 = rect_point(a, corners[i]);
-            Vec2F ip1 = rect_point(a, corners[(i + 1) % 4]);
-            Line ie = {ip0, ip1};
-            for(Uns j = 0; j < 4; ++j) {
-                Vec2F jp0 = rect_point(b, corners[j]);
-                Vec2F jp1 = rect_point(b, corners[(j + 1) % 4]);
-                Line je = {jp0, jp1};
-                if(line_line_intersect(ie, je)) return true;
-            }
-        }
-        return false;
+    default: LUX_UNREACHABLE();
     }
 }
 
-static bool broad_phase(CollisionShape const& a,
-                        CollisionShape const& b) {
-    return rect_rect_intersect(get_aabb(a), get_aabb(b));
+static bool rect_shape_intersect(Rect const& a, CollisionShape const& b) {
+    switch(b.shape.tag) {
+    case EntityComps::Shape::SPHERE: {
+        Sphere b_sphere = {b.pos, b.shape.sphere.rad};
+        return sphere_rect_intersect(b_sphere, a);
+    }
+    case EntityComps::Shape::RECT:
+        if(b.angle == 0.f) {
+            Aabb b_aabb = {b.pos, b.shape.rect.sz};
+            return aabb_rect_intersect(b_aabb, a);
+        } else {
+            Rect b_rect = {b.pos, b.shape.rect.sz, b.angle};
+            return rect_rect_intersect(a, b_rect);
+        }
+    default: LUX_UNREACHABLE();
+    }
+}
+
+static bool broad_phase(CollisionShape const& a, CollisionShape const& b) {
+    return aabb_aabb_intersect(get_aabb(a), get_aabb(b));
 }
 
 static bool narrow_phase(CollisionShape const& a, CollisionShape const& b) {
-    CollisionShape const& first  = a.shape.tag < b.shape.tag ? a : b;
-    CollisionShape const& second = a.shape.tag < b.shape.tag ? b : a;
-    switch(first.shape.tag) {
-        case EntityComps::Shape::SPHERE: switch(second.shape.tag) {
-            case EntityComps::Shape::SPHERE:
-                return sphere_sphere_intersect(first, second);
-            case EntityComps::Shape::RECT:
-                return sphere_rect_intersect(first, second);
-            default: LUX_UNREACHABLE();
-        }
-        case EntityComps::Shape::RECT:
-            LUX_ASSERT(second.shape.tag == EntityComps::Shape::RECT);
-            return rect_rect_intersect(first, second);
-        default: LUX_UNREACHABLE();
+    switch(a.shape.tag) {
+    case EntityComps::Shape::SPHERE: {
+        Sphere a_sphere = {a.pos, a.shape.sphere.rad};
+        return sphere_shape_intersect(a_sphere, b);
     }
-    LUX_UNREACHABLE();
+    case EntityComps::Shape::RECT:
+        if(a.angle == 0.f) {
+            Aabb a_aabb = {a.pos, a.shape.rect.sz};
+            if(b.angle == 0.f) {
+                Aabb b_aabb = {b.pos, b.shape.rect.sz};
+                return aabb_aabb_intersect(a_aabb, b_aabb);
+            } else {
+                Rect b_rect = {b.pos, b.shape.rect.sz, b.angle};
+                return aabb_rect_intersect(a_aabb, b_rect);
+            }
+        } else {
+            Rect a_rect = {a.pos, a.shape.rect.sz, a.angle};
+            if(b.angle == 0.f) {
+                Aabb b_aabb = {b.pos, b.shape.rect.sz};
+                return aabb_rect_intersect(b_aabb, a_rect);
+            } else {
+                Rect b_rect = {b.pos, b.shape.rect.sz, b.angle};
+                return rect_rect_intersect(a_rect, b_rect);
+            }
+        }
+    default: LUX_UNREACHABLE();
+    }
 }
 
 static bool check_map_collision(CollisionShape const& a) {
-    CollisionShape block_shape =
-        {{{.rect = {{0.5f, 0.5f}}}, EntityComps::Shape::RECT}, 0.f, {}};
+    Aabb block_shape = {{}, {0.5f, 0.5f}};
     MapPos map_pos = (MapPos)glm::floor(a.pos);
     //@IMPROVE we might optimize for situations with a single point, we would
     //need to check if the map bound has a chance to cross the tile boundary
@@ -249,17 +325,7 @@ static bool check_map_collision(CollisionShape const& a) {
             VoxelType const& vox = get_voxel_type({x, y});
             if(vox.shape == VoxelType::BLOCK) {
                 block_shape.pos = Vec2F(x, y) + Vec2F(0.5f, 0.5f);
-                switch(a.shape.tag) {
-                    case EntityComps::Shape::SPHERE:
-                        if(sphere_rect_intersect(a, block_shape)) {
-                            return true;
-                        } break;
-                    case EntityComps::Shape::RECT:
-                        if(rect_rect_intersect(a, block_shape)) {
-                            return true;
-                        } break;
-                    default: LUX_UNREACHABLE();
-                }
+                if(aabb_shape_intersect(block_shape, a)) return true;
             }
         }
     }
