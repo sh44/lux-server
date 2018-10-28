@@ -55,18 +55,18 @@ struct Line {
     EntityVec end;
 };
 
-static F32 get_map_bound(CollisionShape const& a) {
+static Vec2F get_aabb_sz(CollisionShape const& a) {
     switch(a.shape.tag) {
-        case EntityComps::Shape::SPHERE: return a.shape.sphere.rad;
+        case EntityComps::Shape::SPHERE:
+            return Vec2F(a.shape.sphere.rad);
         case EntityComps::Shape::RECT:
-            return glm::length(Vec2F(a.shape.rect.sz.x, a.shape.rect.sz.y));
+            return Vec2F(glm::length(a.shape.rect.sz));
         default: LUX_UNREACHABLE();
     }
 }
 
-static bool broad_phase(CollisionShape const& a,
-                        CollisionShape const& b) {
-    return glm::distance(a.pos, b.pos) <= get_map_bound(a) + get_map_bound(b);
+static CollisionShape get_aabb(CollisionShape const& a) {
+    return {{{.rect = {get_aabb_sz(a)}}, EntityComps::Shape::RECT}, 0.f, a.pos};
 }
 
 static bool point_point_intersect(EntityVec const&,
@@ -187,7 +187,7 @@ static bool rect_rect_intersect(CollisionShape const& a,
     if(a.angle == 0.f && b.angle == 0.f) {
         //@TODO dunno if this works at all
         if(glm::any(glm::greaterThan(glm::abs(a.pos - b.pos),
-               (a.shape.rect.sz + b.shape.rect.sz) / 2.f))) {
+                                     a.shape.rect.sz + b.shape.rect.sz))) {
             return false;
         }
         return true;
@@ -212,6 +212,11 @@ static bool rect_rect_intersect(CollisionShape const& a,
     }
 }
 
+static bool broad_phase(CollisionShape const& a,
+                        CollisionShape const& b) {
+    return rect_rect_intersect(get_aabb(a), get_aabb(b));
+}
+
 static bool narrow_phase(CollisionShape const& a, CollisionShape const& b) {
     CollisionShape const& first  = a.shape.tag < b.shape.tag ? a : b;
     CollisionShape const& second = a.shape.tag < b.shape.tag ? b : a;
@@ -233,17 +238,17 @@ static bool narrow_phase(CollisionShape const& a, CollisionShape const& b) {
 
 static bool check_map_collision(CollisionShape const& a) {
     CollisionShape block_shape =
-        {{{.rect = {{0.5f, 0.5f}}}, EntityComps::Shape::RECT}, 0.f, {0.5f, 0.5f}};
+        {{{.rect = {{0.5f, 0.5f}}}, EntityComps::Shape::RECT}, 0.f, {}};
     MapPos map_pos = (MapPos)glm::floor(a.pos);
     //@IMPROVE we might optimize for situations with a single point, we would
     //need to check if the map bound has a chance to cross the tile boundary
-    MapCoord bound = std::ceil(get_map_bound(a));
-    for(MapCoord y = map_pos.y - bound; y <= map_pos.y + bound; ++y) {
-        for(MapCoord x = map_pos.x - bound; x <= map_pos.x + bound; ++x) {
+    Vec2I bound = glm::ceil(get_aabb_sz(a));
+    for(MapCoord y = map_pos.y - bound.y; y <= map_pos.y + bound.y; ++y) {
+        for(MapCoord x = map_pos.x - bound.x; x <= map_pos.x + bound.x; ++x) {
             guarantee_chunk(to_chk_pos({x, y}));
             VoxelType const& vox = get_voxel_type({x, y});
             if(vox.shape == VoxelType::BLOCK) {
-                block_shape.pos = Vec2F(0.5f, 0.5f) + Vec2F(x, y);
+                block_shape.pos = Vec2F(x, y) + Vec2F(0.5f, 0.5f);
                 switch(a.shape.tag) {
                     case EntityComps::Shape::SPHERE:
                         if(sphere_rect_intersect(a, block_shape)) {
