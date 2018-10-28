@@ -95,6 +95,27 @@ static Vec2F rect_point(Rect const& a, Vec2F point) {
     return glm::rotate(point * a.sz, a.angle) + a.pos;
 }
 
+template<SizeT len>
+static void rect_points(Rect const& a,
+                        Arr<Point, len> const& in, Arr<Point, len>* out) {
+    F32 c = std::cos(a.angle);
+    F32 s = std::sin(a.angle);
+    glm::mat2 rot = {c, -s,
+                     s,  c};
+    for(Uns i = 0; i < len; ++i) {
+        Point vert = in[i] * a.sz;
+        (*out)[i] = vert * rot + a.pos;
+    }
+}
+
+template<SizeT len>
+static void aabb_points(Aabb const& a,
+                        Arr<Point, len> const& in, Arr<Point, len>* out) {
+    for(Uns i = 0; i < len; ++i) {
+        (*out)[i] = in[i] * a.sz + a.pos;
+    }
+}
+
 static bool point_aabb_intersect(Point const& a, Aabb const& b) {
     return a.x >= b.pos.x - b.sz.x &&
            a.x <= b.pos.x + b.sz.x &&
@@ -102,14 +123,17 @@ static bool point_aabb_intersect(Point const& a, Aabb const& b) {
            a.y <= b.pos.y + b.sz.y;
 }
 
+static bool point_rect_intersect(Point const& a, Arr<Point, 3> const& bp) {
+    F32 p0 = glm::dot(bp[0] - a, bp[0] - bp[1]);
+    F32 p1 = glm::dot(bp[0] - a, bp[0] - bp[2]);
+    return p0 > 0.f && p0 < glm::dot(bp[0] - bp[1], bp[0] - bp[1]) &&
+           p1 > 0.f && p1 < glm::dot(bp[0] - bp[2], bp[0] - bp[2]);
+}
+
 static bool point_rect_intersect(Point const& a, Rect const& b) {
-    EntityVec b00 = rect_point(b, {-1.f, -1.f});
-    EntityVec b10 = rect_point(b, { 1.f, -1.f});
-    EntityVec b01 = rect_point(b, {-1.f,  1.f});
-    F32 p0 = glm::dot(b00 - a, b00 - b10);
-    F32 p1 = glm::dot(b00 - a, b00 - b01);
-    return p0 > 0.f && p0 < glm::dot(b00 - b10, b00 - b10) &&
-           p1 > 0.f && p1 < glm::dot(b00 - b01, b00 - b01);
+    Arr<Point, 3> bp;
+    rect_points(b, {{-1.f, -1.f}, {1.f, -1.f}, {-1.f, 1.f}}, &bp);
+    return point_rect_intersect(a, bp);
 }
 
 static bool line_line_intersect(Line const& a, Line const& b) {
@@ -140,29 +164,21 @@ static bool line_sphere_intersect(Line const& a, Sphere const& b) {
 }
 
 static bool line_aabb_intersect(Line const& a, Aabb const& b) {
-    EntityVec b00 = b.pos + b.sz * Vec2F(-1.f, -1.f);
-    EntityVec b10 = b.pos + b.sz * Vec2F( 1.f, -1.f);
-    EntityVec b01 = b.pos + b.sz * Vec2F(-1.f,  1.f);
-    EntityVec b11 = b.pos + b.sz * Vec2F( 1.f,  1.f);
-    Line d0 = {b00, b10};
-    Line d1 = {b10, b11};
-    Line d2 = {b11, b01};
-    Line d3 = {b01, b00};
-    return line_line_intersect(a, d0) || line_line_intersect(a, d1) ||
-           line_line_intersect(a, d2) || line_line_intersect(a, d3);
+    Point bp[4];
+    aabb_points(b, {{-1.f, -1.f}, {1.f, -1.f}, {-1.f, 1.f}, {1.f, 1.f}}, &bp);
+    for(Uns i = 0; i < 4; ++i) {
+        if(line_line_intersect(a, {bp[i], bp[(i + 1) % 4]})) return true;
+    }
+    return false;
 }
 
 static bool line_rect_intersect(Line const& a, Rect const& b) {
-    EntityVec b00 = rect_point(b, {-1.f, -1.f});
-    EntityVec b10 = rect_point(b, { 1.f, -1.f});
-    EntityVec b01 = rect_point(b, {-1.f,  1.f});
-    EntityVec b11 = rect_point(b, { 1.f,  1.f});
-    Line d0 = {b00, b10};
-    Line d1 = {b10, b11};
-    Line d2 = {b11, b01};
-    Line d3 = {b01, b00};
-    return line_line_intersect(a, d0) || line_line_intersect(a, d1) ||
-           line_line_intersect(a, d2) || line_line_intersect(a, d3);
+    Point bp[4];
+    rect_points(b, {{-1.f, -1.f}, {1.f, -1.f}, {-1.f, 1.f}, {1.f, 1.f}}, &bp);
+    for(Uns i = 0; i < 4; ++i) {
+        if(line_line_intersect(a, {bp[i], bp[(i + 1) % 4]})) return true;
+    }
+    return false;
 }
 
 static bool sphere_sphere_intersect(Sphere const& a, Sphere const& b) {
@@ -182,47 +198,45 @@ static bool sphere_aabb_intersect(Sphere const& a, Aabb const& b) {
 }
 
 static bool sphere_rect_intersect(Sphere const& a, Rect const& b) {
-    //@IMPROVE, we could calculate cos/sin once, among other things
-    EntityVec b00 = rect_point(b, {-1.f, -1.f});
-    EntityVec b10 = rect_point(b, { 1.f, -1.f});
-    EntityVec b01 = rect_point(b, {-1.f,  1.f});
-    EntityVec b11 = rect_point(b, { 1.f,  1.f});
-    Line jk = {b00, b10};
-    Line kl = {b10, b11};
-    Line lm = {b11, b01};
-    Line mj = {b01, b00};
-    return point_rect_intersect(a.pos, b) ||
-        line_sphere_intersect(jk, a) || line_sphere_intersect(kl, a) ||
-        line_sphere_intersect(lm, a) || line_sphere_intersect(mj, a);
+    if(point_rect_intersect(a.pos, b)) return true;
+    Point bp[4];
+    rect_points(b, {{-1.f, -1.f}, {1.f, -1.f}, {-1.f, 1.f}, {1.f, 1.f}}, &bp);
+    for(Uns i = 0; i < 4; ++i) {
+        if(line_sphere_intersect({bp[i], bp[(i + 1) % 4]}, a)) return true;
+    }
+    return false;
 }
 
 static bool aabb_aabb_intersect(Aabb const& a, Aabb const& b) {
     return glm::all(glm::lessThanEqual(glm::abs(a.pos - b.pos), a.sz + b.sz));
 }
 
-static bool rect_rect_intersect(Rect const& a, Rect const& b) {
-    if(point_rect_intersect(a.pos, b) ||
-       point_rect_intersect(b.pos, a)) return true;
+static bool aabb_rect_intersect(Aabb const& a, Rect const& b) {
     Vec2F constexpr corners[4] =
-        {{-1.f, -1.f}, {-1.f, 1.f}, {1.f, 1.f}, {1.f, -1.f}};
-    //@TODO this must be soooooo slooow
+        {{-1.f, -1.f}, {-1.f, 1.f}, {1.f, -1.f}, {1.f, 1.f}};
+    Arr<Point, 4> ap;
+    Arr<Point, 4> bp;
+    aabb_points(a, corners, &ap);
+    rect_points(b, corners, &bp);
     for(Uns i = 0; i < 4; ++i) {
-        Vec2F ip0 = rect_point(a, corners[i]);
-        Vec2F ip1 = rect_point(a, corners[(i + 1) % 4]);
-        Line ie = {ip0, ip1};
-        for(Uns j = 0; j < 4; ++j) {
-            Vec2F jp0 = rect_point(b, corners[j]);
-            Vec2F jp1 = rect_point(b, corners[(j + 1) % 4]);
-            Line je = {jp0, jp1};
-            if(line_line_intersect(ie, je)) return true;
-        }
+        if(point_aabb_intersect(bp[i], a)) return true;
+        if(point_rect_intersect(ap[i], *(Arr<Point, 3>*)&bp)) return true;
     }
     return false;
 }
 
-static bool aabb_rect_intersect(Aabb const& a, Rect const& b) {
-    //@TODO
-    return rect_rect_intersect({a.pos, a.sz, 0.f}, b);
+static bool rect_rect_intersect(Rect const& a, Rect const& b) {
+    Vec2F constexpr corners[4] =
+        {{-1.f, -1.f}, {-1.f, 1.f}, {1.f, -1.f}, {1.f, 1.f}};
+    Point ap[4];
+    Point bp[4];
+    rect_points(a, corners, &ap);
+    rect_points(b, corners, &bp);
+    for(Uns i = 0; i < 4; ++i) {
+        if(point_rect_intersect(bp[i], *(Arr<Point, 3>*)&ap)) return true;
+        if(point_rect_intersect(ap[i], *(Arr<Point, 3>*)&bp)) return true;
+    }
+    return false;
 }
 
 static bool sphere_shape_intersect(Sphere const& a, CollisionShape const& b) {
