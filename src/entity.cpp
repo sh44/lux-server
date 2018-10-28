@@ -107,19 +107,13 @@ static bool point_rect_intersect(EntityVec const& a,
 }
 
 static bool line_line_intersect(Line const& a, Line const& b) {
-    ///probably slow?
     Vec2F ab = a.beg;
-    Vec2F ae = a.end;
     Vec2F bb = b.beg;
-    Vec2F be = b.end;
-    F32 t0 = (-(ae.y - ab.y) * (ab.x - bb.x) + (ae.x - ab.x) * (ab.y - bb.y)) /
-             (-(be.x - bb.x) * (ae.y - ab.y) + (ae.x - ab.x) * (be.y - bb.y));
-    F32 t1 = ( (be.x - bb.x) * (ab.y - bb.y) - (be.y - bb.y) * (ab.x - bb.x)) /
-             (-(be.x - bb.x) * (ae.y - ab.y) + (ae.x - ab.x) * (be.y - bb.y));
-    /*F32 t0 = ((ab.x - bb.x) * (bb.y - be.y) - (ab.y - bb.y) * (bb.x - be.x)) /
-             ((ab.x - ae.x) * (bb.y - be.y) - (ab.y - ae.y) * (bb.x - be.x));
-    F32 t1 = -((ab.x - ae.x) * (ab.y - bb.y) - (ab.y - ae.y) * (ab.x - bb.x)) /
-              ((ab.x - ae.x) * (bb.y - be.y) - (ab.y - ae.y) * (bb.x - be.x));*/
+    Vec2F ad = a.end - a.beg;
+    Vec2F bd = b.end - b.beg;
+    Vec2F diff = bb - ab;
+    F32 t0 = -(df.x * ad.y + -(df.y * ad.x)) / ((bd.x * ad.y) - (ad.x * bd.y));
+    F32 t1 = (bd.x * t0 + df.x) / ad.x;
     return (t0 >= 0.f && t0 <= 1.f) &&
            (t1 >= 0.f && t1 <= 1.f);
 }
@@ -172,6 +166,7 @@ static bool sphere_rect_intersect(CollisionShape const& a,
         }
         return sq_dst <= std::pow(a.shape.sphere.rad, 2);
     } else {
+        //@IMPROVE, we could calculate cos/sin once, among other things
         EntityVec b00 = rect_point(b, {-1.f, -1.f});
         EntityVec b10 = rect_point(b, { 1.f, -1.f});
         EntityVec b01 = rect_point(b, {-1.f,  1.f});
