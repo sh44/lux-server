@@ -156,17 +156,16 @@ static bool line_line_intersect(Line const& a, Line const& b) {
 }
 
 static bool line_sphere_intersect(Line const& a, Sphere const& b) {
-    //@TODO might not work
-    Vec2F ray = a.end - a.beg;
-    Vec2F d = a.beg - b.pos;
-    F32 k = 2.f * glm::dot(ray, d);
-    F32 l = glm::length2(d) - std::pow(b.rad, 2);
-    F32 delta = std::pow(k, 2) - 4.f * l;
+    Point ray  = a.end - a.beg;
+    Point diff = a.beg - b.pos;
+    F32 j = glm::length2(ray);
+    F32 k = 2.f * glm::dot(ray, diff);
+    F32 l = glm::length2(diff) - std::pow(b.rad, 2);
+    F32 delta = std::pow(k, 2) - 4.f * j * l;
     if(delta < 0.f) return false;
-    F32 t0 = ((-k) - std::sqrt(delta)) / 2.f;
-    F32 t1 = ((-k) + std::sqrt(delta)) / 2.f;
-    return (t0 >= 0.f && t0 <= 1.f) ||
-           (t1 >= 0.f && t1 <= 1.f);
+    F32 t = ((-k) + std::sqrt(delta)) / (2.f * j);
+    ///we don't really care about the second intersection point if it exists
+    return t >= 0.f && t <= 1.f;
 }
 
 static bool line_aabb_intersect(Line const& a, Aabb const& b) {
@@ -313,22 +312,10 @@ static bool shape_shape_intersect(CollisionShape const& a,
     case EntityComps::Shape::RECT:
         if(a.angle == 0.f) {
             Aabb a_aabb = {a.pos, a.shape.rect.sz};
-            if(b.angle == 0.f) {
-                Aabb b_aabb = {b.pos, b.shape.rect.sz};
-                return aabb_aabb_intersect(a_aabb, b_aabb);
-            } else {
-                Rect b_rect = {b.pos, b.shape.rect.sz, b.angle};
-                return aabb_rect_intersect(a_aabb, b_rect);
-            }
+            return aabb_shape_intersect(a_aabb, b);
         } else {
             Rect a_rect = {a.pos, a.shape.rect.sz, a.angle};
-            if(b.angle == 0.f) {
-                Aabb b_aabb = {b.pos, b.shape.rect.sz};
-                return aabb_rect_intersect(b_aabb, a_rect);
-            } else {
-                Rect b_rect = {b.pos, b.shape.rect.sz, b.angle};
-                return rect_rect_intersect(a_rect, b_rect);
-            }
+            return rect_shape_intersect(a_rect, b);
         }
     default: LUX_UNREACHABLE();
     }
