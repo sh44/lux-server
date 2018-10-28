@@ -12,6 +12,7 @@
 #include <map.hpp>
 #include <entity.hpp>
 
+Uns constexpr COLLISION_ITERATIONS = 8;
 static EntityComps          comps;
 SparseDynArr<Entity>        entities;
 EntityComps& entity_comps = comps;
@@ -322,7 +323,6 @@ void entities_tick() {
             if(comps.vel.count(id) > 0) {
                 auto& vel = comps.vel.at(id);
                 EntityVec old_pos = pos;
-                EntityVec new_pos = pos + vel;
                 if(comps.shape.count(id) > 0) {
                     collision_sectors[to_chk_pos(old_pos)].insert(id);
                     if(glm::length(vel) < 0.01f) {
@@ -332,45 +332,31 @@ void entities_tick() {
                         if(comps.orientation.count(id) > 0) {
                             angle = comps.orientation.at(id).angle;
                         }
-                        CollisionShape shape = {comps.shape.at(id), angle, pos};
-                        shape.pos = {new_pos.x, old_pos.y};
-                        //@IMPROVE, don't check for entity-entity collision twice,
-                        //if possible
-                        EntityId x_col = check_entities_collision(shape, id);
-                        if(!check_map_collision(shape) &&
-                           x_col == entities.end()) {
-                            pos.x = new_pos.x;
-                            if(to_chk_pos(old_pos) != to_chk_pos(pos)) {
-                                collision_sectors.at(to_chk_pos(old_pos)).erase(id);
-                                collision_sectors[to_chk_pos(pos)].insert(id);
+                        Vec2F try_vel = vel;
+                        for(Uns i = 0; i < COLLISION_ITERATIONS; i++) {
+                            EntityVec new_pos = pos + try_vel;
+                            CollisionShape shape = {comps.shape.at(id),
+                                                    angle, new_pos};
+                            EntityId col = check_entities_collision(shape, id);
+                            if(col != entities.end()) {
+                                if(comps.vel.count(col) > 0) {
+                                    comps.vel.at(col) =
+                                        (comps.vel.at(col) + vel) / 2.f;
+                                }
+                                if(comps.container.count(id) > 0 &&
+                                   comps.item.count(col) > 0) {
+                                    comps.pos.erase(col);
+                                    comps.container.at(id).items.emplace_back(col);
+                                }
+                            } else if(!check_map_collision(shape)) {
+                                pos = new_pos;
+                                break;
                             }
+                            try_vel /= 2.f;
                         }
-                        if(x_col != entities.end() && comps.vel.count(x_col) > 0) {
-                            comps.vel.at(x_col).x =
-                                (comps.vel.at(x_col).x + vel.x) / 2.f;
-                        }
-                        shape.pos = {old_pos.x, new_pos.y};
-                        EntityId y_col = check_entities_collision(shape, id);
-                        if(!check_map_collision(shape) &&
-                           y_col == entities.end()) {
-                            pos.y = new_pos.y;
-                            if(to_chk_pos(old_pos) != to_chk_pos(pos)) {
-                                collision_sectors.at(to_chk_pos(old_pos)).erase(id);
-                                collision_sectors[to_chk_pos(pos)].insert(id);
-                            }
-                        }
-                        if(y_col != entities.end() && comps.vel.count(y_col) > 0) {
-                            comps.vel.at(y_col).y =
-                                (comps.vel.at(y_col).y + vel.y) / 2.f;
-                        }
-                        EntityId col = entities.end();
-                        if(x_col != entities.end()) col = x_col;
-                        if(y_col != entities.end()) col = y_col;
-                        if(comps.container.count(id) > 0) {
-                            if(col != entities.end() && comps.item.count(col) > 0) {
-                                comps.pos.erase(col);
-                                comps.container.at(id).items.emplace_back(col);
-                            }
+                        if(to_chk_pos(old_pos) != to_chk_pos(pos)) {
+                            collision_sectors.at(to_chk_pos(old_pos)).erase(id);
+                            collision_sectors[to_chk_pos(pos)].insert(id);
                         }
                     }
                 } else {
