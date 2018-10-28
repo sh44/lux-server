@@ -32,16 +32,21 @@ void console_main() {
 }
 
 int main(int argc, char** argv) {
-    U16 server_port;
+    U16 server_port = 31337;
     { ///read commandline args
-        if(argc != 2) {
-            LUX_FATAL("usage: %s SERVER_PORT", argv[0]);
+        if(argc == 1) {
+            LUX_LOG("no commandline arguments given");
+            LUX_LOG("assuming server port %u", server_port);
+        } else {
+            if(argc != 2) {
+                LUX_FATAL("usage: %s SERVER_PORT", argv[0]);
+            }
+            U64 raw_server_port = std::atol(argv[1]);
+            if(raw_server_port >= 1 << 16) {
+                LUX_FATAL("invalid port %zu given", raw_server_port);
+            }
+            server_port = raw_server_port;
         }
-        U64 raw_server_port = std::atol(argv[1]);
-        if(raw_server_port >= 1 << 16) {
-            LUX_FATAL("invalid port %zu given", raw_server_port);
-        }
-        server_port = raw_server_port;
     }
 
     db_init();
