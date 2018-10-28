@@ -13,6 +13,8 @@
 #include <entity.hpp>
 
 Uns constexpr COLLISION_ITERATIONS = 8;
+F32 constexpr MIN_SPEED = 0.01f;
+F32 constexpr MAX_SPEED = 1.f;
 static EntityComps          comps;
 SparseDynArr<Entity>        entities;
 EntityComps& entity_comps = comps;
@@ -117,17 +119,21 @@ static void aabb_points(Aabb const& a,
 }
 
 static bool point_aabb_intersect(Point const& a, Aabb const& b) {
-    return a.x >= b.pos.x - b.sz.x &&
-           a.x <= b.pos.x + b.sz.x &&
-           a.y >= b.pos.y - b.sz.y &&
-           a.y <= b.pos.y + b.sz.y;
+    Point min = b.pos - b.sz;
+    Point max = b.pos + b.sz;
+    return a.x >= min.x &&
+           a.x <= max.x &&
+           a.y >= min.y &&
+           a.y <= max.y;
 }
 
 static bool point_rect_intersect(Point const& a, Arr<Point, 3> const& bp) {
-    F32 p0 = glm::dot(bp[0] - a, bp[0] - bp[1]);
-    F32 p1 = glm::dot(bp[0] - a, bp[0] - bp[2]);
-    return p0 > 0.f && p0 < glm::dot(bp[0] - bp[1], bp[0] - bp[1]) &&
-           p1 > 0.f && p1 < glm::dot(bp[0] - bp[2], bp[0] - bp[2]);
+    for(Uns i = 0; i < 2; ++i) {
+        Point side = bp[i + 1] - bp[0];
+        F32 p = glm::dot(a - bp[0], side);
+        if(p < 0.f || p > glm::dot(side, side)) return false;
+    }
+    return true;
 }
 
 static bool point_rect_intersect(Point const& a, Rect const& b) {
@@ -153,7 +159,7 @@ static bool line_sphere_intersect(Line const& a, Sphere const& b) {
     //@TODO might not work
     Vec2F ray = a.end - a.beg;
     Vec2F d = a.beg - b.pos;
-    F32 k = 2.f * (ray.x * d.x + ray.y * d.y);
+    F32 k = 2.f * glm::dot(ray, d);
     F32 l = glm::length2(d) - std::pow(b.rad, 2);
     F32 delta = std::pow(k, 2) - 4.f * l;
     if(delta < 0.f) return false;
@@ -228,8 +234,8 @@ static bool aabb_rect_intersect(Aabb const& a, Rect const& b) {
 static bool rect_rect_intersect(Rect const& a, Rect const& b) {
     Vec2F constexpr corners[4] =
         {{-1.f, -1.f}, {-1.f, 1.f}, {1.f, -1.f}, {1.f, 1.f}};
-    Point ap[4];
-    Point bp[4];
+    Arr<Point, 4> ap;
+    Arr<Point, 4> bp;
     rect_points(a, corners, &ap);
     rect_points(b, corners, &bp);
     for(Uns i = 0; i < 4; ++i) {
@@ -297,7 +303,8 @@ static bool broad_phase(CollisionShape const& a, CollisionShape const& b) {
     return aabb_aabb_intersect(get_aabb(a), get_aabb(b));
 }
 
-static bool narrow_phase(CollisionShape const& a, CollisionShape const& b) {
+static bool shape_shape_intersect(CollisionShape const& a,
+                                  CollisionShape const& b) {
     switch(a.shape.tag) {
     case EntityComps::Shape::SPHERE: {
         Sphere a_sphere = {a.pos, a.shape.sphere.rad};
@@ -364,7 +371,8 @@ static EntityId check_entities_collision(CollisionShape const& a, EntityId a_id)
                         angle = comps.orientation.at(id).angle;
                     }
                     CollisionShape shape = {comps.shape.at(id), angle, pos};
-                    if(broad_phase(a, shape) && narrow_phase(a, shape)) {
+                    if(broad_phase(a, shape) &&
+                       shape_shape_intersect(a, shape)) {
                         return id;
                     }
                 }
@@ -392,63 +400,57 @@ void entities_tick() {
         ++it;
     }
     entities.foreach([](EntityId id) {
-        if(comps.pos.count(id) > 0) {
+        if(comps.pos.count(id) > 0 &&
+           comps.vel.count(id) > 0) {
             auto& pos = comps.pos.at(id);
-            ChkPos chk_pos = to_chk_pos(pos);
-            constexpr ChkPos offsets[] =
-                {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-            for(auto const& offset : offsets) {
-                //guarantee_chunk(chk_pos + offset);
-            }
-            if(comps.vel.count(id) > 0) {
-                auto& vel = comps.vel.at(id);
-                EntityVec old_pos = pos;
-                if(comps.shape.count(id) > 0) {
-                    collision_sectors[to_chk_pos(old_pos)].insert(id);
-                    if(glm::length(vel) < 0.01f) {
-                        vel = {0.f, 0.f};
-                    } else {
-                        F32 angle = 0.f;
-                        if(comps.orientation.count(id) > 0) {
-                            angle = comps.orientation.at(id).angle;
-                        }
-                        Vec2F try_vel = vel;
-                        for(Uns i = 0; i < COLLISION_ITERATIONS; i++) {
-                            EntityVec new_pos = pos + try_vel;
-                            CollisionShape shape = {comps.shape.at(id),
-                                                    angle, new_pos};
-                            EntityId col = check_entities_collision(shape, id);
-                            if(col != entities.end()) {
-                                if(comps.vel.count(col) > 0) {
-                                    comps.vel.at(col) =
-                                        (comps.vel.at(col) + vel) / 2.f;
-                                }
-                                if(comps.container.count(id) > 0 &&
-                                   comps.item.count(col) > 0) {
-                                    comps.pos.erase(col);
-                                    comps.container.at(id).items.emplace_back(col);
-                                }
-                            } else if(!check_map_collision(shape)) {
-                                pos = new_pos;
-                                break;
-                            }
-                            try_vel /= 2.f;
-                        }
-                        if(to_chk_pos(old_pos) != to_chk_pos(pos)) {
-                            collision_sectors.at(to_chk_pos(old_pos)).erase(id);
-                            collision_sectors[to_chk_pos(pos)].insert(id);
-                        }
-                    }
+            auto& vel = comps.vel.at(id);
+            EntityVec old_pos = pos;
+            if(comps.shape.count(id) > 0) {
+                collision_sectors[to_chk_pos(old_pos)].insert(id);
+                F32 speed = glm::length(vel);
+                if(speed < MIN_SPEED) {
+                    vel = {0.f, 0.f};
                 } else {
-                    pos += vel;
+                    if(speed > MAX_SPEED) {
+                        static_assert(MAX_SPEED != 0.f);
+                        vel = glm::normalize(vel) * MAX_SPEED;
+                    }
+                    F32 angle = 0.f;
+                    if(comps.orientation.count(id) > 0) {
+                        angle = comps.orientation.at(id).angle;
+                    }
+                    Vec2F try_vel = vel;
+                    for(Uns i = 0; i < COLLISION_ITERATIONS; i++) {
+                        EntityVec new_pos = pos + try_vel;
+                        CollisionShape shape = {comps.shape.at(id),
+                                                angle, new_pos};
+                        EntityId col = check_entities_collision(shape, id);
+                        if(col != entities.end()) {
+                            if(comps.vel.count(col) > 0) {
+                                comps.vel.at(col) =
+                                    (comps.vel.at(col) + vel) / 2.f;
+                            }
+                            if(comps.container.count(id) > 0 &&
+                               comps.item.count(col) > 0) {
+                                comps.pos.erase(col);
+                                comps.container.at(id).items.emplace_back(col);
+                            }
+                        } else if(!check_map_collision(shape)) {
+                            pos = new_pos;
+                            break;
+                        }
+                        try_vel /= 2.f;
+                    }
+                    if(to_chk_pos(old_pos) != to_chk_pos(pos)) {
+                        collision_sectors.at(to_chk_pos(old_pos)).erase(id);
+                        collision_sectors[to_chk_pos(pos)].insert(id);
+                    }
                 }
-                //@TODO magic number
-                vel *= 0.9f;
-                if((MapPos)pos != (MapPos)old_pos) {
-                    //del_light_source(old_pos);
-                    //add_light_node(pos, {0.5f, 0.5f, 0.5f});
-                }
+            } else {
+                pos += vel;
             }
+            //@TODO magic number
+            vel *= 0.9f;
         }
     });
     entities.free_slots();
