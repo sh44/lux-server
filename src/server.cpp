@@ -118,7 +118,7 @@ void kick_client(ClientId id, char const* reason) {
 
 LUX_MAY_FAIL add_client(ENetPeer* peer) {
     U8* ip = get_ip(peer->address);
-    LUX_LOG("new client connecting")
+    LUX_LOG("new client connecting");
     LUX_LOG("    ip: %u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
 
     ENetPacket* in_pack;

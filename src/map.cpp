@@ -14,7 +14,7 @@ static VecMap<ChkPos, Chunk> chunks;
 
 constexpr Uns LIGHT_BITS_PER_COLOR = 5;
 static_assert(LIGHT_BITS_PER_COLOR * 3 <= sizeof(LightLvl) * 8);
-constexpr Uns LIGHT_RANGE          = std::exp2(LIGHT_BITS_PER_COLOR);
+constexpr Uns LIGHT_RANGE          = 1 << LIGHT_BITS_PER_COLOR;
 
 static void update_chunk_light(ChkPos const &pos, Chunk& chunk);
 static bool is_chunk_loaded(ChkPos const& pos) {
