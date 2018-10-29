@@ -4,6 +4,7 @@
 #include <enet/enet.h>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/fast_square_root.hpp>
+#include <glm/gtx/rotate_vector.hpp> //@TODO
 //
 #include <lux_shared/common.hpp>
 #include <lux_shared/net/common.hpp>
@@ -369,6 +370,16 @@ void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
         server.clients.foreach([&](ClientId id) {
             auto const& client = server.clients[id];
             ss_tick.player_id = client.entity;
+            /*EntityId bullet = create_entity();
+            entity_comps.vel[bullet] = glm::rotate(Vec2F(0.f, -1.f),
+                entity_comps.orientation.at(client.entity).angle);
+            entity_comps.pos[bullet] = entity_comps.pos.at(client.entity) +
+                entity_comps.vel.at(bullet);
+            entity_comps.shape[bullet] = EntityComps::Shape
+                {{.sphere = {0.05f}}, .tag = EntityComps::Shape::SPHERE};
+            entity_comps.visible[bullet] = {2};
+            entity_comps.orientation[bullet] =
+                {entity_comps.orientation.at(client.entity).angle};*/
 
             (void)send_net_data(client.peer, &ss_tick, TICK_CHANNEL, false);
         });
