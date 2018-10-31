@@ -2,8 +2,6 @@
 #include <cstdlib>
 //
 #include <lux_shared/common.hpp>
-#include <lux_shared/util/packer.hpp>
-#include <lux_shared/vec_hash.hpp>
 #include <lux_shared/map.hpp>
 //
 #include <db.hpp>
@@ -27,39 +25,18 @@ static Chunk& load_chunk(ChkPos const& pos) {
     LUX_LOG("    pos: {%zd, %zd}", pos.x, pos.y);
     ///@RESEARCH to do a better way to no-copy default construct
     Chunk& chunk = chunks[pos];
+    TileId wall_id = db_tile_id("stone_wall");
+    TileId floor_id = db_tile_id("stone_floor");
     for(Uns i = 0; i < CHK_VOL; ++i) {
-        VoxelId voxel_id = db_voxel_id("void");
         MapPos map_pos = to_map_pos(pos, i);
-        Uns pos_hash = std::hash<MapPos>()(map_pos / 2l);
-        if((map_pos.x % 16 == 0 || map_pos.y % 16 == 0) && pos_hash % 7 != 0) {
-            voxel_id = db_voxel_id("stone_wall");
+        if(lux_rands(3, map_pos / (MapCoord)16) == 0) {
+            chunk.wall[i] = true;
         } else {
-            if(pos_hash % 13 == 0) {
-                voxel_id = db_voxel_id("stone_wall");
-            } else {
-                voxel_id = db_voxel_id("stone_floor");
-                if(rand() % 50 == 0 && entities.size() < 20000) {
-                    auto id = create_player();
-                    entity_comps.pos[id] = map_pos;
-                    if(rand() % 10 != 0) {
-                        entity_comps.item[id] = {1.f};
-                        constexpr char default_name[] = "donger man";
-                        entity_comps.name[id].resize(sizeof(default_name) - 1);
-                        std::memcpy(entity_comps.name[id].data(),
-                                    default_name, sizeof(default_name) - 1);
-                    } else {
-                        entity_comps.shape[id] = EntityComps::Shape
-                            {{.sphere = {2.f}}, EntityComps::Shape::SPHERE};
-                        constexpr char default_name[] = "Big Bob";
-                        entity_comps.name[id].resize(sizeof(default_name) - 1);
-                        std::memcpy(entity_comps.name[id].data(),
-                                    default_name, sizeof(default_name) - 1);
-                    }
-                }
-            }
+            chunk.wall[i] = false;
         }
-        chunk.light_lvls[i] = 0x0000;
-        chunk.voxels[i] = voxel_id;
+        chunk.light_lvl[i] = 0x0000;
+        chunk.fg_id[i] = wall_id;
+        chunk.bg_id[i] = floor_id;
         if((map_pos.x % 16 != 0 && map_pos.y % 16 != 0) && rand() % 200 == 0) {
             add_light_node(to_map_pos(pos, i), {0.75f, 0.75f, 0.75f});
         }
@@ -79,12 +56,24 @@ Chunk const& get_chunk(ChkPos const& pos) {
     return chunks.at(pos);
 }
 
-VoxelId get_voxel(MapPos const& pos) {
-    return get_chunk(to_chk_pos(pos)).voxels[to_chk_idx(pos)];
+TileId get_fg_id(MapPos const& pos) {
+    return get_chunk(to_chk_pos(pos)).fg_id[to_chk_idx(pos)];
 }
 
-VoxelType const& get_voxel_type(MapPos const& pos) {
-    return db_voxel_type(get_voxel(pos));
+TileId get_bg_id(MapPos const& pos) {
+    return get_chunk(to_chk_pos(pos)).bg_id[to_chk_idx(pos)];
+}
+
+TileBp const& get_bg_bp(MapPos const& pos) {
+    return db_tile_bp(get_bg_id(pos));
+}
+
+TileBp const& get_fg_bp(MapPos const& pos) {
+    return db_tile_bp(get_fg_id(pos));
+}
+
+bool is_tile_wall(MapPos const& pos) {
+    return get_chunk(to_chk_pos(pos)).wall[to_chk_idx(pos)];
 }
 //@CONSIDER separate file for lightsim
 struct LightNode {
@@ -138,11 +127,11 @@ static void update_chunk_light(ChkPos const &pos, Chunk& chunk) {
         MapPos base_pos = to_map_pos(pos, node.idx);
         //@IMPROVE bit-level parallelism
 
-        LightLvl map_lvl = chunk.light_lvls[node.idx];
+        LightLvl map_lvl = chunk.light_lvl[node.idx];
         Vec3<U8> map_color = {(map_lvl & 0xF800) >> 11,
                               (map_lvl & 0x07C0) >>  6,
                               (map_lvl & 0x003E) >>  1};
-        if(db_voxel_type(chunk.voxels[node.idx]).shape == VoxelType::BLOCK) {
+        if(chunk.wall[node.idx]) {
             node.col = (Vec3<U8>)glm::round(Vec3F(node.col) * 0.5f);
         }
         auto is_less = glm::lessThan(map_color, node.col);
@@ -151,10 +140,10 @@ static void update_chunk_light(ChkPos const &pos, Chunk& chunk) {
             /* node.col is guaranteed to be non-zero when is_less is true */
             Vec3<U8> new_color = node.col * (Vec3<U8>)is_less +
                                  map_color * (Vec3<U8>)(glm::not_(is_less));
-            chunk.light_lvls[node.idx] = (new_color.r << 11) |
+            chunk.light_lvl[node.idx] = (new_color.r << 11) |
                                          (new_color.g <<  6) |
                                          (new_color.b <<  1);
-            if(db_voxel_type(chunk.voxels[node.idx]).shape == VoxelType::BLOCK) {
+            if(chunk.wall[node.idx]) {
                 node.col = Vec3<U8>(1);
             }
             if(glm::any(atleast_two)) {

@@ -221,15 +221,17 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
     return LUX_OK;
 }
 
-LUX_MAY_FAIL send_map_load(ENetPeer* peer, VecSet<ChkPos> const& requests) {
-    ss_sgnl.tag = NetSsSgnl::MAP_LOAD;
+LUX_MAY_FAIL send_tiles(ENetPeer* peer, VecSet<ChkPos> const& requests) {
+    ss_sgnl.tag = NetSsSgnl::TILES;
     for(auto const& pos : requests) {
         guarantee_chunk(pos);
         Chunk const& chunk = get_chunk(pos);
-        std::memcpy(ss_sgnl.map_load.chunks[pos].voxels, chunk.voxels,
-                    CHK_VOL * sizeof(VoxelId));
-        std::memcpy(ss_sgnl.map_load.chunks[pos].light_lvls, chunk.light_lvls,
-                    CHK_VOL * sizeof(LightLvl));
+        for(Uns i = 0; i < CHK_VOL; ++i) {
+            ss_sgnl.tiles.chunks[pos].id[i] =
+                chunk.wall[i] ? chunk.fg_id[i] : chunk.bg_id[i];
+        }
+        std::memcpy(ss_sgnl.tiles.chunks[pos].wall.raw_data,
+                    chunk.wall.raw_data, sizeof(chunk.wall));
     }
 
     LUX_RETHROW(send_net_data(peer, &ss_sgnl, SIGNAL_CHANNEL),
@@ -246,18 +248,18 @@ LUX_MAY_FAIL send_map_load(ENetPeer* peer, VecSet<ChkPos> const& requests) {
 }
 
 LUX_MAY_FAIL send_light_update(ENetPeer* peer, DynArr<ChkPos> const& updates) {
-    ss_sgnl.tag = NetSsSgnl::LIGHT_UPDATE;
+    ss_sgnl.tag = NetSsSgnl::LIGHT;
 
     Server::Client& client = server.clients[(ClientId)peer->data];
     for(Uns i = 0; i < updates.size(); ++i) {
         ChkPos const& pos = updates[i];
         if(client.loaded_chunks.count(pos) > 0) {
             Chunk const& chunk = get_chunk(pos);
-            std::memcpy(ss_sgnl.light_update.chunks[pos].light_lvls,
-                        chunk.light_lvls, CHK_VOL * sizeof(LightLvl));
+            std::memcpy(ss_sgnl.light.chunks[pos].light_lvl,
+                        chunk.light_lvl, CHK_VOL * sizeof(LightLvl));
         }
     }
-    if(ss_sgnl.light_update.chunks.size() == 0) return LUX_OK;
+    if(ss_sgnl.light.chunks.size() == 0) return LUX_OK;
     return send_net_data(peer, &ss_sgnl, SIGNAL_CHANNEL);
 }
 
@@ -286,7 +288,7 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
 
     switch(sgnl.tag) {
         case NetCsSgnl::MAP_REQUEST: {
-            (void)send_map_load(peer, sgnl.map_request.requests);
+            (void)send_tiles(peer, sgnl.map_request.requests);
         } break;
         case NetCsSgnl::COMMAND: {
             ClientId client_id = (ClientId)peer->data;

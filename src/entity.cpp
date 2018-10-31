@@ -330,8 +330,7 @@ static bool check_map_collision(CollisionShape const& a) {
     for(MapCoord y = map_pos.y - bound.y; y <= map_pos.y + bound.y; ++y) {
         for(MapCoord x = map_pos.x - bound.x; x <= map_pos.x + bound.x; ++x) {
             guarantee_chunk(to_chk_pos({x, y}));
-            VoxelType const& vox = get_voxel_type({x, y});
-            if(vox.shape == VoxelType::BLOCK) {
+            if(is_tile_wall({x, y})) {
                 block_shape.pos = Vec2F(x, y) + Vec2F(0.5f, 0.5f);
                 if(aabb_shape_intersect(block_shape, a)) return true;
             }

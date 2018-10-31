@@ -4,6 +4,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
+#include <ctime>
 //
 #include <lua.hpp>
 //
@@ -32,6 +33,7 @@ void console_main() {
 }
 
 int main(int argc, char** argv) {
+    random_seed = std::time(nullptr);
     U16 server_port = 31337;
     { ///read commandline args
         if(argc == 1) {

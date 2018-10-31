@@ -40,14 +40,14 @@ struct EntityComps {
     };
 
     //@IMPROVE more space efficient solution
-    HashTable<EntityId, Pos>          pos;
-    HashTable<EntityId, Vel>          vel;
-    HashTable<EntityId, Name>         name;
-    HashTable<EntityId, Shape>        shape;
-    HashTable<EntityId, Visible>      visible;
-    HashTable<EntityId, Item>         item;
-    HashTable<EntityId, Container>    container;
-    HashTable<EntityId, Orientation>  orientation;
+    IdMap<EntityId, Pos>          pos;
+    IdMap<EntityId, Vel>          vel;
+    IdMap<EntityId, Name>         name;
+    IdMap<EntityId, Shape>        shape;
+    IdMap<EntityId, Visible>      visible;
+    IdMap<EntityId, Item>         item;
+    IdMap<EntityId, Container>    container;
+    IdMap<EntityId, Orientation>  orientation;
 };
 
 struct Entity {

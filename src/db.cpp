@@ -4,34 +4,34 @@
 //
 #include "db.hpp"
 
-static DynArr<VoxelType> voxels;
+static DynArr<TileBp> tiles;
 //@CONSIDER use regular map?
-static HashMap<DynStr, VoxelId, std::hash<DynStr>> voxels_lookup;
+static HashMap<DynStr, TileId> tiles_lookup;
 
-void add_voxel(VoxelType &&voxel_type) {
-    auto &voxel = voxels.emplace_back(voxel_type);
-    voxels_lookup[voxel.str_id] = voxels.size() - 1;
+void add_tile(TileBp &&tile_type) {
+    auto &tile = tiles.emplace_back(tile_type);
+    tiles_lookup[tile.str_id] = tiles.size() - 1;
 }
 
 void db_init() {
-    add_voxel({"void", VoxelType::EMPTY});
-    add_voxel({"stone_floor", VoxelType::FLOOR});
-    add_voxel({"stone_wall", VoxelType::BLOCK});
-    add_voxel({"raw_stone", VoxelType::BLOCK});
-    add_voxel({"dirt", VoxelType::BLOCK});
-    add_voxel({"gravel", VoxelType::BLOCK});
+    add_tile({"void"});
+    add_tile({"stone_floor"});
+    add_tile({"stone_wall"});
+    add_tile({"raw_stone"});
+    add_tile({"dirt"});
+    add_tile({"gravel"});
 }
 
-VoxelType const& db_voxel_type(VoxelId id) {
-    LUX_ASSERT(id < voxels.size());
-    return voxels[id];
+TileBp const& db_tile_bp(TileId id) {
+    LUX_ASSERT(id < tiles.size());
+    return tiles[id];
 }
 
-VoxelType const& db_voxel_type(DynStr const& str_id) {
-    return db_voxel_type(db_voxel_id(str_id));
+TileBp const& db_tile_bp(DynStr const& str_id) {
+    return db_tile_bp(db_tile_id(str_id));
 }
 
-VoxelId const& db_voxel_id(DynStr const& str_id) {
-    LUX_ASSERT(voxels_lookup.count(str_id) > 0);
-    return voxels_lookup.at(str_id);
+TileId const& db_tile_id(DynStr const& str_id) {
+    LUX_ASSERT(tiles_lookup.count(str_id) > 0);
+    return tiles_lookup.at(str_id);
 }

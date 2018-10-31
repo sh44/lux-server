@@ -17,3 +17,4 @@ vgcore*
 *.exe
 *.out
 lux-server
+xxhsum
