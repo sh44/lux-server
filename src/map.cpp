@@ -152,7 +152,6 @@ static void update_chunk_light(ChkPos const &pos, Chunk& chunk) {
             node.col = (Vec3<U8>)glm::round(Vec3F(node.col) * 0.5f);
         }
         auto is_less = glm::lessThan(map_color, node.col);
-        auto atleast_two = glm::greaterThanEqual(node.col, Vec3<U8>(2u));
         if(glm::any(is_less)) {
             /* node.col is guaranteed to be non-zero when is_less is true */
             Vec3<U8> new_color = node.col * (Vec3<U8>)is_less +
@@ -163,6 +162,7 @@ static void update_chunk_light(ChkPos const &pos, Chunk& chunk) {
             if(chunk.wall[node.idx]) {
                 node.col = Vec3<U8>(1);
             }
+            auto atleast_two = glm::greaterThanEqual(node.col, Vec3<U8>(2u));
             if(glm::any(atleast_two)) {
                 Vec3<U8> side_color = node.col - (Vec3<U8>)atleast_two;
                 for(auto const &offset : offsets) {
