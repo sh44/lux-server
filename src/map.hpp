@@ -17,7 +17,7 @@ TileBp const& get_bg_bp(MapPos const& pos);
 TileBp const& get_fg_bp(MapPos const& pos);
 bool is_tile_wall(MapPos const& pos);
 
-void map_tick(DynArr<ChkPos>& light_updated_chunks);
+void map_tick(VecSet<ChkPos>& light_updated_chunks);
 void guarantee_chunk(ChkPos const& pos);
 Chunk const& get_chunk(ChkPos const& pos);
 

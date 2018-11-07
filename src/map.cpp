@@ -25,19 +25,36 @@ static Chunk& load_chunk(ChkPos const& pos) {
     LUX_LOG("    pos: {%zd, %zd}", pos.x, pos.y);
     ///@RESEARCH to do a better way to no-copy default construct
     Chunk& chunk = chunks[pos];
-    TileId wall_id = db_tile_id("stone_wall");
-    TileId floor_id = db_tile_id("stone_floor");
+    static const TileId wall_id = db_tile_id("stone_wall");
+    static const TileId floor_id = db_tile_id("stone_floor");
+    constexpr ChkPos offsets[9] =
+        {{-1, -1}, { 0, -1}, { 1, -1},
+         {-1,  0}, { 0,  0}, { 1,  0},
+         {-1,  1}, { 0,  1}, { 1,  1}};
+    MapPos room_centers[9];
+    Vec2U  room_sizes[9];
+    for(Uns i = 0; i < 9; ++i) {
+        ChkPos chk_pos = pos + offsets[i];
+        MapPos min = to_map_pos(chk_pos, 0);
+        room_centers[i] = {min.x + lux_randmm(0, CHK_SIZE, chk_pos, 0),
+                           min.y + lux_randmm(0, CHK_SIZE, chk_pos, 1)};
+        room_sizes[i] = {lux_randmm(2, 4, chk_pos, 2),
+                         lux_randmm(2, 4, chk_pos, 3)};
+    }
     for(Uns i = 0; i < CHK_VOL; ++i) {
         MapPos map_pos = to_map_pos(pos, i);
-        if(lux_rands(3, map_pos / (MapCoord)16) == 0) {
-            chunk.wall[i] = true;
-        } else {
-            chunk.wall[i] = false;
-        }
+        chunk.wall[i] = true;
         chunk.light_lvl[i] = 0x0000;
         chunk.fg_id[i] = wall_id;
         chunk.bg_id[i] = floor_id;
-        if((map_pos.x % 16 != 0 && map_pos.y % 16 != 0) && rand() % 200 == 0) {
+        for(Uns j = 0; j < 9; ++j) {
+            if(glm::all(glm::lessThanEqual(
+                glm::abs(map_pos - room_centers[j]), (MapPos)room_sizes[j]))) {
+                chunk.wall[i] = false;// chunk.wall[i] ^ true;
+                break;
+            }
+        }
+        if(lux_randm(200, map_pos) == 0) {
             add_light_node(to_map_pos(pos, i), {0.75f, 0.75f, 0.75f});
         }
     }
@@ -85,11 +102,11 @@ struct LightNode {
 VecMap<ChkPos, Queue<LightNode>> light_nodes;
 VecSet<ChkPos>                   awaiting_light_updates;
 
-void map_tick(DynArr<ChkPos>& light_updated_chunks) {
+void map_tick(VecSet<ChkPos>& light_updated_chunks) {
     LUX_ASSERT(light_updated_chunks.size() == 0);
     for(auto const& update : awaiting_light_updates) {
         if(is_chunk_loaded(update)) {
-            light_updated_chunks.emplace_back(update);
+            light_updated_chunks.emplace(update);
         }
     }
     for(auto const& update : light_updated_chunks) {

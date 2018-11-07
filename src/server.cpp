@@ -247,12 +247,11 @@ LUX_MAY_FAIL send_tiles(ENetPeer* peer, VecSet<ChkPos> const& requests) {
     return LUX_OK;
 }
 
-LUX_MAY_FAIL send_light_update(ENetPeer* peer, DynArr<ChkPos> const& updates) {
+LUX_MAY_FAIL send_light(ENetPeer* peer, VecSet<ChkPos> const& chunks) {
     ss_sgnl.tag = NetSsSgnl::LIGHT;
 
     Server::Client& client = server.clients[(ClientId)peer->data];
-    for(Uns i = 0; i < updates.size(); ++i) {
-        ChkPos const& pos = updates[i];
+    for(auto const& pos : chunks) {
         if(client.loaded_chunks.count(pos) > 0) {
             Chunk const& chunk = get_chunk(pos);
             std::memcpy(ss_sgnl.light.chunks[pos].light_lvl,
@@ -289,6 +288,7 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
     switch(sgnl.tag) {
         case NetCsSgnl::MAP_REQUEST: {
             (void)send_tiles(peer, sgnl.map_request.requests);
+            (void)send_light(peer, sgnl.map_request.requests);
         } break;
         case NetCsSgnl::COMMAND: {
             ClientId client_id = (ClientId)peer->data;
@@ -315,9 +315,9 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
     return LUX_OK;
 }
 
-void server_tick(DynArr<ChkPos> const& light_updated_chunks) {
+void server_tick(VecSet<ChkPos> const& light_updated_chunks) {
     server.clients.foreach([&](ClientId id) {
-        (void)send_light_update(server.clients[id].peer, light_updated_chunks);
+        (void)send_light(server.clients[id].peer, light_updated_chunks);
     });
     { ///handle events
         //@CONSIDER splitting this scope
