@@ -429,3 +429,52 @@ void server_make_admin(ClientId id) {
     LUX_ASSERT(is_client_connected(id));
     server.clients[id].admin = true;
 }
+
+void add_dbg_point(NetSsTick::DbgInf::Shape::Point const& val,
+                   Vec4F col, bool border) {
+    ss_tick.dbg_inf.shapes.emplace_back(NetSsTick::DbgInf::Shape{
+        .tag = NetSsTick::DbgInf::Shape::POINT, .point = val,
+        .col = col, .border = border});
+}
+
+void add_dbg_line(NetSsTick::DbgInf::Shape::Line const& val,
+                   Vec4F col, bool border) {
+    ss_tick.dbg_inf.shapes.emplace_back(NetSsTick::DbgInf::Shape{
+        .tag = NetSsTick::DbgInf::Shape::LINE, .line = val,
+        .col = col, .border = border});
+}
+
+void add_dbg_arrow(NetSsTick::DbgInf::Shape::Arrow const& val,
+                   Vec4F col, bool border) {
+    ss_tick.dbg_inf.shapes.emplace_back(NetSsTick::DbgInf::Shape{
+        .tag = NetSsTick::DbgInf::Shape::ARROW, .arrow = val,
+        .col = col, .border = border});
+}
+
+void add_dbg_cross(NetSsTick::DbgInf::Shape::Cross const& val,
+                   Vec4F col, bool border) {
+    ss_tick.dbg_inf.shapes.emplace_back(NetSsTick::DbgInf::Shape{
+        .tag = NetSsTick::DbgInf::Shape::CROSS, .cross = val,
+        .col = col, .border = border});
+}
+
+void add_dbg_sphere(NetSsTick::DbgInf::Shape::Sphere const& val,
+                   Vec4F col, bool border) {
+    ss_tick.dbg_inf.shapes.emplace_back(NetSsTick::DbgInf::Shape{
+        .tag = NetSsTick::DbgInf::Shape::SPHERE, .sphere = val,
+        .col = col, .border = border});
+}
+
+void add_dbg_triangle(NetSsTick::DbgInf::Shape::Triangle const& val,
+                   Vec4F col, bool border) {
+    ss_tick.dbg_inf.shapes.emplace_back(NetSsTick::DbgInf::Shape{
+        .tag = NetSsTick::DbgInf::Shape::TRIANGLE, .triangle = val,
+        .col = col, .border = border});
+}
+
+void add_dbg_rect(NetSsTick::DbgInf::Shape::Rect const& val,
+                   Vec4F col, bool border) {
+    ss_tick.dbg_inf.shapes.emplace_back(NetSsTick::DbgInf::Shape{
+        .tag = NetSsTick::DbgInf::Shape::RECT, .rect = val,
+        .col = col, .border = border});
+}
