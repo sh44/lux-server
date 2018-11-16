@@ -1,6 +1,9 @@
 #include <cstring>
 #include <cstdlib>
 //
+#define GLM_FORCE_PURE
+#include <glm/gtc/noise.hpp>
+//
 #include <lux_shared/common.hpp>
 #include <lux_shared/map.hpp>
 //
@@ -27,32 +30,16 @@ static Chunk& load_chunk(ChkPos const& pos) {
     Chunk& chunk = chunks[pos];
     static const TileId wall_id = db_tile_id("stone_wall");
     static const TileId floor_id = db_tile_id("stone_floor");
-    constexpr ChkPos offsets[9] =
-        {{-1, -1}, { 0, -1}, { 1, -1},
-         {-1,  0}, { 0,  0}, { 1,  0},
-         {-1,  1}, { 0,  1}, { 1,  1}};
-    MapPos room_centers[9];
-    Vec2U  room_sizes[9];
-    for(Uns i = 0; i < 9; ++i) {
-        ChkPos chk_pos = pos + offsets[i];
-        MapPos min = to_map_pos(chk_pos, 0);
-        room_centers[i] = {min.x + lux_randmm(0, CHK_SIZE, chk_pos, 0),
-                           min.y + lux_randmm(0, CHK_SIZE, chk_pos, 1)};
-        room_sizes[i] = {lux_randmm(2, 4, chk_pos, 2),
-                         lux_randmm(2, 4, chk_pos, 3)};
-    }
     for(Uns i = 0; i < CHK_VOL; ++i) {
         MapPos map_pos = to_map_pos(pos, i);
-        chunk.wall[i] = true;
         chunk.light_lvl[i] = 0x0000;
         chunk.fg_id[i] = wall_id;
         chunk.bg_id[i] = floor_id;
-        for(Uns j = 0; j < 9; ++j) {
-            if(glm::all(glm::lessThanEqual(
-                glm::abs(map_pos - room_centers[j]), (MapPos)room_sizes[j]))) {
-                chunk.wall[i] = false;// chunk.wall[i] ^ true;
-                break;
-            }
+        if(map_pos.x < 0) {
+            Vec2F seed = (Vec2F)map_pos * 0.01f;
+            chunk.wall[i] = glm::simplex(seed) > 0.5f;
+        } else {
+            chunk.wall[i] = lux_randf(map_pos) > 0.98f;
         }
         if(lux_randm(200, map_pos) == 0) {
             add_light_node(to_map_pos(pos, i), {0.75f, 0.75f, 0.75f});
@@ -157,8 +144,8 @@ static void update_chunk_light(ChkPos const &pos, Chunk& chunk) {
             Vec3<U8> new_color = node.col * (Vec3<U8>)is_less +
                                  map_color * (Vec3<U8>)(glm::not_(is_less));
             chunk.light_lvl[node.idx] = (new_color.r << 11) |
-                                         (new_color.g <<  6) |
-                                         (new_color.b <<  1);
+                                        (new_color.g <<  6) |
+                                        (new_color.b <<  1);
             if(chunk.wall[node.idx]) {
                 node.col = Vec3<U8>(1);
             }
