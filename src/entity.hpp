@@ -4,7 +4,7 @@
 #include <lux_shared/entity.hpp>
 #include <lux_shared/net/data.hpp>
 
-struct Entity;
+struct Entity {};
 extern SparseDynArr<Entity> entities;
 typedef decltype(entities)::Id EntityId;
 
@@ -50,13 +50,8 @@ struct EntityComps {
     IdMap<EntityId, Orientation>  orientation;
 };
 
-struct Entity {
-    bool deletion_mark = false;
-};
+extern EntityComps& entity_comps;
 
-extern EntityComps&         entity_comps;
-
-void entity_rotate_to(EntityId id, F32 angle);
 EntityId create_entity();
 EntityId create_item(const char* name);
 EntityId create_player();

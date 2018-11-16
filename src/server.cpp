@@ -205,7 +205,7 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
     client.entity = create_player();
     //@TODO
     entity_comps.shape[client.entity] = EntityComps::Shape
-        {{.rect = {{0.8f, 0.4f}}}, EntityComps::Shape::RECT};
+        {{.rect = {{1.f, 1.f}}}, EntityComps::Shape::RECT};
     entity_comps.container[client.entity].items =
         {create_item("dong"), create_item("bong"), create_item("levi's head")};
     entity_comps.visible[client.entity] = {0};
@@ -268,14 +268,27 @@ LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
         "failed to deserialize tick from client")
 
     EntityId entity = server.clients[(ClientId)peer->data].entity;
-    if(entity_comps.vel.count(entity) > 0) {
-        if(f32_cmp(glm::length(cs_tick.player_dir), 1.f)) {
-            entity_comps.vel.at(entity).x = cs_tick.player_dir.x * 0.1f;
-            entity_comps.vel.at(entity).y = cs_tick.player_dir.y * 0.1f;
+    for(auto const& action : cs_tick.actions) {
+        switch(action.tag) {
+            case NetCsTick::Action::MOVE: {
+                //@TODO log this?
+                if(action.target.tag != NetCsTick::Action::Target::DIR) break;
+                if(entity_comps.vel.count(entity) > 0) {
+                    //@TODO else warn
+                    if(f32_cmp(glm::length(action.target.dir), 1.f)) {
+                        entity_comps.vel.at(entity) =
+                            action.target.dir * 0.1f;
+                    }
+                }
+                //@TODO magic number
+                break;
+            }
+            default: break; //TODO warn
         }
     }
     if(entity_comps.orientation.count(entity) > 0) {
-        entity_rotate_to(entity, cs_tick.player_aim_angle);
+        //entity_comps.orientation.at(entity).angle = cs_tick.player_aim_angle;
+        entity_comps.orientation.at(entity).angle = tau / 8.f;
     }
     return LUX_OK;
 }
@@ -378,7 +391,7 @@ void server_tick(VecSet<ChkPos> const& light_updated_chunks) {
             entity_comps.pos[bullet] = entity_comps.pos.at(client.entity) +
                 entity_comps.vel.at(bullet);
             entity_comps.shape[bullet] = EntityComps::Shape
-                {{.sphere = {0.05f}}, .tag = EntityComps::Shape::SPHERE};
+                {{.rect = {{0.05f, 0.05f}}}, .tag = EntityComps::Shape::RECT};
             entity_comps.visible[bullet] = {2};
             entity_comps.orientation[bullet] =
                 {entity_comps.orientation.at(client.entity).angle};*/
