@@ -283,6 +283,17 @@ LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
                 //@TODO magic number
                 break;
             }
+            case NetCsTick::Action::BREAK: {
+                if(action.target.tag != NetCsTick::Action::Target::POINT) break;
+                MapPos pos = glm::floor(action.target.point);
+                ChkPos chk_pos = to_chk_pos(pos);
+                guarantee_chunk(chk_pos);
+                get_chunk(chk_pos).wall[to_chk_idx(pos)] = true;
+                get_chunk(chk_pos).light_lvl[to_chk_idx(pos)] = 0x0000;
+                (void)send_tiles(peer, {chk_pos});
+                (void)send_light(peer, {chk_pos});
+                break;
+            }
             default: break; //TODO warn
         }
     }

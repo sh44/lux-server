@@ -54,7 +54,8 @@ void guarantee_chunk(ChkPos const& pos) {
     }
 }
 
-Chunk const& get_chunk(ChkPos const& pos) {
+Chunk& get_chunk(ChkPos const& pos) {
+    //@TODO const
     LUX_ASSERT(is_chunk_loaded(pos));
     ///wish there was a non-bound-checking way to do it
     return chunks.at(pos);

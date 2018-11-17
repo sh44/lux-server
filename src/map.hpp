@@ -19,7 +19,7 @@ bool is_tile_wall(MapPos const& pos);
 
 void map_tick(VecSet<ChkPos>& light_updated_chunks);
 void guarantee_chunk(ChkPos const& pos);
-Chunk const& get_chunk(ChkPos const& pos);
+Chunk& get_chunk(ChkPos const& pos);
 
 void add_light_node(MapPos const& pos, Vec3F const& col);
 void del_light_node(MapPos const& pos);
