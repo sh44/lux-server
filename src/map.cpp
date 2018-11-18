@@ -28,21 +28,31 @@ static Chunk& load_chunk(ChkPos const& pos) {
     LUX_LOG("    pos: {%zd, %zd}", pos.x, pos.y);
     ///@RESEARCH to do a better way to no-copy default construct
     Chunk& chunk = chunks[pos];
-    static const TileId wall_id = db_tile_id("stone_wall");
-    static const TileId floor_id = db_tile_id("stone_floor");
+    static const TileId wall_id = db_tile_id("raw_stone");
+    static const TileId grass = db_tile_id("grass");
+    static const TileId dark_grass = db_tile_id("dark_grass");
+    static const TileId dirt = db_tile_id("dirt");
+    constexpr Uns octaves    = 16;
+    constexpr F32 base_scale = 0.015f;
     for(Uns i = 0; i < CHK_VOL; ++i) {
         MapPos map_pos = to_map_pos(pos, i);
         chunk.light_lvl[i] = 0x0000;
-        chunk.fg_id[i] = wall_id;
-        chunk.bg_id[i] = floor_id;
-        if(map_pos.x < 0) {
-            Vec2F seed = (Vec2F)map_pos * 0.01f;
-            chunk.wall[i] = glm::simplex(seed) > 0.5f;
-        } else {
-            chunk.wall[i] = lux_randf(map_pos) > 0.98f;
+        chunk.fg_id[i] = dirt;
+        F32 scale  = base_scale;
+        F32 weight = 1.f;
+        F32 avg    = 0.f;
+        for(Uns o = 0; o < octaves; ++o) {
+            avg    += glm::simplex((Vec2F)map_pos * scale) * weight;
+            scale  *= 2.f;
+            weight /= 2.f;
         }
-        if(lux_randm(200, map_pos) == 0) {
-            add_light_node(to_map_pos(pos, i), {0.75f, 0.75f, 0.75f});
+        F32 h = ((avg / (2.f - (weight * 2.f))) + 1.f) / 2.f;
+
+        chunk.wall[i] = h > 0.5f;
+        chunk.bg_id[i] = h > 0.3f ? grass :
+                         h > 0.125f ? dark_grass : dirt;
+        if(!chunk.wall[i] && lux_randf(map_pos) > 0.99f) {
+            add_light_node(to_map_pos(pos, i), Vec3F(1.f));
         }
     }
     return chunk;

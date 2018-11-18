@@ -19,7 +19,8 @@ void db_init() {
     add_tile({"stone_wall"});
     add_tile({"raw_stone"});
     add_tile({"dirt"});
-    add_tile({"gravel"});
+    add_tile({"grass"});
+    add_tile({"dark_grass"});
 }
 
 TileBp const& db_tile_bp(TileId id) {
