@@ -37,7 +37,7 @@ static Chunk& load_chunk(ChkPos const& pos) {
     for(Uns i = 0; i < CHK_VOL; ++i) {
         MapPos map_pos = to_map_pos(pos, i);
         chunk.light_lvl[i] = 0x0000;
-        chunk.fg_id[i] = dirt;
+        chunk.fg_id[i] = wall_id;
         F32 scale  = base_scale;
         F32 weight = 1.f;
         F32 avg    = 0.f;
@@ -49,7 +49,8 @@ static Chunk& load_chunk(ChkPos const& pos) {
         F32 h = ((avg / (2.f - (weight * 2.f))) + 1.f) / 2.f;
 
         chunk.wall[i] = h > 0.5f;
-        chunk.bg_id[i] = h > 0.3f ? grass :
+        chunk.bg_id[i] = h > 0.45f ? dirt :
+                         h > 0.3f ? grass :
                          h > 0.125f ? dark_grass : dirt;
         if(!chunk.wall[i] && lux_randf(map_pos) > 0.99f) {
             add_light_node(to_map_pos(pos, i), Vec3F(1.f));
@@ -159,7 +160,7 @@ static void update_chunk_light(ChkPos const &pos, Chunk& chunk) {
             auto atleast_two = glm::greaterThanEqual(node.col, Vec3<U8>(2u));
             if(glm::any(atleast_two)) {
                 Vec3<U8> side_color = node.col - (Vec3<U8>)atleast_two;
-                for(auto const &offset : manhattan_hollow) {
+                for(auto const &offset : manhattan_hollow<MapCoord>) {
                     //@TODO don't spread lights through Z if there is floor
                     MapPos map_pos = base_pos + offset;
                     ChkPos chk_pos = to_chk_pos(map_pos);
