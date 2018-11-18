@@ -12,6 +12,8 @@
 #include "map.hpp"
 
 static VecMap<ChkPos, Chunk> chunks;
+VecSet<ChkPos> tile_updated_chunks;
+VecSet<ChkPos> light_updated_chunks;
 
 constexpr Uns LIGHT_BITS_PER_COLOR = 5;
 static_assert(LIGHT_BITS_PER_COLOR * 3 <= sizeof(LightLvl) * 8);
@@ -28,16 +30,15 @@ static Chunk& load_chunk(ChkPos const& pos) {
     LUX_LOG("    pos: {%zd, %zd}", pos.x, pos.y);
     ///@RESEARCH to do a better way to no-copy default construct
     Chunk& chunk = chunks[pos];
-    static const TileId wall_id = db_tile_id("raw_stone");
-    static const TileId grass = db_tile_id("grass");
+    static const TileId raw_stone  = db_tile_id("raw_stone");
+    static const TileId grass      = db_tile_id("grass");
     static const TileId dark_grass = db_tile_id("dark_grass");
-    static const TileId dirt = db_tile_id("dirt");
+    static const TileId dirt       = db_tile_id("dirt");
     constexpr Uns octaves    = 16;
     constexpr F32 base_scale = 0.015f;
     for(Uns i = 0; i < CHK_VOL; ++i) {
         MapPos map_pos = to_map_pos(pos, i);
-        chunk.light_lvl[i] = 0x0000;
-        chunk.fg_id[i] = wall_id;
+        chunk.light_lvl[i] = 0xFFFF;
         F32 scale  = base_scale;
         F32 weight = 1.f;
         F32 avg    = 0.f;
@@ -48,12 +49,17 @@ static Chunk& load_chunk(ChkPos const& pos) {
         }
         F32 h = ((avg / (2.f - (weight * 2.f))) + 1.f) / 2.f;
 
-        chunk.wall[i] = h > 0.5f;
-        chunk.bg_id[i] = h > 0.45f ? dirt :
-                         h > 0.3f ? grass :
-                         h > 0.125f ? dark_grass : dirt;
-        if(!chunk.wall[i] && lux_randf(map_pos) > 0.99f) {
-            add_light_node(to_map_pos(pos, i), Vec3F(1.f));
+        chunk.wall[i] = h > 0.5f ? raw_stone : void_tile;
+        chunk.roof[i] = chunk.wall[i];
+        if(chunk.wall[i] != void_tile &&
+           glm::simplex((Vec2F)map_pos * 0.025f) > 0.7f) {
+            chunk.wall[i] = void_tile;
+            chunk.floor[i] = dirt;
+        } else {
+            chunk.floor[i] = h > 0.5f   ? raw_stone :
+                             h > 0.45f  ? dirt :
+                             h > 0.3f   ? grass :
+                             h > 0.125f ? dark_grass : dirt;
         }
     }
     return chunk;
@@ -65,32 +71,42 @@ void guarantee_chunk(ChkPos const& pos) {
     }
 }
 
-Chunk& get_chunk(ChkPos const& pos) {
-    //@TODO const
+Chunk const& get_chunk(ChkPos const& pos) {
     LUX_ASSERT(is_chunk_loaded(pos));
     ///wish there was a non-bound-checking way to do it
     return chunks.at(pos);
 }
 
-TileId get_fg_id(MapPos const& pos) {
-    return get_chunk(to_chk_pos(pos)).fg_id[to_chk_idx(pos)];
+Chunk& write_chunk(ChkPos const& pos) {
+    LUX_ASSERT(is_chunk_loaded(pos));
+    tile_updated_chunks.emplace(pos);
+    return chunks.at(pos);
 }
 
-TileId get_bg_id(MapPos const& pos) {
-    return get_chunk(to_chk_pos(pos)).bg_id[to_chk_idx(pos)];
+TileId get_floor(MapPos const& pos) {
+    return get_chunk(to_chk_pos(pos)).floor[to_chk_idx(pos)];
 }
 
-TileBp const& get_bg_bp(MapPos const& pos) {
-    return db_tile_bp(get_bg_id(pos));
-}
-
-TileBp const& get_fg_bp(MapPos const& pos) {
-    return db_tile_bp(get_fg_id(pos));
-}
-
-bool is_tile_wall(MapPos const& pos) {
+TileId get_wall(MapPos const& pos) {
     return get_chunk(to_chk_pos(pos)).wall[to_chk_idx(pos)];
 }
+
+TileId get_roof(MapPos const& pos) {
+    return get_chunk(to_chk_pos(pos)).roof[to_chk_idx(pos)];
+}
+
+TileBp const& get_floor_bp(MapPos const& pos) {
+    return db_tile_bp(get_floor(pos));
+}
+
+TileBp const& get_wall_bp(MapPos const& pos) {
+    return db_tile_bp(get_wall(pos));
+}
+
+TileBp const& get_roof_bp(MapPos const& pos) {
+    return db_tile_bp(get_roof(pos));
+}
+
 //@CONSIDER separate file for lightsim
 struct LightNode {
     Vec3<U8> col;
@@ -101,8 +117,7 @@ struct LightNode {
 VecMap<ChkPos, Queue<LightNode>> light_nodes;
 VecSet<ChkPos>                   awaiting_light_updates;
 
-void map_tick(VecSet<ChkPos>& light_updated_chunks) {
-    LUX_ASSERT(light_updated_chunks.size() == 0);
+void map_tick() {
     for(auto const& update : awaiting_light_updates) {
         if(is_chunk_loaded(update)) {
             light_updated_chunks.emplace(update);
@@ -112,6 +127,8 @@ void map_tick(VecSet<ChkPos>& light_updated_chunks) {
         update_chunk_light(update, chunks.at(update));
         awaiting_light_updates.erase(update);
     }
+    light_updated_chunks.clear();
+    tile_updated_chunks.clear();
 }
 
 void add_light_node(MapPos const& pos, Vec3F const& col) {
@@ -143,7 +160,7 @@ static void update_chunk_light(ChkPos const &pos, Chunk& chunk) {
         Vec3<U8> map_color = {(map_lvl & 0xF800) >> 11,
                               (map_lvl & 0x07C0) >>  6,
                               (map_lvl & 0x003E) >>  1};
-        if(chunk.wall[node.idx]) {
+        if(chunk.wall[node.idx] != void_tile) {
             node.col = (Vec3<U8>)glm::round(Vec3F(node.col) * 0.5f);
         }
         auto is_less = glm::lessThan(map_color, node.col);
@@ -154,7 +171,7 @@ static void update_chunk_light(ChkPos const &pos, Chunk& chunk) {
             chunk.light_lvl[node.idx] = (new_color.r << 11) |
                                         (new_color.g <<  6) |
                                         (new_color.b <<  1);
-            if(chunk.wall[node.idx]) {
+            if(chunk.wall[node.idx] != void_tile) {
                 node.col = Vec3<U8>(1);
             }
             auto atleast_two = glm::greaterThanEqual(node.col, Vec3<U8>(2u));

@@ -65,10 +65,8 @@ int main(int argc, char** argv) {
         while(server_is_running()) {
             clock.start();
             entities_tick();
-            static VecSet<ChkPos> light_updated_chunks;
-            map_tick(light_updated_chunks);
-            server_tick(light_updated_chunks);
-            light_updated_chunks.clear();
+            map_tick();
+            server_tick();
 
             parse_command_queue();
             clock.stop();

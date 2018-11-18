@@ -4,22 +4,29 @@
 //
 #include <db.hpp>
 
+TileId constexpr void_tile = 0;
+
 struct Chunk {
     Arr<LightLvl, CHK_VOL> light_lvl;
-    Arr<TileId  , CHK_VOL> bg_id;
-    Arr<TileId  , CHK_VOL> fg_id;
-    BitArr<CHK_VOL>         wall;
+    Arr<TileId  , CHK_VOL> floor;
+    Arr<TileId  , CHK_VOL> wall;
+    Arr<TileId  , CHK_VOL> roof;
 };
 
-TileId get_fg_id(MapPos const& pos);
-TileId get_bg_id(MapPos const& pos);
-TileBp const& get_bg_bp(MapPos const& pos);
-TileBp const& get_fg_bp(MapPos const& pos);
-bool is_tile_wall(MapPos const& pos);
+extern VecSet<ChkPos> tile_updated_chunks;
+extern VecSet<ChkPos> light_updated_chunks;
 
-void map_tick(VecSet<ChkPos>& light_updated_chunks);
+TileId get_floor(MapPos const& pos);
+TileId get_wall(MapPos const& pos);
+TileId get_roof(MapPos const& pos);
+TileBp const& get_floor_bp(MapPos const& pos);
+TileBp const& get_wall_bp(MapPos const& pos);
+TileBp const& get_roof_bp(MapPos const& pos);
+
+void map_tick();
 void guarantee_chunk(ChkPos const& pos);
-Chunk& get_chunk(ChkPos const& pos);
+Chunk const& get_chunk(ChkPos const& pos);
+Chunk& write_chunk(ChkPos const& pos);
 
 void add_light_node(MapPos const& pos, Vec3F const& col);
 void del_light_node(MapPos const& pos);

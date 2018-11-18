@@ -10,7 +10,7 @@ typedef std::uintptr_t ClientId;
 bool is_client_connected(ClientId id);
 void server_init(U16 server_port, F64 tick_rate);
 void server_deinit();
-void server_tick(VecSet<ChkPos> const& light_updated_chunks);
+void server_tick();
 
 void kick_client(ClientId id, char const* reason);
 

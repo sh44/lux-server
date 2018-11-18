@@ -226,12 +226,12 @@ LUX_MAY_FAIL send_tiles(ENetPeer* peer, VecSet<ChkPos> const& requests) {
     for(auto const& pos : requests) {
         guarantee_chunk(pos);
         Chunk const& chunk = get_chunk(pos);
-        for(Uns i = 0; i < CHK_VOL; ++i) {
-            ss_sgnl.tiles.chunks[pos].id[i] =
-                chunk.wall[i] ? chunk.fg_id[i] : chunk.bg_id[i];
-        }
-        std::memcpy(ss_sgnl.tiles.chunks[pos].wall.raw_data,
-                    chunk.wall.raw_data, sizeof(chunk.wall));
+        std::memcpy(ss_sgnl.tiles.chunks[pos].floor,
+                    chunk.floor, sizeof(chunk.floor));
+        std::memcpy(ss_sgnl.tiles.chunks[pos].wall,
+                    chunk.wall, sizeof(chunk.wall));
+        std::memcpy(ss_sgnl.tiles.chunks[pos].roof,
+                    chunk.roof, sizeof(chunk.roof));
     }
 
     LUX_RETHROW(send_net_data(peer, &ss_sgnl, SIGNAL_CHANNEL),
@@ -288,8 +288,9 @@ LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
                 MapPos pos = glm::floor(action.target.point);
                 ChkPos chk_pos = to_chk_pos(pos);
                 guarantee_chunk(chk_pos);
-                get_chunk(chk_pos).wall[to_chk_idx(pos)] = true;
-                get_chunk(chk_pos).light_lvl[to_chk_idx(pos)] = 0x0000;
+                write_chunk(chk_pos).wall[to_chk_idx(pos)] =
+                    db_tile_id("stone_wall");
+                write_chunk(chk_pos).light_lvl[to_chk_idx(pos)] = 0x0000;
                 (void)send_tiles(peer, {chk_pos});
                 (void)send_light(peer, {chk_pos});
                 break;
@@ -339,9 +340,10 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
     return LUX_OK;
 }
 
-void server_tick(VecSet<ChkPos> const& light_updated_chunks) {
+void server_tick() {
     server.clients.foreach([&](ClientId id) {
         (void)send_light(server.clients[id].peer, light_updated_chunks);
+        (void)send_tiles(server.clients[id].peer, tile_updated_chunks);
     });
     { ///handle events
         //@CONSIDER splitting this scope
