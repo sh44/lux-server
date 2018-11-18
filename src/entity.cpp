@@ -202,6 +202,9 @@ void entities_tick() {
                     collision_sectors[to_chk_pos(pos)].insert(id);
                 }
             } else {*/
+                if(vel.x != 0.f && vel.y != 0.f) {
+                    comps.orientation.at(id).angle = std::atan2(vel.y, vel.x);
+                }
                 pos += vel;
             //}
             vel *= VEL_DAMPING;

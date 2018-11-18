@@ -300,7 +300,7 @@ LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
     }
     if(entity_comps.orientation.count(entity) > 0) {
         //entity_comps.orientation.at(entity).angle = cs_tick.player_aim_angle;
-        entity_comps.orientation.at(entity).angle = tau / 8.f;
+        //entity_comps.orientation.at(entity).angle = tau / 8.f;
     }
     return LUX_OK;
 }
