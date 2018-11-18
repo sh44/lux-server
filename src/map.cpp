@@ -125,10 +125,6 @@ static void update_chunk_light(ChkPos const &pos, Chunk& chunk) {
         LightNode node = nodes.front();
         nodes.pop();
 
-        constexpr MapPos offsets[4] =
-            {{-1,  0}, { 1,  0},
-             { 0, -1}, { 0,  1}};
-
         MapPos base_pos = to_map_pos(pos, node.idx);
         //@IMPROVE bit-level parallelism
 
@@ -153,7 +149,7 @@ static void update_chunk_light(ChkPos const &pos, Chunk& chunk) {
             auto atleast_two = glm::greaterThanEqual(node.col, Vec3<U8>(2u));
             if(glm::any(atleast_two)) {
                 Vec3<U8> side_color = node.col - (Vec3<U8>)atleast_two;
-                for(auto const &offset : offsets) {
+                for(auto const &offset : manhattan_hollow) {
                     //@TODO don't spread lights through Z if there is floor
                     MapPos map_pos = base_pos + offset;
                     ChkPos chk_pos = to_chk_pos(map_pos);
