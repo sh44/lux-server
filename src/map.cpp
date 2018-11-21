@@ -118,6 +118,8 @@ VecMap<ChkPos, Queue<LightNode>> light_nodes;
 VecSet<ChkPos>                   awaiting_light_updates;
 
 void map_tick() {
+    light_updated_chunks.clear();
+    tile_updated_chunks.clear();
     for(auto const& update : awaiting_light_updates) {
         if(is_chunk_loaded(update)) {
             light_updated_chunks.emplace(update);
@@ -127,8 +129,6 @@ void map_tick() {
         update_chunk_light(update, chunks.at(update));
         awaiting_light_updates.erase(update);
     }
-    light_updated_chunks.clear();
-    tile_updated_chunks.clear();
 }
 
 void add_light_node(MapPos const& pos, Vec3F const& col) {

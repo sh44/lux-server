@@ -207,7 +207,7 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
     entity_comps.shape[client.entity] = EntityComps::Shape
         {{.rect = {{1.f, 1.f}}}, EntityComps::Shape::RECT};
     entity_comps.container[client.entity].items =
-        {create_item("dong"), create_item("bong"), create_item("levi's head")};
+        {create_item("item0"), create_item("item1"), create_item("item2")};
     entity_comps.visible[client.entity] = {0};
     auto& entity_name = entity_comps.name[client.entity];
     entity_name.resize(client.name.size());
@@ -342,6 +342,7 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
 
 void server_tick() {
     server.clients.foreach([&](ClientId id) {
+        //@TODO only send loaded updates
         (void)send_light(server.clients[id].peer, light_updated_chunks);
         (void)send_tiles(server.clients[id].peer, tile_updated_chunks);
     });
