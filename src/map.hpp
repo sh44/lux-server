@@ -13,6 +13,7 @@ struct Chunk {
     Arr<TileId  , CHK_VOL> roof;
 };
 
+extern F32 day_cycle;
 extern VecSet<ChkPos> tile_updated_chunks;
 extern VecSet<ChkPos> light_updated_chunks;
 

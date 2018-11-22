@@ -392,6 +392,7 @@ void server_tick() {
         //instead of resending the whole state all the time
         NetSsTick::EntityComps net_comps;
         get_net_entity_comps(&net_comps);
+        ss_tick.day_cycle = day_cycle;
         ss_tick.entity_comps = net_comps;
         entities.foreach([&](EntityId id) {
             ss_tick.entities.emplace_back(id);

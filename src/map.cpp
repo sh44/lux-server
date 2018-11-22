@@ -12,6 +12,7 @@
 #include "map.hpp"
 
 static VecMap<ChkPos, Chunk> chunks;
+F32 day_cycle;
 VecSet<ChkPos> tile_updated_chunks;
 VecSet<ChkPos> light_updated_chunks;
 
@@ -118,6 +119,7 @@ VecMap<ChkPos, Queue<LightNode>> light_nodes;
 VecSet<ChkPos>                   awaiting_light_updates;
 
 void map_tick() {
+    static Uns tick_num = 0;
     light_updated_chunks.clear();
     tile_updated_chunks.clear();
     for(auto const& update : awaiting_light_updates) {
@@ -129,6 +131,10 @@ void map_tick() {
         update_chunk_light(update, chunks.at(update));
         awaiting_light_updates.erase(update);
     }
+    Uns constexpr ticks_per_day = 32768;
+    day_cycle = std::sin(tau *
+        (((F32)(tick_num % ticks_per_day) / (F32)ticks_per_day) + 0.5f));
+    tick_num++;
 }
 
 void add_light_node(MapPos const& pos, Vec3F const& col) {
