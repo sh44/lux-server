@@ -131,9 +131,10 @@ void map_tick() {
         update_chunk_light(update, chunks.at(update));
         awaiting_light_updates.erase(update);
     }
-    Uns constexpr ticks_per_day = 32768;
-    day_cycle = std::sin(tau *
-        (((F32)(tick_num % ticks_per_day) / (F32)ticks_per_day) + 0.5f));
+    Uns constexpr ticks_per_day = 1 << 15;
+    F32 sin_val = std::sin(tau *
+        (((F32)(tick_num % ticks_per_day) / (F32)ticks_per_day) + 0.25f));
+    day_cycle = glm::sqrt(glm::abs(sin_val)) * glm::sign(sin_val);
     tick_num++;
 }
 
