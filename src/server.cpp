@@ -269,20 +269,16 @@ LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
 
     EntityId entity = server.clients[(ClientId)peer->data].entity;
     for(auto const& action : cs_tick.actions) {
-        switch(action.tag) {
-            case NetCsTick::Action::MOVE: {
-                //@TODO log this?
-                if(action.target.tag != NetCsTick::Action::Target::DIR) break;
-                if(entity_comps.vel.count(entity) > 0) {
-                    //@TODO else warn
-                    if(f32_cmp(glm::length(action.target.dir), 1.f)) {
-                        entity_comps.vel.at(entity) =
-                            action.target.dir * 0.1f;
-                    }
-                }
-                //@TODO magic number
-                break;
-            }
+        if(entity_comps.rasen.count(entity) > 0) {
+            auto& rasen = entity_comps.rasen.at(entity);
+            //@TODO check if size is correct
+            std::memcpy(rasen.o, action.bytecode.data(),
+                        action.bytecode.size() * sizeof(U16));
+            rasen.run();
+        } else {
+            //@TODO warn
+        }
+        /*
             case NetCsTick::Action::BREAK: {
                 if(action.target.tag != NetCsTick::Action::Target::POINT) break;
                 MapPos pos = glm::floor(action.target.point);
@@ -296,7 +292,7 @@ LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
                 break;
             }
             default: break; //TODO warn
-        }
+        }*/
     }
     if(entity_comps.orientation.count(entity) > 0) {
         //entity_comps.orientation.at(entity).angle = cs_tick.player_aim_angle;

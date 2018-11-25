@@ -43,6 +43,7 @@ EntityId create_player() {
         {{.rect = {{0.5f, 0.5f}}}, .tag = EntityComps::Shape::RECT};
     comps.visible[id]     = {1};
     comps.orientation[id] = {0.f};
+    comps.rasen[id].m[RN_RAM_LEN - 1] = id;
     return id;
 }
 
@@ -202,9 +203,6 @@ void entities_tick() {
                     collision_sectors[to_chk_pos(pos)].insert(id);
                 }
             } else {*/
-                if(vel.x != 0.f && vel.y != 0.f) {
-                    comps.orientation.at(id).angle = std::atan2(vel.y, vel.x);
-                }
                 pos += vel;
             //}
             vel *= VEL_DAMPING;
@@ -218,6 +216,7 @@ void remove_entity(EntityId entity) {
     entities.erase(entity);
     ///this is only gonna grow longer...
     if(comps.pos.count(entity)         > 0) comps.pos.erase(entity);
+    if(comps.origin.count(entity)      > 0) comps.origin.erase(entity);
     if(comps.vel.count(entity)         > 0) comps.vel.erase(entity);
     if(comps.name.count(entity)        > 0) comps.name.erase(entity);
     if(comps.shape.count(entity)       > 0) comps.shape.erase(entity);
@@ -225,6 +224,7 @@ void remove_entity(EntityId entity) {
     if(comps.item.count(entity)        > 0) comps.item.erase(entity);
     if(comps.container.count(entity)   > 0) comps.container.erase(entity);
     if(comps.orientation.count(entity) > 0) comps.orientation.erase(entity);
+    if(comps.rasen.count(entity)       > 0) comps.rasen.erase(entity);
 }
 
 void get_net_entity_comps(NetSsTick::EntityComps* net_comps) {

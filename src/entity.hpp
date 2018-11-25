@@ -3,6 +3,11 @@
 #include <lux_shared/common.hpp>
 #include <lux_shared/entity.hpp>
 #include <lux_shared/net/data.hpp>
+//
+#include <rasen.hpp>
+
+F32 constexpr ENTITY_L_VEL = 0.15f;
+F32 constexpr ENTITY_A_VEL = tau / 128.f;
 
 struct Entity {};
 extern SparseDynArr<Entity> entities;
@@ -10,6 +15,7 @@ typedef decltype(entities)::Id EntityId;
 
 struct EntityComps {
     typedef EntityVec    Pos;
+    typedef EntityVec    Origin;
     typedef EntityVec    Vel;
     typedef DynArr<char> Name;
     struct Shape {
@@ -40,14 +46,16 @@ struct EntityComps {
     };
 
     //@IMPROVE more space efficient solution
-    IdMap<EntityId, Pos>          pos;
-    IdMap<EntityId, Vel>          vel;
-    IdMap<EntityId, Name>         name;
-    IdMap<EntityId, Shape>        shape;
-    IdMap<EntityId, Visible>      visible;
-    IdMap<EntityId, Item>         item;
-    IdMap<EntityId, Container>    container;
-    IdMap<EntityId, Orientation>  orientation;
+    IdMap<EntityId, Pos>         pos;
+    IdMap<EntityId, Origin>      origin;
+    IdMap<EntityId, Vel>         vel;
+    IdMap<EntityId, Name>        name;
+    IdMap<EntityId, Shape>       shape;
+    IdMap<EntityId, Visible>     visible;
+    IdMap<EntityId, Item>        item;
+    IdMap<EntityId, Container>   container;
+    IdMap<EntityId, Orientation> orientation;
+    IdMap<EntityId, Rasen>       rasen;
 };
 
 extern EntityComps& entity_comps;
