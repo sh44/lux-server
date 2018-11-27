@@ -16,8 +16,8 @@ F32 day_cycle;
 VecSet<ChkPos> tile_updated_chunks;
 VecSet<ChkPos> light_updated_chunks;
 
-constexpr Uns LIGHT_BITS_PER_COLOR = 5;
-static_assert(LIGHT_BITS_PER_COLOR * 3 <= sizeof(LightLvl) * 8);
+constexpr Uns LIGHT_BITS_PER_COLOR = 4;
+static_assert(LIGHT_BITS_PER_COLOR * 2 <= sizeof(LightLvl) * 8);
 constexpr Uns LIGHT_RANGE          = 1 << LIGHT_BITS_PER_COLOR;
 
 static void update_chunk_light(ChkPos const &pos, Chunk& chunk);
@@ -39,7 +39,6 @@ static Chunk& load_chunk(ChkPos const& pos) {
     constexpr F32 base_scale = 0.015f;
     for(Uns i = 0; i < CHK_VOL; ++i) {
         MapPos map_pos = to_map_pos(pos, i);
-        chunk.light_lvl[i] = 0xFFFF;
         F32 scale  = base_scale;
         F32 weight = 1.f;
         F32 avg    = 0.f;
@@ -61,6 +60,11 @@ static Chunk& load_chunk(ChkPos const& pos) {
                              h > 0.45f  ? dirt :
                              h > 0.3f   ? grass :
                              h > 0.125f ? dark_grass : dirt;
+        }
+        if(chunk.wall[i] == void_tile) {
+            chunk.light_lvl[i] = 0x0F00;
+        } else {
+            chunk.light_lvl[i] = 0x0000;
         }
     }
     return chunk;
@@ -110,9 +114,9 @@ TileBp const& get_roof_bp(MapPos const& pos) {
 
 //@CONSIDER separate file for lightsim
 struct LightNode {
-    Vec3<U8> col;
+    U8       lum;
     ChkIdx   idx;
-    static_assert(sizeof(col.r) * 8 >= LIGHT_BITS_PER_COLOR);
+    static_assert(sizeof(lum) * 8 >= LIGHT_BITS_PER_COLOR);
 };
 
 VecMap<ChkPos, Queue<LightNode>> light_nodes;
@@ -131,19 +135,18 @@ void map_tick() {
         update_chunk_light(update, chunks.at(update));
         awaiting_light_updates.erase(update);
     }
-    Uns constexpr ticks_per_day = 1 << 15;
-    F32 sin_val = std::sin(tau *
+    Uns constexpr ticks_per_day = 1 << 12;
+    day_cycle = std::sin(tau *
         (((F32)(tick_num % ticks_per_day) / (F32)ticks_per_day) + 0.25f));
-    day_cycle = glm::sqrt(glm::abs(sin_val)) * glm::sign(sin_val);
     tick_num++;
 }
 
-void add_light_node(MapPos const& pos, Vec3F const& col) {
+void add_light_node(MapPos const& pos, F32 lum) {
     ChkPos chk_pos = to_chk_pos(pos);
     ChkIdx chk_idx = to_chk_idx(pos);
     //@TODO
-    light_nodes[chk_pos].push(LightNode{
-        Vec3<U8>(glm::round(col * (F32)LIGHT_RANGE)), to_chk_idx(pos)});
+    light_nodes[chk_pos].push(
+        LightNode{(F32)glm::round(lum * (F32)LIGHT_RANGE), to_chk_idx(pos)});
     awaiting_light_updates.insert(chk_pos);
 }
 
@@ -164,35 +167,29 @@ static void update_chunk_light(ChkPos const &pos, Chunk& chunk) {
         //@IMPROVE bit-level parallelism
 
         LightLvl map_lvl = chunk.light_lvl[node.idx];
-        Vec3<U8> map_color = {(map_lvl & 0xF800) >> 11,
-                              (map_lvl & 0x07C0) >>  6,
-                              (map_lvl & 0x003E) >>  1};
+        U8 map_lum = (map_lvl & 0xF000) >> 12;
         if(chunk.wall[node.idx] != void_tile) {
-            node.col = (Vec3<U8>)glm::round(Vec3F(node.col) * 0.5f);
+            node.lum = glm::round((F32)node.lum * 0.5f);
         }
-        auto is_less = glm::lessThan(map_color, node.col);
-        if(glm::any(is_less)) {
-            /* node.col is guaranteed to be non-zero when is_less is true */
-            Vec3<U8> new_color = node.col * (Vec3<U8>)is_less +
-                                 map_color * (Vec3<U8>)(glm::not_(is_less));
-            chunk.light_lvl[node.idx] = (new_color.r << 11) |
-                                        (new_color.g <<  6) |
-                                        (new_color.b <<  1);
+        if(map_lum < node.lum) {
+            /* node.lum is guaranteed to be non-zero when > map_lum */
+            U8 new_lum = node.lum;
+            chunk.light_lvl[node.idx] &= 0x0FFF;
+            chunk.light_lvl[node.idx] |= new_lum << 12;
             if(chunk.wall[node.idx] != void_tile) {
-                node.col = Vec3<U8>(1);
+                node.lum = 1;
             }
-            auto atleast_two = glm::greaterThanEqual(node.col, Vec3<U8>(2u));
-            if(glm::any(atleast_two)) {
-                Vec3<U8> side_color = node.col - (Vec3<U8>)atleast_two;
+            if(node.lum >= 2) {
+                U8 side_lum = node.lum - 1;
                 for(auto const &offset : manhattan_hollow<MapCoord>) {
                     //@TODO don't spread lights through Z if there is floor
                     MapPos map_pos = base_pos + offset;
                     ChkPos chk_pos = to_chk_pos(map_pos);
                     ChkIdx idx     = to_chk_idx(map_pos);
                     if(chk_pos == pos) {
-                        nodes.push({side_color, idx});
+                        nodes.push({side_lum, idx});
                     } else {
-                        light_nodes[chk_pos].push({side_color, idx});
+                        light_nodes[chk_pos].push({side_lum, idx});
                         awaiting_light_updates.insert(chk_pos);
                     }
                 }
