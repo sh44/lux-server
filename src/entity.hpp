@@ -15,8 +15,8 @@ typedef decltype(entities)::Id EntityId;
 
 struct EntityComps {
     typedef EntityVec    Pos;
-    typedef EntityVec    Origin;
     typedef EntityVec    Vel;
+    typedef F32          AVel;
     typedef DynArr<char> Name;
     struct Shape {
         union {
@@ -42,19 +42,21 @@ struct EntityComps {
         DynArr<EntityId> items;
     };
     struct Orientation {
-        F32 angle; ///in radians
+        Vec2F origin;
+        F32   angle; ///in radians
     };
 
     //@IMPROVE more space efficient solution
     IdMap<EntityId, Pos>         pos;
-    IdMap<EntityId, Origin>      origin;
     IdMap<EntityId, Vel>         vel;
+    IdMap<EntityId, AVel>        a_vel;
     IdMap<EntityId, Name>        name;
     IdMap<EntityId, Shape>       shape;
     IdMap<EntityId, Visible>     visible;
     IdMap<EntityId, Item>        item;
     IdMap<EntityId, Container>   container;
     IdMap<EntityId, Orientation> orientation;
+    IdMap<EntityId, EntityId>    parent;
     IdMap<EntityId, Rasen>       rasen;
 };
 

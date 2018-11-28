@@ -149,12 +149,8 @@ void extcall_entity_get_pos(Rasen* cpu) {
         extcall_err(cpu);
         return;
     }
-    Vec2F origin = {0.f, 0.f};
-    if(entity_comps.origin.count(id) > 0) {
-        origin = entity_comps.origin.at(id);
-    }
     Vec2<I8> pos =
-        glm::floor(glm::clamp(entity_comps.pos.at(id) - origin, -128.f, 127.f));
+        glm::floor(glm::clamp(entity_comps.pos.at(id), -128.f, 127.f));
     cpu->push(pos.y);
     cpu->push(pos.x);
 }

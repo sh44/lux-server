@@ -36,14 +36,25 @@ EntityId create_item(const char* name) {
 
 EntityId create_player() {
     LUX_LOG("creating new player");
-    EntityId id           = create_entity();
-    comps.pos[id]         = {3, 3};
-    comps.vel[id]         = {0, 0};
-    comps.shape[id]       = EntityComps::Shape
+    EntityId id            = create_entity();
+    comps.pos[id]          = {3, 3};
+    comps.vel[id]          = {0, 0};
+    comps.shape[id]        = EntityComps::Shape
         {{.rect = {{0.5f, 0.5f}}}, .tag = EntityComps::Shape::RECT};
-    comps.visible[id]     = {1};
-    comps.orientation[id] = {0.f};
-    comps.rasen[id].m[RN_RAM_LEN - 1] = id;
+    comps.visible[id]      = {1};
+    comps.orientation[id]  = {{0.f, 0.f}, 0.f};
+    EntityId previous = id;
+    for(Uns i = 0; i < 16; i++) {
+        EntityId limb_id       = create_entity();
+        comps.pos[limb_id]     = {3.f - 0.25f, 0};
+        comps.shape[limb_id]   = EntityComps::Shape
+            {{.rect = {{2.0f, 0.25f}}}, .tag = EntityComps::Shape::RECT};
+        comps.visible[limb_id] = {1};
+        comps.parent[limb_id] = previous;
+        comps.orientation[limb_id] = {{-2.f, 0.f}, 0.f};
+        comps.a_vel[limb_id]    = {(F32)i * 0.001f};
+        previous = limb_id;
+    }
     return id;
 }
 
@@ -177,6 +188,16 @@ void entities_tick() {
         } else ++it;
     }
     entities.foreach([](EntityId id) {
+        if(comps.parent.count(id) > 0 &&
+           !entities.contains(comps.parent.at(id))) {
+           entities.erase(id);
+           return;
+        }
+        if(comps.orientation.count(id) > 0 &&
+           comps.a_vel.count(id) > 0) {
+            comps.orientation.at(id).angle += comps.a_vel.at(id);
+            //@TODO divide to prevent precision loss or something?
+        }
         if(comps.pos.count(id) > 0 &&
            comps.vel.count(id) > 0) {
             auto& pos = comps.pos.at(id);
@@ -216,7 +237,6 @@ void remove_entity(EntityId entity) {
     entities.erase(entity);
     ///this is only gonna grow longer...
     if(comps.pos.count(entity)         > 0) comps.pos.erase(entity);
-    if(comps.origin.count(entity)      > 0) comps.origin.erase(entity);
     if(comps.vel.count(entity)         > 0) comps.vel.erase(entity);
     if(comps.name.count(entity)        > 0) comps.name.erase(entity);
     if(comps.shape.count(entity)       > 0) comps.shape.erase(entity);
@@ -263,6 +283,10 @@ void get_net_entity_comps(NetSsTick::EntityComps* net_comps) {
         net_comps->container[container.first] = {container.second.items};
     }
     for(auto const& orientation : comps.orientation) {
-        net_comps->orientation[orientation.first] = {orientation.second.angle};
+        net_comps->orientation[orientation.first] =
+            {orientation.second.origin, orientation.second.angle};
+    }
+    for(auto const& parent : comps.parent) {
+        net_comps->parent[parent.first] = parent.second;
     }
 }
