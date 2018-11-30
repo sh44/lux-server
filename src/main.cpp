@@ -15,7 +15,6 @@
 #include <map.hpp>
 #include <entity.hpp>
 #include <server.hpp>
-#include <command.hpp>
 
 std::atomic<bool> exiting = false;
 
@@ -25,7 +24,8 @@ void console_main() {
         std::getline(std::cin, input);
         if(input.size() > 2 && input[0] == '/') {
             input.erase(0, 1);
-            add_command(input.c_str());
+            //@TODO add_command(input.c_str());
+            LUX_UNIMPLEMENTED();
         } else if(input.size() > 1) {
             server_broadcast(input.c_str());
         }
@@ -52,8 +52,6 @@ int main(int argc, char** argv) {
     }
 
     db_init();
-    command_init();
-    LUX_DEFER { command_deinit(); };
     constexpr F64 TICK_RATE = 64.0;
     server_init(server_port, TICK_RATE);
     LUX_DEFER { server_deinit(); };
@@ -68,7 +66,6 @@ int main(int argc, char** argv) {
             map_tick();
             server_tick();
 
-            parse_command_queue();
             clock.stop();
             auto remaining = clock.synchronize();
             if(remaining < util::TickClock::Duration::zero()) {

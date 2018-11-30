@@ -15,7 +15,6 @@
 //
 #include <map.hpp>
 #include <entity.hpp>
-#include <command.hpp>
 #include "server.hpp"
 
 Uns constexpr MAX_CLIENTS  = 16;
@@ -329,7 +328,8 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
                     sgnl.command.contents.data());
 
             //@TODO we should redirect output somehow
-            add_command(sgnl.command.contents.data());
+            //@TODO add_command(sgnl.command.contents.data());
+            LUX_UNIMPLEMENTED();
         } break;
         default: LUX_UNREACHABLE();
     }

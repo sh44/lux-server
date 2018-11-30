@@ -32,17 +32,14 @@ include_directories("deps/lux-shared/include"
                     "src" "${PROJECT_BINARY_DIR}/include"
                     "${PROJECT_BINARY_DIR}/deps/lux-shared/include")
 add_subdirectory("deps/lux-shared")
-add_subdirectory("api")
 
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 add_executable(lux-server ${SOURCES})
 
 find_package(Threads REQUIRED)
 find_library(ENET_LIB enet)
-find_library(LUAJIT_LIB luajit)
 
 target_link_libraries(lux-server lux)
 target_link_libraries(lux-server Threads::Threads)
 target_link_libraries(lux-server "${ENET_LIB}")
-target_link_libraries(lux-server "${LUAJIT_LIB}")
 
