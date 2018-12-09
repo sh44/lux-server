@@ -23,7 +23,7 @@ struct Server {
     F64 tick_rate = 0.0;
     struct Client {
         ENetPeer*      peer;
-        DynStr         name;
+        StrBuff        name;
         EntityId       entity;
         VecSet<ChkPos> loaded_chunks;
         bool           admin = false;
@@ -64,8 +64,8 @@ void server_deinit() {
     LUX_LOG("deinitializing server");
 
     LUX_LOG("kicking all clients");
-    server.clients.foreach([](ClientId id) {
-        kick_client(id, "server stopping");
+    foreach(server.clients, [](ClientId id) {
+        kick_client(id, "server stopping"_l);
     });
     enet_host_destroy(server.host);
     enet_deinitialize();
@@ -79,7 +79,8 @@ void erase_client(ClientId id) {
     LUX_ASSERT(is_client_connected(id));
     LUX_LOG("client disconnected");
     LUX_LOG("    id: %zu" , id);
-    LUX_LOG("    name: %s", server.clients[id].name.c_str());
+    auto const& name = server.clients[id].name;
+    LUX_LOG("    name: %.*s", (int)name.len, name.beg);
     remove_entity(server.clients[id].entity);
     server.clients.erase(id);
 }
@@ -91,26 +92,26 @@ void kick_peer(ENetPeer *peer) {
     enet_peer_disconnect_now(peer, 0);
 }
 
-LUX_MAY_FAIL static server_send_msg(ClientId id, char const* beg, SizeT len) {
-    char constexpr prefix[] = "[SERVER]: ";
-    SizeT total_len = (sizeof(prefix) - 1) + len;
+LUX_MAY_FAIL static server_send_msg(ClientId id, Str str) {
+    Str constexpr prefix = "[SERVER]: "_l;
     ss_sgnl.tag = NetSsSgnl::MSG;
-    ss_sgnl.msg.contents.resize(total_len);
-    std::memcpy(ss_sgnl.msg.contents.data(), prefix, sizeof(prefix) - 1);
-    std::memcpy(ss_sgnl.msg.contents.data() + (sizeof(prefix) - 1), beg, len);
+    ss_sgnl.msg.contents.resize(prefix.len + str.len);
+    ss_sgnl.msg.contents.cpy(prefix).cpy(str);
     LUX_ASSERT(is_client_connected(id));
     return send_net_data(server.clients[id].peer, &ss_sgnl, SIGNAL_CHANNEL);
 }
 
-void kick_client(ClientId id, char const* reason) {
+void kick_client(ClientId id, Str reason) {
     LUX_ASSERT(is_client_connected(id));
-    DynStr name = server.clients[id].name;
+    DynStr name = (DynStr)server.clients[id].name;
     LUX_LOG("kicking client");
-    LUX_LOG("    name: %s", name.c_str());
-    LUX_LOG("    reason: %s", reason);
+    LUX_LOG("    name: %.*s", (int)name.len, name.beg);
+    LUX_LOG("    reason: %.*s", (int)reason.len, reason.beg);
     LUX_LOG("    id: %zu", id);
-    DynStr msg = DynStr("you got kicked for: ") + DynStr(reason);
-    (void)server_send_msg(id, msg.c_str(), msg.size());
+    Str constexpr prefix = "you got kicked for: "_l;
+    StrBuff msg(prefix.len + reason.len);
+    msg.cpy(prefix).cpy(reason);
+    (void)server_send_msg(id, msg);
     enet_host_flush(server.host);
     kick_peer(server.clients[id].peer);
     erase_client(id);
@@ -175,20 +176,18 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
             return LUX_FAIL;
         }
 
-        ClientId duplicate_id = get_client_id((const char*)cs_init.name);
+        ClientId duplicate_id = get_client_id((Str)cs_init.name);
         if(duplicate_id != server.clients.end()) {
             //@CONSIDER kicking the new one instead
             LUX_LOG("client already connected, kicking the old one");
-            kick_client(duplicate_id, "double-join");
+            kick_client(duplicate_id, "double-join"_l);
         }
     }
 
     { ///send init packet
-        U8 constexpr server_name[] = "lux-server";
-        static_assert(sizeof(server_name) <= SERVER_NAME_LEN);
-        std::memcpy(ss_init.name, server_name, sizeof(server_name));
-        std::memset(ss_init.name + sizeof(server_name), 0,
-                    SERVER_NAME_LEN - sizeof(server_name));
+        Str constexpr name = "lux-server"_l;
+        LUX_ASSERT(name.len <= SERVER_NAME_LEN);
+        ((DynStr)ss_init.name).cpy(name).set('\0');
         ss_init.tick_rate = server.tick_rate;
 
         LUX_RETHROW(send_net_data(peer, &ss_init, INIT_CHANNEL),
@@ -199,21 +198,15 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
     Server::Client& client = server.clients[id];
     client.peer = peer;
     client.peer->data = (void*)id;
-    client.name = DynStr((char const*)cs_init.name,
-        strnlen((char const*)cs_init.name, CLIENT_NAME_LEN));
+    client.name = (Str)cs_init.name;
     client.entity = create_player();
     //@TODO
-    entity_comps.shape[client.entity] = EntityComps::Shape
-        {{.rect = {{1.f, 1.f}}}, EntityComps::Shape::RECT};
     entity_comps.container[client.entity].items =
-        {create_item("item0"), create_item("item1"), create_item("item2")};
-    entity_comps.visible[client.entity] = {0};
-    auto& entity_name = entity_comps.name[client.entity];
-    entity_name.resize(client.name.size());
-    std::memcpy(entity_name.data(), client.name.data(), client.name.size());
+        {create_item("item0"_l), create_item("item1"_l), create_item("item2"_l)};
+    entity_comps.name[client.entity] = (Str)client.name;
 
     LUX_LOG("client connected successfully");
-    LUX_LOG("    name: %s", client.name.c_str());
+    LUX_LOG("    name: %.*s", (int)client.name.len, client.name.beg);
 #ifndef NDEBUG
     (void)server_make_admin(id);
 #endif
@@ -266,37 +259,14 @@ LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
     LUX_RETHROW(deserialize_packet(in_pack, &cs_tick),
         "failed to deserialize tick from client")
 
-    EntityId entity = server.clients[(ClientId)peer->data].entity;
-    for(auto const& action : cs_tick.actions) {
-        if(entity_comps.rasen.count(entity) > 0) {
-            auto& rasen = entity_comps.rasen.at(entity);
-            //@TODO check if size is correct
-            std::memcpy(rasen.o, action.bytecode.data(),
-                        action.bytecode.size() * sizeof(U16));
-            rasen.run();
-        } else {
-            //@TODO warn
-        }
-        /*
-            case NetCsTick::Action::BREAK: {
-                if(action.target.tag != NetCsTick::Action::Target::POINT) break;
-                MapPos pos = glm::floor(action.target.point);
-                ChkPos chk_pos = to_chk_pos(pos);
-                guarantee_chunk(chk_pos);
-                write_chunk(chk_pos).wall[to_chk_idx(pos)] =
-                    db_tile_id("stone_wall");
-                write_chunk(chk_pos).light_lvl[to_chk_idx(pos)] = 0x0000;
-                (void)send_tiles(peer, {chk_pos});
-                (void)send_light(peer, {chk_pos});
-                break;
-            }
-            default: break; //TODO warn
-        }*/
-    }
-    if(entity_comps.orientation.count(entity) > 0) {
-        //entity_comps.orientation.at(entity).angle = cs_tick.player_aim_angle;
-        //entity_comps.orientation.at(entity).angle = tau / 8.f;
-    }
+    auto& client = server.clients[(ClientId)peer->data];
+    foreach(cs_tick.actions, [&](SizeT idx) {
+        //@TODO check if size is correct
+        /*std::memcpy(client.rasen.o, action.bytecode.data(),
+                    action.bytecode.len * sizeof(U16));
+        client.rasen.run();*/
+        LUX_UNIMPLEMENTED();
+    });
     return LUX_OK;
 }
 
@@ -312,20 +282,18 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
         } break;
         case NetCsSgnl::COMMAND: {
             ClientId client_id = (ClientId)peer->data;
+            auto const& name = server.clients[client_id].name;
+            auto const& contents = sgnl.command.contents;
             if(!server.clients[client_id].admin) {
-                LUX_LOG("client %s tried to execute command \"%*s\""
-                        " without admin rights",
-                        server.clients[client_id].name.c_str(),
-                        (int)sgnl.command.contents.size(),
-                        sgnl.command.contents.data());
-                char constexpr DENY_MSG[] = "you do not have admin rights, this"
-                    " incident will be reported";
-                (void)server_send_msg(client_id, DENY_MSG,
-                                sizeof(DENY_MSG));
+                LUX_LOG("client %.*s tried to execute command \"%*s\""
+                        " without admin rights", (int)name.len, name.beg,
+                        (int)contents.len, contents.beg);
+                (void)server_send_msg(client_id, "you do not have admin rights,"
+                                      " this incident will be reported"_l);
                 return LUX_FAIL;
             }
-            LUX_LOG("[%s]: %s", server.clients[client_id].name.c_str(),
-                    sgnl.command.contents.data());
+            LUX_LOG("[%.*s]: %.*s", (int)name.len, name.beg, (int)contents.len,
+                    contents.beg);
 
             //@TODO we should redirect output somehow
             //@TODO add_command(sgnl.command.contents.data());
@@ -337,7 +305,7 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
 }
 
 void server_tick() {
-    server.clients.foreach([&](ClientId id) {
+    foreach(server.clients, [&](ClientId id) {
         //@TODO only send loaded updates
         (void)send_light(server.clients[id].peer, light_updated_chunks);
         (void)send_tiles(server.clients[id].peer, tile_updated_chunks);
@@ -368,7 +336,7 @@ void server_tick() {
                         if(handle_signal(event.peer, event.packet) != LUX_OK) {
                             LUX_LOG("failed to handle signal from client");
                             kick_client((ClientId)event.peer->data,
-                                        "corrupted signal packet");
+                                        "corrupted signal packet"_l);
                             continue;
                         }
                     } else {
@@ -376,7 +344,7 @@ void server_tick() {
                             server.clients[(ClientId)event.peer->data].name;
                         LUX_LOG("ignoring unexpected packet");
                         LUX_LOG("    channel: %u", event.channelID);
-                        LUX_LOG("    from: %s", name.c_str());
+                        LUX_LOG("    from: %.*s", (int)name.len, name.beg);
                     }
                 }
             }
@@ -390,10 +358,10 @@ void server_tick() {
         get_net_entity_comps(&net_comps);
         ss_tick.day_cycle = day_cycle;
         ss_tick.entity_comps = net_comps;
-        entities.foreach([&](EntityId id) {
-            ss_tick.entities.emplace_back(id);
+        foreach(entities, [&](EntityId id) {
+            ss_tick.entities.emplace(id);
         });
-        server.clients.foreach([&](ClientId id) {
+        foreach(server.clients, [&](ClientId id) {
             auto const& client = server.clients[id];
             ss_tick.player_id = client.entity;
             /*EntityId bullet = create_entity();
@@ -414,16 +382,9 @@ void server_tick() {
     server.clients.free_slots();
 }
 
-void server_broadcast(char const* beg) {
-    //@TODO use strlen, also should we really send the null terminator as well?
-    //we send the length anyway
-    char const* end = beg;
-    while(*end != '\0') ++end;
-    ///we count the null terminator
-    ++end;
-    SizeT len = end - beg;
-    server.clients.foreach([&](ClientId id) {
-        (void)server_send_msg(id, beg, len);
+void server_broadcast(Str msg) {
+    foreach(server.clients, [&](ClientId id) {
+        (void)server_send_msg(id, msg);
     });
 }
 
@@ -435,11 +396,11 @@ void server_quit() {
     server.is_running = false;
 }
 
-ClientId get_client_id(char const* name) {
+ClientId get_client_id(Str name) {
     ClientId rval = server.clients.end();
-    server.clients.foreach_while([&](ClientId id) {
+    foreach_while(server.clients, [&](ClientId id) {
         auto const& client = server.clients[id];
-        if(std::strcmp(client.name.c_str(), name) == 0) {
+        if((Str)client.name == name) {
             rval = id;
             return false;
         }
@@ -456,49 +417,49 @@ void server_make_admin(ClientId id) {
 
 void add_dbg_point(NetSsTick::DbgInf::Shape::Point const& val,
                    Vec4F col, bool border) {
-    ss_tick.dbg_inf.shapes.emplace_back(NetSsTick::DbgInf::Shape{
+    ss_tick.dbg_inf.shapes.emplace(NetSsTick::DbgInf::Shape{
         .tag = NetSsTick::DbgInf::Shape::POINT, .point = val,
         .col = col, .border = border});
 }
 
 void add_dbg_line(NetSsTick::DbgInf::Shape::Line const& val,
                    Vec4F col, bool border) {
-    ss_tick.dbg_inf.shapes.emplace_back(NetSsTick::DbgInf::Shape{
+    ss_tick.dbg_inf.shapes.emplace(NetSsTick::DbgInf::Shape{
         .tag = NetSsTick::DbgInf::Shape::LINE, .line = val,
         .col = col, .border = border});
 }
 
 void add_dbg_arrow(NetSsTick::DbgInf::Shape::Arrow const& val,
                    Vec4F col, bool border) {
-    ss_tick.dbg_inf.shapes.emplace_back(NetSsTick::DbgInf::Shape{
+    ss_tick.dbg_inf.shapes.emplace(NetSsTick::DbgInf::Shape{
         .tag = NetSsTick::DbgInf::Shape::ARROW, .arrow = val,
         .col = col, .border = border});
 }
 
 void add_dbg_cross(NetSsTick::DbgInf::Shape::Cross const& val,
                    Vec4F col, bool border) {
-    ss_tick.dbg_inf.shapes.emplace_back(NetSsTick::DbgInf::Shape{
+    ss_tick.dbg_inf.shapes.emplace(NetSsTick::DbgInf::Shape{
         .tag = NetSsTick::DbgInf::Shape::CROSS, .cross = val,
         .col = col, .border = border});
 }
 
 void add_dbg_sphere(NetSsTick::DbgInf::Shape::Sphere const& val,
                    Vec4F col, bool border) {
-    ss_tick.dbg_inf.shapes.emplace_back(NetSsTick::DbgInf::Shape{
+    ss_tick.dbg_inf.shapes.emplace(NetSsTick::DbgInf::Shape{
         .tag = NetSsTick::DbgInf::Shape::SPHERE, .sphere = val,
         .col = col, .border = border});
 }
 
 void add_dbg_triangle(NetSsTick::DbgInf::Shape::Triangle const& val,
                    Vec4F col, bool border) {
-    ss_tick.dbg_inf.shapes.emplace_back(NetSsTick::DbgInf::Shape{
+    ss_tick.dbg_inf.shapes.emplace(NetSsTick::DbgInf::Shape{
         .tag = NetSsTick::DbgInf::Shape::TRIANGLE, .triangle = val,
         .col = col, .border = border});
 }
 
 void add_dbg_rect(NetSsTick::DbgInf::Shape::Rect const& val,
                    Vec4F col, bool border) {
-    ss_tick.dbg_inf.shapes.emplace_back(NetSsTick::DbgInf::Shape{
+    ss_tick.dbg_inf.shapes.emplace(NetSsTick::DbgInf::Shape{
         .tag = NetSsTick::DbgInf::Shape::RECT, .rect = val,
         .col = col, .border = border});
 }

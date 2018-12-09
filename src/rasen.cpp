@@ -6,37 +6,22 @@
 #include <entity.hpp>
 #include "rasen.hpp"
 
-void Rasen::err(U8 code) {
-    LUX_ASSERT(extcalls[RN_XC_ERR] != nullptr);
-    s[sp++] = code;
-    (*(extcalls[RN_XC_ERR]))(this);
+void RasenEnv::err(U8 code, RasenStack const& s) {
+    LUX_UNIMPLEMENTED();
 }
 
-void Rasen::run() {
-    running = true;
-    while(running) {
-        tick();
-    }
-}
-
-void Rasen::tick() {
-    U16 word = fetch();
-    pc++;
-    exec(word);
-}
-
-U16 Rasen::fetch() {
-    if(pc >= RN_ROM_LEN) pc = RN_ROM_LEN - pc;
-    return o[pc];
-}
-
-void Rasen::exec(U16 word) {
+void RasenEnv::exec(U16 word, RasenStack const& stack) {
     U8  c = (word & 0xF000) >> 12;
     U8  x = (word & 0x0F00) >> 8;
     U8  y = (word & 0x00F0) >> 4;
     U8  z =  word & 0x000F;
     U8  v =  word & 0x00FF;
     U16 t =  word & 0x0FFF;
+    auto& s  = *stack.val;
+    auto& sp = *stack.sp;
+    auto& m  = ram;
+    auto& cr = r[0xf];
+    pc++;
     switch(c) {
         case 0x0: switch(x) {
             case 0x2: r[z]    =  r[y];    break;
@@ -53,19 +38,19 @@ void Rasen::exec(U16 word) {
             case 0xd: r[z]   %=  r[y];    break;
             case 0xe: r[z]    =  m[r[y]]; break;
             case 0xf: m[r[z]] =  r[y];    break;
-            default: err(RN_ERR_ILLEGAL_OP); break;
+            default: err(RN_SC_ERR_ILLEGAL_OP, stack);
         } break;
         case 0x1: switch(x) {
             case 0x0: s[sp++] =  r[y];    break;
             case 0x1: r[y]    =  s[--sp]; break;
             case 0x2: s[sp++] =  v;       break;
-            default: err(RN_ERR_ILLEGAL_OP); break;
+            default: err(RN_SC_ERR_ILLEGAL_OP, stack);
         } break;
         case 0x6: {
-            if(t > arr_len(extcalls) || extcalls[t] == nullptr) {
-                err(RN_ERR_ILLEGAL_XC);
-            } else {
-                (*extcalls[t])(this);
+            if(parent_tag == INTERNAL) {
+                int_parent->call(t, stack);
+            } else if(parent_tag == EXTERNAL) {
+                //ext_parent.call(t, stack);
             }
             break;
         }
@@ -78,18 +63,35 @@ void Rasen::exec(U16 word) {
         case 0xd: if(    cr != 0) pc = t; break;
         case 0xe: if((I8)cr >  0) pc = t; break;
         case 0xf: if((I8)cr <  0) pc = t; break;
-        default: err(RN_ERR_ILLEGAL_OP); break;
+        default: err(RN_SC_ERR_ILLEGAL_OP, stack);
     }
 }
 
-void Rasen::push(U8 val) {
-    s[sp++] = val;
+void RasenEnv::exec_rom(Slice<U16> const& rom, RasenStack const& s) {
+    pc = 0;
+    while(pc < rom.len) {
+        exec(rom.beg[pc], s);
+    }
 }
 
-U8 Rasen::pop() {
-    return s[--sp];
+void RasenEnv::call(U16 id, RasenStack const& s) {
+    if(id < funcs.len) {
+        exec_rom(funcs[id], s);
+    } else {
+        err(RN_SC_ERR_ILLEGAL_CALL, s);
+    }
 }
 
+void RasenEnv::call(Str const& str_id, RasenStack const& s) {
+    if(funcs_lookup.count(str_id) > 0) {
+        auto id = funcs_lookup.at(str_id);
+        LUX_ASSERT(id < funcs.len);
+        call(id, s);
+    } else {
+        err(RN_SC_ERR_ILLEGAL_CALL, s);
+    }
+}
+/*
 void extcall_err(Rasen* cpu) {
     LUX_LOG("RaseN error: %02x", cpu->pop());
     LUX_LOG("\tPC:    %02x", cpu->pc);
@@ -119,12 +121,12 @@ void extcall_print(Rasen* cpu) {
 void extcall_entity_rotate(Rasen* cpu) {
     U16 id = cpu->pop();
     bool right = cpu->pop() != 0;
-    if(entity_comps.orientation.count(id) == 0) {
+    if(entity_comps.a_vel.count(id) == 0) {
         cpu->push(RN_ERR_NO_ENTITY);
         extcall_err(cpu);
         return;
     }
-    entity_comps.orientation.at(id).angle += (right ? 1.f : -1.f) * ENTITY_A_VEL;
+    entity_comps.a_vel.at(id).vel += (right ? 1.f : -1.f) * ENTITY_A_VEL;
 }
 
 void extcall_entity_move(Rasen* cpu) {
@@ -167,3 +169,4 @@ void extcall_entity_get_rotation(Rasen* cpu) {
     cpu->push((rval & 0xFF00) >> 8);
     cpu->push( rval & 0x00FF);
 }
+*/

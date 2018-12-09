@@ -31,32 +31,43 @@ static Chunk& load_chunk(ChkPos const& pos) {
     LUX_LOG("    pos: {%zd, %zd}", pos.x, pos.y);
     ///@RESEARCH to do a better way to no-copy default construct
     Chunk& chunk = chunks[pos];
-    static const TileId raw_stone  = db_tile_id("raw_stone");
-    static const TileId grass      = db_tile_id("grass");
-    static const TileId dark_grass = db_tile_id("dark_grass");
-    static const TileId dirt       = db_tile_id("dirt");
+    static const TileId raw_stone  = db_tile_id("raw_stone"_l);
+    static const TileId wall       = db_tile_id("stone_wall"_l);
+    static const TileId grass      = db_tile_id("grass"_l);
+    static const TileId dark_grass = db_tile_id("dark_grass"_l);
+    static const TileId dirt       = db_tile_id("dirt"_l);
+    static const TileId leaves     = db_tile_id("tree_leaves"_l);
     constexpr Uns octaves    = 16;
     constexpr F32 base_scale = 0.015f;
+    constexpr F32 mul        = 2.f;
+    constexpr F32 h_exp      = 1.25f;
     for(Uns i = 0; i < CHK_VOL; ++i) {
-        MapPos map_pos = to_map_pos(pos, i);
+        MapPos map_pos = to_map_pos(pos, i) + MapPos(1000, 1030);
         F32 scale  = base_scale;
         F32 weight = 1.f;
-        F32 avg    = 0.f;
+        F32 sum    = 0.f;
+        F32 num    = 0.f;
         for(Uns o = 0; o < octaves; ++o) {
-            avg    += glm::simplex((Vec2F)map_pos * scale) * weight;
-            scale  *= 2.f;
-            weight /= 2.f;
+            auto rs = [&](){return glm::pow(lux_randf(map_pos, o), 2.f);};
+            Vec2F shift = {rs(), rs()};
+            shift  *= scale * 4.f;
+            sum    += glm::simplex(((Vec2F)map_pos + shift) * scale) * weight;
+            num    += weight;
+            scale  *= mul;
+            weight /= mul;
         }
-        F32 h = ((avg / (2.f - (weight * 2.f))) + 1.f) / 2.f;
+        F32 h = glm::pow(((sum / num) + 1.f) / 2.f, h_exp);
 
-        chunk.wall[i] = h > 0.5f ? raw_stone : void_tile;
-        chunk.roof[i] = chunk.wall[i];
+        chunk.wall[i] = h > 0.5f ? wall : void_tile;
+        if(chunk.roof[i] != leaves) {
+            chunk.roof[i] = h > 0.47f ? raw_stone : void_tile;
+        }
         if(chunk.wall[i] != void_tile &&
            glm::simplex((Vec2F)map_pos * 0.025f) > 0.7f) {
             chunk.wall[i] = void_tile;
             chunk.floor[i] = dirt;
         } else {
-            chunk.floor[i] = h > 0.5f   ? raw_stone :
+            chunk.floor[i] = h > 0.5f   ? dirt :
                              h > 0.45f  ? dirt :
                              h > 0.3f   ? grass :
                              h > 0.125f ? dark_grass : dirt;
@@ -66,6 +77,62 @@ static Chunk& load_chunk(ChkPos const& pos) {
         } else {
             chunk.light_lvl[i] = 0x0000;
         }
+        //placeholder trees
+        /*IdxPos idx_pos = to_idx_pos(i);
+        if(idx_pos.x > 0 && idx_pos.x < CHK_SIZE - 1 &&
+           idx_pos.y > 0 && idx_pos.y < CHK_SIZE - 1 &&
+           chunk.roof[i] == void_tile && chunk.wall[i] == void_tile &&
+           lux_randf(map_pos) > 0.96f) {
+            chunk.wall[i] = db_tile_id("tree_trunk");
+            for(Uns y = idx_pos.y - 1; y <= idx_pos.y + 1; y++) {
+                for(Uns x = idx_pos.x - 1; x <= idx_pos.x + 1; x++) {
+                    ChkIdx idx = to_chk_idx(IdxPos(x, y));
+                    if(chunk.roof[idx] == void_tile) {
+                        chunk.roof[idx] = leaves;
+                    }
+                }
+            }
+        }*/
+        if(chunk.wall[i] == void_tile && lux_randf(map_pos) > 0.999f) {
+            add_light_node(to_map_pos(pos, i), 0.5f);
+        }
+    }
+    if(pos == ChkPos(1, -1)) {
+        ChkIdx idx;
+        Uns tries = 0;
+        do {
+            idx = lux_randmm(0, CHK_VOL, pos, tries);
+            tries++;
+        } while(chunk.wall[idx] != void_tile && tries < 1000);
+        MapPos map_pos = to_map_pos(pos, idx);
+        EntityId id = create_entity();
+        entity_comps.pos[id] = map_pos;
+        entity_comps.vel[id] = {0.f, 0.f};
+        entity_comps.shape[id] = EntityComps::Shape
+            {{.sphere = {1.f}}, .tag = EntityComps::Shape::SPHERE};
+        entity_comps.visible[id] = {0};
+        entity_comps.orientation[id] = {{0.f, 0.f}, 0.f};
+        entity_comps.a_vel[id] = {0.f, 0.1f};
+        /*entity_comps.rasen[id].m[RN_RAM_LEN - 1] = id;
+        U16 constexpr run_program[] = {
+            RN_PUSHV(1),
+            RN_LOADV(RN_R0, 0xff),
+            RN_PUSH (RN_R0),
+            RN_XCALL(RN_XC_ENTITY_MOVE),
+            RN_LOADV(RN_R1, 0x00),
+            RN_ADDV (RN_R1, 1),
+            RN_CONST(RN_R2, 8),
+            RN_MOD  (RN_R2, RN_R1),
+            RN_SAVEV(RN_R1, 0x00),
+            RN_COPY (RN_R1, RN_CR),
+            RN_JNZ  (14),
+            RN_PUSHV(1),
+            RN_PUSH (RN_R0),
+            RN_XCALL(RN_XC_ENTITY_ROTATE),
+            RN_XCALL(RN_XC_HALT),
+        };
+        entity_comps.rasen[id].running = true;
+        std::memcpy(entity_comps.rasen[id].o, run_program, sizeof(run_program));*/
     }
     return chunk;
 }
@@ -136,8 +203,9 @@ void map_tick() {
         awaiting_light_updates.erase(update);
     }
     Uns constexpr ticks_per_day = 1 << 12;
-    day_cycle = std::sin(tau *
-        (((F32)(tick_num % ticks_per_day) / (F32)ticks_per_day) + 0.25f));
+    day_cycle = 1.f;
+    /*day_cycle = std::sin(tau *
+        (((F32)(tick_num % ticks_per_day) / (F32)ticks_per_day) + 0.25f));*/
     tick_num++;
 }
 

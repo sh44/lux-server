@@ -19,7 +19,7 @@
 std::atomic<bool> exiting = false;
 
 void console_main() {
-    std::string input;
+    /*std::string input;
     while(!exiting) {
         std::getline(std::cin, input);
         if(input.size() > 2 && input[0] == '/') {
@@ -29,7 +29,8 @@ void console_main() {
         } else if(input.size() > 1) {
             server_broadcast(input.c_str());
         }
-    }
+    }*/
+    LUX_UNIMPLEMENTED();
 }
 
 int main(int argc, char** argv) {

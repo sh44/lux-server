@@ -12,12 +12,12 @@ void server_init(U16 server_port, F64 tick_rate);
 void server_deinit();
 void server_tick();
 
-void kick_client(ClientId id, char const* reason);
+void kick_client(ClientId id, Str reason);
 
-void server_broadcast(char const* str);
+void server_broadcast(Str str);
 bool server_is_running();
 void server_quit();
-ClientId get_client_id(char const* name);
+ClientId get_client_id(Str name);
 void server_make_admin(ClientId id);
 
 void add_dbg_point(NetSsTick::DbgInf::Shape::Point const& val,

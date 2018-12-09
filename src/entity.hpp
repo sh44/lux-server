@@ -7,17 +7,16 @@
 #include <rasen.hpp>
 
 F32 constexpr ENTITY_L_VEL = 0.15f;
-F32 constexpr ENTITY_A_VEL = tau / 128.f;
+F32 constexpr ENTITY_A_VEL = tau / 512.f;
 
 struct Entity {};
 extern SparseDynArr<Entity> entities;
 typedef decltype(entities)::Id EntityId;
 
 struct EntityComps {
-    typedef EntityVec    Pos;
-    typedef EntityVec    Vel;
-    typedef F32          AVel;
-    typedef DynArr<char> Name;
+    typedef EntityVec Pos;
+    typedef EntityVec Vel;
+    typedef StrBuff   Name;
     struct Shape {
         union {
             struct {
@@ -45,6 +44,14 @@ struct EntityComps {
         Vec2F origin;
         F32   angle; ///in radians
     };
+    struct AVel {
+        F32 vel;
+        F32 damping; ///from 0.f to 1.f
+    };
+    struct Ai {
+        RasenEnv rn_env;
+        bool active = true;
+    };
 
     //@IMPROVE more space efficient solution
     IdMap<EntityId, Pos>         pos;
@@ -57,13 +64,14 @@ struct EntityComps {
     IdMap<EntityId, Container>   container;
     IdMap<EntityId, Orientation> orientation;
     IdMap<EntityId, EntityId>    parent;
-    IdMap<EntityId, Rasen>       rasen;
+    IdMap<EntityId, U32>         tick_life;
+    IdMap<EntityId, Ai>          ai;
 };
 
 extern EntityComps& entity_comps;
 
 EntityId create_entity();
-EntityId create_item(const char* name);
+EntityId create_item(Str name);
 EntityId create_player();
 void remove_entity(EntityId entity);
 void entities_tick();

@@ -7,7 +7,7 @@
 #include <glm/gtx/component_wise.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 //
-#include <lux_shared/containers.hpp>
+#include <lux_shared/common.hpp>
 //
 #include <db.hpp>
 #include <map.hpp>
@@ -26,11 +26,9 @@ EntityId create_entity() {
     return id;
 }
 
-EntityId create_item(const char* name) {
+EntityId create_item(Str name) {
     EntityId id = create_entity();
-    SizeT len = std::strlen(name);
-    comps.name[id].resize(len);
-    std::memcpy(comps.name[id].data(), name, len);
+    comps.name[id] = name;
     return id;
 }
 
@@ -40,21 +38,27 @@ EntityId create_player() {
     comps.pos[id]          = {3, 3};
     comps.vel[id]          = {0, 0};
     comps.shape[id]        = EntityComps::Shape
-        {{.rect = {{0.5f, 0.5f}}}, .tag = EntityComps::Shape::RECT};
-    comps.visible[id]      = {1};
+        {{.rect = {{0.8f, 0.5f}}}, .tag = EntityComps::Shape::RECT};
+    comps.visible[id]      = {2};
     comps.orientation[id]  = {{0.f, 0.f}, 0.f};
-    EntityId previous = id;
-    for(Uns i = 0; i < 16; i++) {
-        EntityId limb_id       = create_entity();
-        comps.pos[limb_id]     = {3.f - 0.25f, 0};
-        comps.shape[limb_id]   = EntityComps::Shape
-            {{.rect = {{2.0f, 0.25f}}}, .tag = EntityComps::Shape::RECT};
-        comps.visible[limb_id] = {1};
-        comps.parent[limb_id] = previous;
-        comps.orientation[limb_id] = {{-2.f, 0.f}, 0.f};
-        comps.a_vel[limb_id]    = {(F32)i * 0.001f};
-        previous = limb_id;
-    }
+    comps.a_vel[id]        = {0.f, 0.15f};
+    EntityId limb_id       = create_entity();
+    comps.pos[limb_id]     = {-1.15f, 0};
+    comps.shape[limb_id]   = EntityComps::Shape
+        {{.rect = {{0.4f, 0.25f}}}, .tag = EntityComps::Shape::RECT};
+    comps.visible[limb_id] = {1};
+    comps.parent[limb_id] = id;
+    comps.orientation[limb_id] = {{0.5f, 0.f}, 0.f};
+    comps.a_vel[limb_id]    = {-0.08f, 0.f};
+    //comps.tick_life[limb_id] = {20};
+    EntityId bob       = create_entity();
+    comps.pos[bob]     = {-1.0f, 0};
+    comps.shape[bob]   = EntityComps::Shape
+        {{.rect = {{0.6f, 0.2f}}}, .tag = EntityComps::Shape::RECT};
+    comps.visible[bob] = {1};
+    comps.parent[bob] = limb_id;
+    comps.orientation[bob] = {{0.6f, 0.f}, 0.f};
+    comps.a_vel[bob]    = {-0.06f, 0.f};
     return id;
 }
 
@@ -187,15 +191,24 @@ void entities_tick() {
             it = collision_sectors.erase(it);
         } else ++it;
     }
-    entities.foreach([](EntityId id) {
+    foreach(entities, [](EntityId id) {
         if(comps.parent.count(id) > 0 &&
            !entities.contains(comps.parent.at(id))) {
-           entities.erase(id);
+           remove_entity(id);
            return;
+        }
+        if(comps.ai.count(id) > 0) {
+            auto& ai = comps.ai.at(id);
+            if(ai.active && ai.rn_env.funcs_lookup.count("tick"_l) > 0) {
+                U8 s[RN_STACK_LEN];
+                U8 sp = 0;
+                ai.rn_env.call("tick"_l, RasenStack{&s, &sp});
+            }
         }
         if(comps.orientation.count(id) > 0 &&
            comps.a_vel.count(id) > 0) {
-            comps.orientation.at(id).angle += comps.a_vel.at(id);
+            comps.orientation.at(id).angle += comps.a_vel.at(id).vel;
+            comps.a_vel.at(id).vel *= 1.f - comps.a_vel.at(id).damping;
             //@TODO divide to prevent precision loss or something?
         }
         if(comps.pos.count(id) > 0 &&
@@ -228,12 +241,20 @@ void entities_tick() {
             //}
             vel *= VEL_DAMPING;
         }
+        if(comps.tick_life.count(id) > 0) {
+            auto& tick_life = comps.tick_life.at(id);
+            if(tick_life == 0) {
+                remove_entity(id);
+                return;
+            } else tick_life--;
+        }
     });
     entities.free_slots();
 }
 
 void remove_entity(EntityId entity) {
     LUX_ASSERT(entities.contains(entity));
+    LUX_LOG("removing entity %u", entity);
     entities.erase(entity);
     ///this is only gonna grow longer...
     if(comps.pos.count(entity)         > 0) comps.pos.erase(entity);
@@ -244,7 +265,7 @@ void remove_entity(EntityId entity) {
     if(comps.item.count(entity)        > 0) comps.item.erase(entity);
     if(comps.container.count(entity)   > 0) comps.container.erase(entity);
     if(comps.orientation.count(entity) > 0) comps.orientation.erase(entity);
-    if(comps.rasen.count(entity)       > 0) comps.rasen.erase(entity);
+    if(comps.ai.count(entity)          > 0) comps.ai.erase(entity);
 }
 
 void get_net_entity_comps(NetSsTick::EntityComps* net_comps) {
@@ -253,7 +274,7 @@ void get_net_entity_comps(NetSsTick::EntityComps* net_comps) {
         net_comps->pos[pos.first] = pos.second;
     }
     for(auto const& name : comps.name) {
-        net_comps->name[name.first] = name.second;
+        net_comps->name[name.first] = (Str)name.second;
     }
     ///we infer the size of a sprite from the shape of an entity
     for(auto const& visible : comps.visible) {
