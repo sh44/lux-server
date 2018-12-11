@@ -64,9 +64,9 @@ void server_deinit() {
     LUX_LOG("deinitializing server");
 
     LUX_LOG("kicking all clients");
-    foreach(server.clients, [](ClientId id) {
-        kick_client(id, "server stopping"_l);
-    });
+    for(auto pair : server.clients) {
+        kick_client(pair.k, "server stopping"_l);
+    }
     enet_host_destroy(server.host);
     enet_deinitialize();
 }
@@ -177,7 +177,7 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
         }
 
         ClientId duplicate_id = get_client_id((Str)cs_init.name);
-        if(duplicate_id != server.clients.end()) {
+        if(duplicate_id != server.clients.end().id) {
             //@CONSIDER kicking the new one instead
             LUX_LOG("client already connected, kicking the old one");
             kick_client(duplicate_id, "double-join"_l);
@@ -260,13 +260,13 @@ LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
         "failed to deserialize tick from client")
 
     auto& client = server.clients[(ClientId)peer->data];
-    foreach(cs_tick.actions, [&](SizeT idx) {
+    for(auto action : cs_tick.actions) {
         //@TODO check if size is correct
         /*std::memcpy(client.rasen.o, action.bytecode.data(),
                     action.bytecode.len * sizeof(U16));
         client.rasen.run();*/
         LUX_UNIMPLEMENTED();
-    });
+    }
     return LUX_OK;
 }
 
@@ -305,11 +305,11 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
 }
 
 void server_tick() {
-    foreach(server.clients, [&](ClientId id) {
+    for(auto pair : server.clients) {
         //@TODO only send loaded updates
-        (void)send_light(server.clients[id].peer, light_updated_chunks);
-        (void)send_tiles(server.clients[id].peer, tile_updated_chunks);
-    });
+        (void)send_light(pair.v.peer, light_updated_chunks);
+        (void)send_tiles(pair.v.peer, tile_updated_chunks);
+    }
     { ///handle events
         //@CONSIDER splitting this scope
         ENetEvent event;
@@ -358,11 +358,11 @@ void server_tick() {
         get_net_entity_comps(&net_comps);
         ss_tick.day_cycle = day_cycle;
         ss_tick.entity_comps = net_comps;
-        foreach(entities, [&](EntityId id) {
-            ss_tick.entities.emplace(id);
-        });
-        foreach(server.clients, [&](ClientId id) {
-            auto const& client = server.clients[id];
+        for(auto pair : entities) {
+            ss_tick.entities.emplace(pair.k);
+        }
+        for(auto pair : server.clients) {
+            auto const& client = pair.v;
             ss_tick.player_id = client.entity;
             /*EntityId bullet = create_entity();
             entity_comps.vel[bullet] = glm::rotate(Vec2F(0.f, -1.f),
@@ -376,16 +376,16 @@ void server_tick() {
                 {entity_comps.orientation.at(client.entity).angle};*/
 
             (void)send_net_data(client.peer, &ss_tick, TICK_CHANNEL, false);
-        });
+        }
         clear_net_data(&ss_tick);
     }
     server.clients.free_slots();
 }
 
 void server_broadcast(Str msg) {
-    foreach(server.clients, [&](ClientId id) {
-        (void)server_send_msg(id, msg);
-    });
+    for(auto pair : server.clients) {
+        (void)server_send_msg(pair.k, msg);
+    }
 }
 
 bool server_is_running() {
@@ -397,15 +397,14 @@ void server_quit() {
 }
 
 ClientId get_client_id(Str name) {
-    ClientId rval = server.clients.end();
-    foreach_while(server.clients, [&](ClientId id) {
-        auto const& client = server.clients[id];
+    ClientId rval = server.clients.end().id;
+    for(auto pair : server.clients) {
+        auto const& client = pair.v;
         if((Str)client.name == name) {
-            rval = id;
-            return false;
+            rval = pair.k;
+            break;
         }
-        return true;
-    });
+    }
     return rval;
 }
 

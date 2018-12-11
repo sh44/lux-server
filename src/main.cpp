@@ -6,8 +6,6 @@
 #include <cmath>
 #include <ctime>
 //
-#include <lua.hpp>
-//
 #include <lux_shared/common.hpp>
 #include <lux_shared/util/tick_clock.hpp>
 //

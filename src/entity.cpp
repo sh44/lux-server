@@ -18,8 +18,8 @@ F32 constexpr VEL_DAMPING = 0.9f;
 F32 constexpr MIN_SPEED = 0.01f;
 F32 constexpr MAX_SPEED = 1.f;
 static EntityComps          comps;
-SparseDynArr<Entity>        entities;
 EntityComps& entity_comps = comps;
+SparseDynArr<Entity>        entities;
 
 EntityId create_entity() {
     EntityId id = entities.emplace();
@@ -50,7 +50,6 @@ EntityId create_player() {
     comps.parent[limb_id] = id;
     comps.orientation[limb_id] = {{0.5f, 0.f}, 0.f};
     comps.a_vel[limb_id]    = {-0.08f, 0.f};
-    //comps.tick_life[limb_id] = {20};
     EntityId bob       = create_entity();
     comps.pos[bob]     = {-1.0f, 0};
     comps.shape[bob]   = EntityComps::Shape
@@ -191,11 +190,18 @@ void entities_tick() {
             it = collision_sectors.erase(it);
         } else ++it;
     }
-    foreach(entities, [](EntityId id) {
-        if(comps.parent.count(id) > 0 &&
-           !entities.contains(comps.parent.at(id))) {
-           remove_entity(id);
-           return;
+    for(auto pair : entities) {
+        EntityId id = pair.k;
+        if(comps.parent.count(id) > 0) {
+            EntityId parent = comps.parent.at(id);
+            if(!entities.contains(parent)) {
+                LUX_LOG_WARN("stray child entity #%u", id);
+                LUX_LOG_WARN("\tits parent #%u no longer exists", parent)
+                LUX_LOG_WARN("\tdeleting the child, it should have been"
+                             " deleted along with the parent");
+                remove_entity(id);
+                continue;
+            }
         }
         if(comps.ai.count(id) > 0) {
             auto& ai = comps.ai.at(id);
@@ -210,6 +216,7 @@ void entities_tick() {
             comps.orientation.at(id).angle += comps.a_vel.at(id).vel;
             comps.a_vel.at(id).vel *= 1.f - comps.a_vel.at(id).damping;
             //@TODO divide to prevent precision loss or something?
+            //@TODO Modular arithmetic class
         }
         if(comps.pos.count(id) > 0 &&
            comps.vel.count(id) > 0) {
@@ -241,14 +248,7 @@ void entities_tick() {
             //}
             vel *= VEL_DAMPING;
         }
-        if(comps.tick_life.count(id) > 0) {
-            auto& tick_life = comps.tick_life.at(id);
-            if(tick_life == 0) {
-                remove_entity(id);
-                return;
-            } else tick_life--;
-        }
-    });
+    }
     entities.free_slots();
 }
 

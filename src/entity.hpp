@@ -11,7 +11,6 @@ F32 constexpr ENTITY_A_VEL = tau / 512.f;
 
 struct Entity {};
 extern SparseDynArr<Entity> entities;
-typedef decltype(entities)::Id EntityId;
 
 struct EntityComps {
     typedef EntityVec Pos;
@@ -64,7 +63,6 @@ struct EntityComps {
     IdMap<EntityId, Container>   container;
     IdMap<EntityId, Orientation> orientation;
     IdMap<EntityId, EntityId>    parent;
-    IdMap<EntityId, U32>         tick_life;
     IdMap<EntityId, Ai>          ai;
 };
 
