@@ -21,6 +21,8 @@ static EntityComps          comps;
 EntityComps& entity_comps = comps;
 SparseDynArr<Entity>        entities;
 
+static RasenExtEnv entity_env;
+
 EntityId create_entity() {
     EntityId id = entities.emplace();
     return id;
@@ -30,6 +32,38 @@ EntityId create_item(Str name) {
     EntityId id = create_entity();
     comps.name[id] = name;
     return id;
+}
+
+LUX_MAY_FAIL static entity_move(RasenFrame* frame) {
+    EntityId id;
+    for(Uns i = 0; i < sizeof(EntityId); ++i) {
+        LUX_RETHROW(frame->read_sys_mem(((U8*)&id) + i, 0 + i),
+                    "failed to read entity id");
+    }
+    Vec2<I8> dir;
+    LUX_RETHROW(comps.vel.count(id) > 0,
+                "entity has no position component");
+    LUX_RETHROW(frame->pop((U8*)&dir.x),
+                "failed to read X direction");
+    LUX_RETHROW(frame->pop((U8*)&dir.y),
+                "failed to read Y direction");
+    comps.vel.at(id) += (Vec2F)dir * ENTITY_L_VEL;
+    return LUX_OK;
+}
+
+LUX_MAY_FAIL static entity_rotate(RasenFrame* frame) {
+    EntityId id;
+    for(Uns i = 0; i < sizeof(EntityId); ++i) {
+        LUX_RETHROW(frame->read_sys_mem(((U8*)&id) + i, 0 + i),
+                    "failed to read entity id");
+    }
+    I8 dir;
+    LUX_RETHROW(comps.a_vel.count(id) > 0,
+                "entity has no position component");
+    LUX_RETHROW(frame->pop((U8*)&dir),
+                "failed to read direction");
+    comps.a_vel.at(id).vel += (F32)dir * ENTITY_A_VEL;
+    return LUX_OK;
 }
 
 EntityId create_player() {
@@ -42,6 +76,10 @@ EntityId create_player() {
     comps.visible[id]      = {2};
     comps.orientation[id]  = {{0.f, 0.f}, 0.f};
     comps.a_vel[id]        = {0.f, 0.15f};
+    entity_env.register_func("entity_move"_l, &entity_move);
+    entity_env.register_func("entity_rotate"_l, &entity_rotate);
+    auto& ai = comps.ai[id];
+    ai.rn_env.add_external_parent(entity_env);
     EntityId limb_id       = create_entity();
     comps.pos[limb_id]     = {-1.15f, 0};
     comps.shape[limb_id]   = EntityComps::Shape
@@ -205,10 +243,11 @@ void entities_tick() {
         }
         if(comps.ai.count(id) > 0) {
             auto& ai = comps.ai.at(id);
-            if(ai.active && ai.rn_env.funcs_lookup.count("tick"_l) > 0) {
+            if(ai.active && ai.rn_env.symbol_table.count("tick"_l) > 0) {
                 U8 s[RN_STACK_LEN];
                 U8 sp = 0;
-                ai.rn_env.call("tick"_l, RasenStack{&s, &sp});
+                (void)entity_do_action(id, ai.rn_env.symbol_table["tick"_l],
+                    Slice<U8>{s, sp});
             }
         }
         if(comps.orientation.count(id) > 0 &&
@@ -221,8 +260,14 @@ void entities_tick() {
         if(comps.pos.count(id) > 0 &&
            comps.vel.count(id) > 0) {
             auto& pos = comps.pos.at(id);
-            auto& vel = comps.vel.at(id);
-            EntityVec old_pos = pos;
+            EntityVec& vel = comps.vel.at(id);
+            EntityVec abs_vel;
+            if(comps.orientation.count(id) > 0) {
+                F32 angle = comps.orientation.at(id).angle;
+                abs_vel = rotate(vel, angle);
+            } else {
+                abs_vel = vel;
+            }
             /*if(comps.shape.count(id) > 0) {
                 collision_sectors[to_chk_pos(old_pos)].insert(id);
                 F32 speed = glm::length(vel);
@@ -244,7 +289,7 @@ void entities_tick() {
                     collision_sectors[to_chk_pos(pos)].insert(id);
                 }
             } else {*/
-                pos += vel;
+                pos += abs_vel;
             //}
             vel *= VEL_DAMPING;
         }
@@ -310,4 +355,15 @@ void get_net_entity_comps(NetSsTick::EntityComps* net_comps) {
     for(auto const& parent : comps.parent) {
         net_comps->parent[parent.first] = parent.second;
     }
+}
+
+LUX_MAY_FAIL entity_do_action(U16 entity_id, U16 action_id, Slice<U8> const& stack) {
+    LUX_ASSERT(comps.ai.count(entity_id) > 0);
+    auto& ai = comps.ai.at(entity_id);
+    LUX_ASSERT(ai.rn_env.available_funcs.len > action_id);
+    U8 sys_mem[0x10];
+    static_assert(sizeof(sys_mem) >= sizeof(EntityId));
+    std::memcpy(sys_mem, &entity_id, sizeof(entity_id));
+    RasenFrame frame = {stack, (Slice<U8>)sys_mem};
+    return ai.rn_env.call(action_id, &frame);
 }

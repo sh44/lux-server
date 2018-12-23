@@ -6,7 +6,7 @@
 //
 #include <rasen.hpp>
 
-F32 constexpr ENTITY_L_VEL = 0.15f;
+F32 constexpr ENTITY_L_VEL = 0.015f;
 F32 constexpr ENTITY_A_VEL = tau / 512.f;
 
 struct Entity {};
@@ -74,3 +74,4 @@ EntityId create_player();
 void remove_entity(EntityId entity);
 void entities_tick();
 void get_net_entity_comps(NetSsTick::EntityComps* net_comps);
+LUX_MAY_FAIL entity_do_action(U16 entity_id, U16 action_id, Slice<U8> const& stack);

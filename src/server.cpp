@@ -41,6 +41,8 @@ NetSsInit ss_init;
 NetSsSgnl ss_sgnl;
 NetSsTick ss_tick;
 
+LUX_MAY_FAIL static send_rasen_label(ENetPeer* peer, NetRasenLabel const& label);
+
 void server_init(U16 port, F64 tick_rate) {
     server.tick_rate = tick_rate;
 
@@ -184,22 +186,35 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
         }
     }
 
-    { ///send init packet
-        Str constexpr name = "lux-server"_l;
-        LUX_ASSERT(name.len <= SERVER_NAME_LEN);
-        ((DynStr)ss_init.name).cpy(name).set('\0');
-        ss_init.tick_rate = server.tick_rate;
-
-        LUX_RETHROW(send_net_data(peer, &ss_init, INIT_CHANNEL),
-            "failed to send init data to client");
-    }
-
     ClientId id = server.clients.emplace();
     Server::Client& client = server.clients[id];
     client.peer = peer;
     client.peer->data = (void*)id;
     client.name = (Str)cs_init.name;
     client.entity = create_player();
+
+    { ///send init packet
+        Str constexpr name = "lux-server"_l;
+        LUX_ASSERT(name.len <= SERVER_NAME_LEN);
+        ((DynStr)ss_init.name).cpy(name).set('\0');
+        ss_init.tick_rate    = server.tick_rate;
+        if(entity_comps.ai.count(client.entity) > 0) {
+            auto const& ai = entity_comps.ai.at(client.entity);
+            DynArr<NetRasenLabel> labels(ai.rn_env.symbol_table.size());
+            Uns i = 0;
+            for(auto const& pair : ai.rn_env.symbol_table) {
+                labels[i++] = {pair.first, pair.second};
+            }
+            ss_init.rasen_labels = labels;
+        }
+
+        if(send_net_data(peer, &ss_init, INIT_CHANNEL) != LUX_OK) {
+            LUX_LOG_ERR("failed to send init data to client");
+            //@TODO naming consistency (should be entity_erase)
+            remove_entity(client.entity);
+            return LUX_FAIL;
+        }
+    }
     //@TODO
     entity_comps.container[client.entity].items =
         {create_item("item0"_l), create_item("item1"_l), create_item("item2"_l)};
@@ -254,18 +269,23 @@ LUX_MAY_FAIL send_light(ENetPeer* peer, VecSet<ChkPos> const& chunks) {
     return send_net_data(peer, &ss_sgnl, SIGNAL_CHANNEL);
 }
 
+LUX_MAY_FAIL static send_rasen_label(ENetPeer* peer, NetRasenLabel const& label) {
+    ss_sgnl.tag = NetSsSgnl::RASEN_LABEL;
+    ss_sgnl.rasen_label = label;
+    return send_net_data(peer, &ss_sgnl, SIGNAL_CHANNEL);
+}
+
 LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
     LUX_ASSERT(is_client_connected((ClientId)peer->data));
     LUX_RETHROW(deserialize_packet(in_pack, &cs_tick),
         "failed to deserialize tick from client")
 
     auto& client = server.clients[(ClientId)peer->data];
-    for(auto action : cs_tick.actions) {
-        //@TODO check if size is correct
-        /*std::memcpy(client.rasen.o, action.bytecode.data(),
-                    action.bytecode.len * sizeof(U16));
-        client.rasen.run();*/
-        LUX_UNIMPLEMENTED();
+    LUX_RETHROW(entity_comps.ai.count(client.entity) > 0,
+                "client tried to execute an action,"
+                " despite not having an action processor");
+    for(auto const& action : cs_tick.actions) {
+        LUX_RETHROW(entity_do_action(client.entity, action.id, action.stack));
     }
     return LUX_OK;
 }
@@ -275,6 +295,17 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
     LUX_RETHROW(deserialize_packet(in_pack, &sgnl),
         "failed to deserialize signal from client");
 
+    if(cs_sgnl.actions.len > 0) {
+        Server::Client& client = server.clients[(ClientId)peer->data];
+        LUX_RETHROW(entity_comps.ai.count(client.entity) > 0,
+                    "client tried to execute an action,"
+                    " despite not having an action processor");
+        for(auto const& action : cs_sgnl.actions) {
+            LUX_LOG("TEST");
+            LUX_RETHROW(entity_do_action(client.entity,
+                action.id, action.stack));
+        }
+    }
     switch(sgnl.tag) {
         case NetCsSgnl::MAP_REQUEST: {
             (void)send_tiles(peer, sgnl.map_request.requests);
@@ -299,6 +330,25 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
             //@TODO add_command(sgnl.command.contents.data());
             LUX_UNIMPLEMENTED();
         } break;
+        case NetCsSgnl::RASEN_ASM: {
+            ClientId client_id = (ClientId)peer->data;
+            auto const& client = server.clients[client_id];
+            auto const& rasen_asm = sgnl.rasen_asm;
+            if(entity_comps.ai.count(client.entity) > 0) {
+                auto& rn_env = entity_comps.ai.at(client.entity).rn_env;
+                LUX_RETHROW(rn_env.register_func(rasen_asm.str_id,
+                                                 rasen_asm.contents),
+                    "client #%zu bytecode compilation failed", client_id);
+                NetRasenLabel label = {
+                    rasen_asm.str_id, rn_env.symbol_table[rasen_asm.str_id]};
+                return send_rasen_label(peer, label);
+            } else {
+                LUX_LOG_WARN("client #%zu tried to compile bytecode"
+                             " but has no rasen env", client_id);
+                return LUX_FAIL;
+            }
+            break;
+        }
         default: LUX_UNREACHABLE();
     }
     return LUX_OK;
@@ -354,6 +404,7 @@ void server_tick() {
     { ///dispatch ticks
         //@IMPROVE we might want to turn this into a differential transfer,
         //instead of resending the whole state all the time
+        //@TODO static
         NetSsTick::EntityComps net_comps;
         get_net_entity_comps(&net_comps);
         ss_tick.day_cycle = day_cycle;

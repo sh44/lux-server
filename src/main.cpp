@@ -52,6 +52,7 @@ int main(int argc, char** argv) {
 
     db_init();
     constexpr F64 TICK_RATE = 64.0;
+    rasen_init();
     server_init(server_port, TICK_RATE);
     LUX_DEFER { server_deinit(); };
 

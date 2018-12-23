@@ -204,8 +204,8 @@ void map_tick() {
     }
     Uns constexpr ticks_per_day = 1 << 12;
     day_cycle = 1.f;
-    /*day_cycle = std::sin(tau *
-        (((F32)(tick_num % ticks_per_day) / (F32)ticks_per_day) + 0.25f));*/
+    day_cycle = std::sin(tau *
+        (((F32)(tick_num % ticks_per_day) / (F32)ticks_per_day) + 0.25f));
     tick_num++;
 }
 
