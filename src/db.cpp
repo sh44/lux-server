@@ -4,39 +4,39 @@
 //
 #include "db.hpp"
 
-static DynArr<TileBp> tiles;
+static DynArr<BlockBp> blocks;
 //@CONSIDER use regular map?
-static HashMap<Str, TileId> tiles_lookup;
+static HashMap<Str, BlockId> blocks_lookup;
 
-void add_tile(TileBp &&tile_type) {
-    auto &tile = tiles.push(std::move(tile_type));
-    tiles_lookup[tile.str_id] = tiles.len - 1;
-    LUX_LOG("added tile %zu: \"%.*s\"",
-            tiles.len - 1, (int)tile.str_id.len, tile.str_id.beg);
+void add_block(BlockBp &&block_type) {
+    auto &block = blocks.push(std::move(block_type));
+    blocks_lookup[block.str_id] = blocks.len - 1;
+    LUX_LOG("added block %zu: \"%.*s\"",
+            blocks.len - 1, (int)block.str_id.len, block.str_id.beg);
 }
 
 void db_init() {
-    add_tile({"void"_l});
-    add_tile({"stone_floor"_l});
-    add_tile({"stone_wall"_l});
-    add_tile({"raw_stone"_l});
-    add_tile({"dirt"_l});
-    add_tile({"grass"_l});
-    add_tile({"dark_grass"_l});
-    add_tile({"tree_trunk"_l});
-    add_tile({"tree_leaves"_l});
+    add_block({"void"_l});
+    add_block({"stone_floor"_l});
+    add_block({"stone_wall"_l});
+    add_block({"raw_stone"_l});
+    add_block({"dirt"_l});
+    add_block({"grass"_l});
+    add_block({"dark_grass"_l});
+    add_block({"tree_trunk"_l});
+    add_block({"tree_leaves"_l});
 }
 
-TileBp const& db_tile_bp(TileId id) {
-    LUX_ASSERT(id < tiles.len);
-    return tiles[id];
+BlockBp const& db_block_bp(BlockId id) {
+    LUX_ASSERT(id < blocks.len);
+    return blocks[id];
 }
 
-TileBp const& db_tile_bp(Str const& str_id) {
-    return db_tile_bp(db_tile_id(str_id));
+BlockBp const& db_block_bp(Str const& str_id) {
+    return db_block_bp(db_block_id(str_id));
 }
 
-TileId const& db_tile_id(Str const& str_id) {
-    LUX_ASSERT(tiles_lookup.count(str_id) > 0);
-    return tiles_lookup.at(str_id);
+BlockId const& db_block_id(Str const& str_id) {
+    LUX_ASSERT(blocks_lookup.count(str_id) > 0);
+    return blocks_lookup.at(str_id);
 }

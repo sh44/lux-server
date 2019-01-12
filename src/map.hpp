@@ -4,25 +4,17 @@
 //
 #include <db.hpp>
 
-TileId constexpr void_tile = 0;
-
 struct Chunk {
     Arr<LightLvl, CHK_VOL> light_lvl;
-    Arr<TileId  , CHK_VOL> floor;
-    Arr<TileId  , CHK_VOL> wall;
-    Arr<TileId  , CHK_VOL> roof;
+    Arr<BlockId , CHK_VOL> blocks;
 };
 
 extern F32 day_cycle;
-extern VecSet<ChkPos> tile_updated_chunks;
+extern VecSet<ChkPos> block_updated_chunks;
 extern VecSet<ChkPos> light_updated_chunks;
 
-TileId get_floor(MapPos const& pos);
-TileId get_wall(MapPos const& pos);
-TileId get_roof(MapPos const& pos);
-TileBp const& get_floor_bp(MapPos const& pos);
-TileBp const& get_wall_bp(MapPos const& pos);
-TileBp const& get_roof_bp(MapPos const& pos);
+BlockId get_block(MapPos const& pos);
+BlockBp const& get_block_bp(MapPos const& pos);
 
 void map_tick();
 void guarantee_chunk(ChkPos const& pos);

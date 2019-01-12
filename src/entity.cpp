@@ -40,14 +40,15 @@ LUX_MAY_FAIL static entity_move(RasenFrame* frame) {
         LUX_RETHROW(frame->read_sys_mem(((U8*)&id) + i, 0 + i),
                     "failed to read entity id");
     }
-    Vec2<I8> dir;
+    Vec3<I8> dir;
     LUX_RETHROW(comps.vel.count(id) > 0,
                 "entity has no position component");
     LUX_RETHROW(frame->pop((U8*)&dir.x),
                 "failed to read X direction");
     LUX_RETHROW(frame->pop((U8*)&dir.y),
                 "failed to read Y direction");
-    comps.vel.at(id) += (Vec2F)dir * ENTITY_L_VEL;
+    dir.z = 0;
+    comps.vel.at(id) += (Vec3F)dir * ENTITY_L_VEL;
     return LUX_OK;
 }
 
@@ -69,10 +70,10 @@ LUX_MAY_FAIL static entity_rotate(RasenFrame* frame) {
 EntityId create_player() {
     LUX_LOG("creating new player");
     EntityId id            = create_entity();
-    comps.pos[id]          = {3, 3};
-    comps.vel[id]          = {0, 0};
+    comps.pos[id]          = {300, 300, 0};
+    comps.vel[id]          = {0, 0, 0};
     comps.shape[id]        = EntityComps::Shape
-        {{.rect = {{0.8f, 0.5f}}}, .tag = EntityComps::Shape::RECT};
+        {{.box = {{0.8f, 0.5f, 1.f}}}, .tag = EntityComps::Shape::BOX};
     comps.visible[id]      = {2};
     comps.orientation[id]  = {{0.f, 0.f}, 0.f};
     comps.a_vel[id]        = {0.f, 0.15f};
@@ -81,17 +82,17 @@ EntityId create_player() {
     auto& ai = comps.ai[id];
     ai.rn_env.add_external_parent(entity_env);
     EntityId limb_id       = create_entity();
-    comps.pos[limb_id]     = {-1.15f, 0};
+    comps.pos[limb_id]     = {-1.15f, 0, 0};
     comps.shape[limb_id]   = EntityComps::Shape
-        {{.rect = {{0.4f, 0.25f}}}, .tag = EntityComps::Shape::RECT};
+        {{.box = {{0.4f, 0.25f, 0.1f}}}, .tag = EntityComps::Shape::BOX};
     comps.visible[limb_id] = {1};
     comps.parent[limb_id] = id;
     comps.orientation[limb_id] = {{0.5f, 0.f}, 0.f};
     comps.a_vel[limb_id]    = {-0.08f, 0.f};
     EntityId bob       = create_entity();
-    comps.pos[bob]     = {-1.0f, 0};
+    comps.pos[bob]     = {-1.0f, 0, 0};
     comps.shape[bob]   = EntityComps::Shape
-        {{.rect = {{0.6f, 0.2f}}}, .tag = EntityComps::Shape::RECT};
+        {{.box = {{0.6f, 0.2f, 0.1f}}}, .tag = EntityComps::Shape::BOX};
     comps.visible[bob] = {1};
     comps.parent[bob] = limb_id;
     comps.orientation[bob] = {{0.6f, 0.f}, 0.f};
@@ -104,7 +105,7 @@ static VecMap<ChkPos, SortSet<EntityId>> collision_sectors;
 struct CollisionShape {
     EntityComps::Shape shape;
     F32 angle;
-    Vec2F pos;
+    Vec3F pos;
 };
 
 typedef EntityVec Point;
@@ -121,21 +122,21 @@ struct Sphere {
 
 struct Aabb {
     Point pos;
-    Vec2F sz;
+    Vec3F sz;
 };
 
 struct Rect {
     Point pos;
-    Vec2F sz;
+    Vec3F sz;
     F32   angle;
 };
 
-static Vec2F get_aabb_sz(CollisionShape const& a) {
+static Vec3F get_aabb_sz(CollisionShape const& a) {
     switch(a.shape.tag) {
         case EntityComps::Shape::SPHERE:
-            return Vec2F(a.shape.sphere.rad);
-        case EntityComps::Shape::RECT:
-            return Vec2F(glm::length(a.shape.rect.sz));
+            return Vec3F(a.shape.sphere.rad);
+        case EntityComps::Shape::BOX:
+            return Vec3F(glm::length(a.shape.box.sz));
         default: LUX_UNREACHABLE();
     }
 }
@@ -144,8 +145,8 @@ static Aabb get_aabb(CollisionShape const& a) {
     return {a.pos, get_aabb_sz(a)};
 }
 
-static Vec2F rect_point(Rect const& a, Vec2F point) {
-    return glm::rotate(point * a.sz, a.angle) + a.pos;
+static Vec2F rect_point(Rect const& a, Vec3F point) {
+    return glm::rotate(point * a.sz, a.angle, Vec3F(0, 0, 1)) + a.pos;
 }
 
 template<SizeT len>
@@ -153,8 +154,9 @@ static void rect_points(Rect const& a,
                         Arr<Point, len> const& in, Arr<Point, len>* out) {
     F32 c = std::cos(a.angle);
     F32 s = std::sin(a.angle);
-    glm::mat2 rot = {c, -s,
-                     s,  c};
+    glm::mat3 rot = {c, -s, 0,
+                     s,  c, 0,
+                     0,  0, 1};
     for(Uns i = 0; i < len; ++i) {
         Point vert = in[i] * a.sz;
         (*out)[i] = vert * rot + a.pos;
@@ -264,7 +266,7 @@ void entities_tick() {
             EntityVec abs_vel;
             if(comps.orientation.count(id) > 0) {
                 F32 angle = comps.orientation.at(id).angle;
-                abs_vel = rotate(vel, angle);
+                abs_vel = glm::rotate(vel, angle, Vec3F(0, 0, 1));
             } else {
                 abs_vel = vel;
             }
@@ -290,6 +292,15 @@ void entities_tick() {
                 }
             } else {*/
                 pos += abs_vel;
+                guarantee_chunk(to_chk_pos(glm::floor(pos)));
+                while(get_block(glm::floor(pos)) == void_block) {
+                    pos.z -= 1;
+                    guarantee_chunk(to_chk_pos(glm::floor(pos)));
+                }
+                while(get_block(glm::floor(pos)) != void_block) {
+                    pos.z += 1;
+                    guarantee_chunk(to_chk_pos(glm::floor(pos)));
+                }
             //}
             vel *= VEL_DAMPING;
         }
@@ -330,8 +341,8 @@ void get_net_entity_comps(NetSsTick::EntityComps* net_comps) {
                 case EntityComps::Shape::SPHERE: {
                     quad_sz = Vec2F(shape.sphere.rad);
                 } break;
-                case EntityComps::Shape::RECT: {
-                    quad_sz = shape.rect.sz;
+                case EntityComps::Shape::BOX: {
+                    quad_sz = Vec2F(shape.box.sz);
                 } break;
                 default: LUX_UNREACHABLE();
             }

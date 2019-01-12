@@ -5,13 +5,13 @@
 //
 #include <entity.hpp>
 
-struct TileBp {
-    TileBp(Str str) :
+struct BlockBp {
+    BlockBp(Str str) :
         str_id(str) { }
     StrBuff str_id;
 };
 
 void db_init();
-TileBp const& db_tile_bp(TileId id);
-TileBp const& db_tile_bp(Str const& str_id);
-TileId const& db_tile_id(Str const& str_id);
+BlockBp const& db_block_bp(BlockId id);
+BlockBp const& db_block_bp(Str const& str_id);
+BlockId const& db_block_id(Str const& str_id);

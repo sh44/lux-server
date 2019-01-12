@@ -22,12 +22,12 @@ struct EntityComps {
                 F32 rad;
             } sphere;
             struct {
-                Vec2F sz;
-            } rect;
+                Vec3F sz;
+            } box;
         };
         enum Tag : U8 {
             SPHERE,
-            RECT,
+            BOX,
         } tag;
     };
     struct Visible {

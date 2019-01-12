@@ -54,6 +54,7 @@ void server_init(U16 port, F64 tick_rate) {
     {
         ENetAddress addr = {ENET_HOST_ANY, port};
         server.host = enet_host_create(&addr, MAX_CLIENTS, CHANNEL_NUM, 0, 0);
+        //@TODO enet_host_compress_with_range_coder(server.host);
         if(server.host == nullptr) {
             LUX_FATAL("couldn't initialize ENet host");
         }
@@ -228,17 +229,14 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
     return LUX_OK;
 }
 
-LUX_MAY_FAIL send_tiles(ENetPeer* peer, VecSet<ChkPos> const& requests) {
-    ss_sgnl.tag = NetSsSgnl::TILES;
+LUX_MAY_FAIL send_blocks(ENetPeer* peer, VecSet<ChkPos> const& requests) {
+    ss_sgnl.tag = NetSsSgnl::BLOCKS;
     for(auto const& pos : requests) {
         guarantee_chunk(pos);
         Chunk const& chunk = get_chunk(pos);
-        std::memcpy(ss_sgnl.tiles.chunks[pos].floor,
-                    chunk.floor, sizeof(chunk.floor));
-        std::memcpy(ss_sgnl.tiles.chunks[pos].wall,
-                    chunk.wall, sizeof(chunk.wall));
-        std::memcpy(ss_sgnl.tiles.chunks[pos].roof,
-                    chunk.roof, sizeof(chunk.roof));
+        //@TODO use dst size
+        std::memcpy(ss_sgnl.blocks.chunks[pos].id,
+                    chunk.blocks, sizeof(chunk.blocks));
     }
 
     LUX_RETHROW(send_net_data(peer, &ss_sgnl, SIGNAL_CHANNEL),
@@ -308,7 +306,7 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
     }
     switch(sgnl.tag) {
         case NetCsSgnl::MAP_REQUEST: {
-            (void)send_tiles(peer, sgnl.map_request.requests);
+            (void)send_blocks(peer, sgnl.map_request.requests);
             (void)send_light(peer, sgnl.map_request.requests);
         } break;
         case NetCsSgnl::COMMAND: {
@@ -356,10 +354,25 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
 
 void server_tick() {
     for(auto pair : server.clients) {
-        //@TODO only send loaded updates
-        (void)send_light(pair.v.peer, light_updated_chunks);
-        (void)send_tiles(pair.v.peer, tile_updated_chunks);
+        static VecSet<ChkPos> light_chunks_to_send;
+        static VecSet<ChkPos> block_chunks_to_send;
+        for(auto const& pos : light_updated_chunks) {
+            if(pair.v.loaded_chunks.count(pos) > 0) {
+                light_chunks_to_send.insert(pos);
+            }
+        }
+        for(auto const& pos : block_updated_chunks) {
+            if(pair.v.loaded_chunks.count(pos) > 0) {
+                block_chunks_to_send.insert(pos);
+            }
+        }
+        (void)send_light(pair.v.peer, light_chunks_to_send);
+        (void)send_blocks(pair.v.peer, block_chunks_to_send);
+        light_chunks_to_send.clear();
+        block_chunks_to_send.clear();
     }
+    light_updated_chunks.clear();
+    block_updated_chunks.clear();
     { ///handle events
         //@CONSIDER splitting this scope
         ENetEvent event;
