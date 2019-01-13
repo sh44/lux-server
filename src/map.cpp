@@ -6,10 +6,10 @@
 //
 #include <lux_shared/common.hpp>
 #include <lux_shared/map.hpp>
+#include <lux_shared/noise.hpp>
 //
 #include <db.hpp>
 #include <entity.hpp>
-#include <simplex/SimplexNoise.h>
 #include "map.hpp"
 
 struct SuspendedChunk {
@@ -60,31 +60,30 @@ static Chunk& load_chunk(ChkPos const& pos) {
     static const BlockId wood       = db_block_id("tree_trunk"_l);
     constexpr Uns octaves    = 8;
     constexpr F32 base_scale = 0.002f;
-    constexpr F32 mul        = 2.f;
     constexpr F32 h_exp      = 3.f;
+    constexpr F32 max_h      = 256.f;
     Vec2<ChkCoord> h_pos = pos;
     if(height_map.count(h_pos) == 0) {
         auto& h_chunk = height_map[h_pos];
-        for(Uns i = 0; i < CHK_SIZE * CHK_SIZE; ++i) {
-            MapPos map_pos = to_map_pos(pos, i);
-            Vec2F seed = (Vec2F)map_pos * base_scale;
-            F32 weight = .5f;
-            F32 val    = 0.f;
-            for(Uns o = 0; o < octaves; ++o) {
-                val    += SimplexNoise::noise(seed.x, seed.y) * weight;
-                seed   *= mul;
-                weight /= mul;
+        Vec2F base_seed = (Vec2F)(h_pos * (ChkCoord)CHK_SIZE) * base_scale;
+        Vec2F seed = base_seed;
+        Uns idx = 0;
+        for(Uns y = 0; y < CHK_SIZE; ++y) {
+            for(Uns x = 0; x < CHK_SIZE; ++x) {
+                h_chunk[idx] =
+                    pow(p_norm(noise_fbm(seed, octaves)), h_exp) * max_h;
+                seed.x += base_scale;
+                ++idx;
             }
-            val = p_norm(val);
-            val /= (1.f - glm::exp2(-(F32)octaves)); //normalizes the val
-            h_chunk[i] = glm::pow(val, h_exp) * 256.f;
+            seed.x  = base_seed.x;
+            seed.y += base_scale;
         }
     }
     auto const& h_chunk = height_map.at(h_pos);
     for(Uns i = 0; i < CHK_VOL; ++i) {
+        MapPos map_pos = to_map_pos(pos, i);
         F32 h = h_chunk[i & ((CHK_SIZE * CHK_SIZE) - 1)];
         MapCoord f_h = glm::floor(h);
-        MapPos map_pos = to_map_pos(pos, i);
 
         BlockId floor = map_pos.z > f_h ? void_block :
                         map_pos.z > 4 - f_h ? grass :
