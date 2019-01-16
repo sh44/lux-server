@@ -11,7 +11,6 @@ struct Chunk {
 
 extern F32 day_cycle;
 extern VecSet<ChkPos> block_updated_chunks;
-extern VecSet<ChkPos> light_updated_chunks;
 
 BlockId get_block(MapPos const& pos);
 BlockBp const& get_block_bp(MapPos const& pos);

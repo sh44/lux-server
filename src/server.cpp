@@ -1,3 +1,4 @@
+#define ENET_DEBUG_COMPRESS
 #include <cstring>
 #include <algorithm>
 //
@@ -8,7 +9,6 @@
 //
 #include <lux_shared/common.hpp>
 #include <lux_shared/net/common.hpp>
-#include <lux_shared/net/serial.hpp>
 #include <lux_shared/net/data.hpp>
 #include <lux_shared/net/data.inl>
 #include <lux_shared/net/enet.hpp>
@@ -59,6 +59,7 @@ void server_init(U16 port, F64 tick_rate) {
             LUX_FATAL("couldn't initialize ENet host");
         }
     }
+    net_compression_init(server.host);
     server.is_running = true;
 }
 
@@ -101,7 +102,7 @@ LUX_MAY_FAIL static server_send_msg(ClientId id, Str str) {
     ss_sgnl.msg.contents.resize(prefix.len + str.len);
     ss_sgnl.msg.contents.cpy(prefix).cpy(str);
     LUX_ASSERT(is_client_connected(id));
-    return send_net_data(server.clients[id].peer, &ss_sgnl, SIGNAL_CHANNEL);
+    return send_net_data(server.clients[id].peer, &ss_sgnl, SGNL_CHANNEL);
 }
 
 void kick_client(ClientId id, Str reason) {
@@ -233,44 +234,33 @@ LUX_MAY_FAIL send_blocks(ENetPeer* peer, VecSet<ChkPos> const& requests) {
     ss_sgnl.tag = NetSsSgnl::BLOCKS;
     for(auto const& pos : requests) {
         guarantee_chunk(pos);
+    }
+    ///we separate the loops, because  TODO
+    for(auto const& pos : requests) {
         Chunk const& chunk = get_chunk(pos);
         //@TODO use dst size
         std::memcpy(ss_sgnl.blocks.chunks[pos].id,
                     chunk.blocks, sizeof(chunk.blocks));
     }
 
-    LUX_RETHROW(send_net_data(peer, &ss_sgnl, SIGNAL_CHANNEL),
+    LUX_RETHROW(send_net_data(peer, &ss_sgnl, SGNL_CHANNEL),
         "failed to send map load data to client");
 
+    /*
     ///we need to do it outside, because we must be sure that the packet has
     ///been received (i.e. sent in this case, enet guarantees that the peer will
     ///either receive it or get disconnected
     Server::Client& client = server.clients[(ClientId)peer->data];
     for(auto const& pos : requests) {
         client.loaded_chunks.emplace(pos);
-    }
+    }*/
     return LUX_OK;
-}
-
-LUX_MAY_FAIL send_light(ENetPeer* peer, VecSet<ChkPos> const& chunks) {
-    ss_sgnl.tag = NetSsSgnl::LIGHT;
-
-    Server::Client& client = server.clients[(ClientId)peer->data];
-    for(auto const& pos : chunks) {
-        if(client.loaded_chunks.count(pos) > 0) {
-            Chunk const& chunk = get_chunk(pos);
-            std::memcpy(ss_sgnl.light.chunks[pos].light_lvl,
-                        chunk.light_lvl, CHK_VOL * sizeof(LightLvl));
-        }
-    }
-    if(ss_sgnl.light.chunks.size() == 0) return LUX_OK;
-    return send_net_data(peer, &ss_sgnl, SIGNAL_CHANNEL);
 }
 
 LUX_MAY_FAIL static send_rasen_label(ENetPeer* peer, NetRasenLabel const& label) {
     ss_sgnl.tag = NetSsSgnl::RASEN_LABEL;
     ss_sgnl.rasen_label = label;
-    return send_net_data(peer, &ss_sgnl, SIGNAL_CHANNEL);
+    return send_net_data(peer, &ss_sgnl, SGNL_CHANNEL);
 }
 
 LUX_MAY_FAIL handle_tick(ENetPeer* peer, ENetPacket *in_pack) {
@@ -306,27 +296,12 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
     }
     switch(sgnl.tag) {
         case NetCsSgnl::MAP_REQUEST: {
-            (void)send_blocks(peer, sgnl.map_request.requests);
-            (void)send_light(peer, sgnl.map_request.requests);
-        } break;
-        case NetCsSgnl::COMMAND: {
-            ClientId client_id = (ClientId)peer->data;
-            auto const& name = server.clients[client_id].name;
-            auto const& contents = sgnl.command.contents;
-            if(!server.clients[client_id].admin) {
-                LUX_LOG("client %.*s tried to execute command \"%*s\""
-                        " without admin rights", (int)name.len, name.beg,
-                        (int)contents.len, contents.beg);
-                (void)server_send_msg(client_id, "you do not have admin rights,"
-                                      " this incident will be reported"_l);
-                return LUX_FAIL;
+            Server::Client& client = server.clients[(ClientId)peer->data];
+            for(auto const& pos : sgnl.map_request.requests) {
+                guarantee_chunk(pos);
+                client.loaded_chunks.emplace(pos);
             }
-            LUX_LOG("[%.*s]: %.*s", (int)name.len, name.beg, (int)contents.len,
-                    contents.beg);
-
-            //@TODO we should redirect output somehow
-            //@TODO add_command(sgnl.command.contents.data());
-            LUX_UNIMPLEMENTED();
+            //(void)send_blocks(peer, sgnl.map_request.requests);
         } break;
         case NetCsSgnl::RASEN_ASM: {
             ClientId client_id = (ClientId)peer->data;
@@ -354,24 +329,15 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
 
 void server_tick() {
     for(auto pair : server.clients) {
-        static VecSet<ChkPos> light_chunks_to_send;
         static VecSet<ChkPos> block_chunks_to_send;
-        for(auto const& pos : light_updated_chunks) {
-            if(pair.v.loaded_chunks.count(pos) > 0) {
-                light_chunks_to_send.insert(pos);
-            }
-        }
         for(auto const& pos : block_updated_chunks) {
             if(pair.v.loaded_chunks.count(pos) > 0) {
                 block_chunks_to_send.insert(pos);
             }
         }
-        (void)send_light(pair.v.peer, light_chunks_to_send);
         (void)send_blocks(pair.v.peer, block_chunks_to_send);
-        light_chunks_to_send.clear();
         block_chunks_to_send.clear();
     }
-    light_updated_chunks.clear();
     block_updated_chunks.clear();
     { ///handle events
         //@CONSIDER splitting this scope
@@ -395,7 +361,7 @@ void server_tick() {
                         if(handle_tick(event.peer, event.packet) != LUX_OK) {
                             continue;
                         }
-                    } else if(event.channelID == SIGNAL_CHANNEL) {
+                    } else if(event.channelID == SGNL_CHANNEL) {
                         if(handle_signal(event.peer, event.packet) != LUX_OK) {
                             LUX_LOG("failed to handle signal from client");
                             kick_client((ClientId)event.peer->data,
@@ -476,53 +442,4 @@ void server_make_admin(ClientId id) {
     LUX_LOG("making client %zu an admin", id);
     LUX_ASSERT(is_client_connected(id));
     server.clients[id].admin = true;
-}
-
-void add_dbg_point(NetSsTick::DbgInf::Shape::Point const& val,
-                   Vec4F col, bool border) {
-    ss_tick.dbg_inf.shapes.emplace(NetSsTick::DbgInf::Shape{
-        .tag = NetSsTick::DbgInf::Shape::POINT, .point = val,
-        .col = col, .border = border});
-}
-
-void add_dbg_line(NetSsTick::DbgInf::Shape::Line const& val,
-                   Vec4F col, bool border) {
-    ss_tick.dbg_inf.shapes.emplace(NetSsTick::DbgInf::Shape{
-        .tag = NetSsTick::DbgInf::Shape::LINE, .line = val,
-        .col = col, .border = border});
-}
-
-void add_dbg_arrow(NetSsTick::DbgInf::Shape::Arrow const& val,
-                   Vec4F col, bool border) {
-    ss_tick.dbg_inf.shapes.emplace(NetSsTick::DbgInf::Shape{
-        .tag = NetSsTick::DbgInf::Shape::ARROW, .arrow = val,
-        .col = col, .border = border});
-}
-
-void add_dbg_cross(NetSsTick::DbgInf::Shape::Cross const& val,
-                   Vec4F col, bool border) {
-    ss_tick.dbg_inf.shapes.emplace(NetSsTick::DbgInf::Shape{
-        .tag = NetSsTick::DbgInf::Shape::CROSS, .cross = val,
-        .col = col, .border = border});
-}
-
-void add_dbg_sphere(NetSsTick::DbgInf::Shape::Sphere const& val,
-                   Vec4F col, bool border) {
-    ss_tick.dbg_inf.shapes.emplace(NetSsTick::DbgInf::Shape{
-        .tag = NetSsTick::DbgInf::Shape::SPHERE, .sphere = val,
-        .col = col, .border = border});
-}
-
-void add_dbg_triangle(NetSsTick::DbgInf::Shape::Triangle const& val,
-                   Vec4F col, bool border) {
-    ss_tick.dbg_inf.shapes.emplace(NetSsTick::DbgInf::Shape{
-        .tag = NetSsTick::DbgInf::Shape::TRIANGLE, .triangle = val,
-        .col = col, .border = border});
-}
-
-void add_dbg_rect(NetSsTick::DbgInf::Shape::Rect const& val,
-                   Vec4F col, bool border) {
-    ss_tick.dbg_inf.shapes.emplace(NetSsTick::DbgInf::Shape{
-        .tag = NetSsTick::DbgInf::Shape::RECT, .rect = val,
-        .col = col, .border = border});
 }

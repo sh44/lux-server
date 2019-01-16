@@ -121,15 +121,7 @@ static Chunk& load_chunk(ChkPos const& pos) {
             }
         }
     }
-    ///we wrote some blocks, so the game thinks the chunk has been updated and
-    ///has to be resent to every player, however this would make the chunk get
-    ///sent twice, because of how the server responds to map requests
-    if(block_updated_chunks.count(pos) > 0) {
-        block_updated_chunks.erase(pos);
-    }
-    if(light_updated_chunks.count(pos) > 0) {
-        light_updated_chunks.erase(pos);
-    }
+    block_updated_chunks.insert(pos);
     return chunk;
 }
 

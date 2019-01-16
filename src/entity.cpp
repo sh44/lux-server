@@ -353,12 +353,6 @@ void get_net_entity_comps(NetSsTick::EntityComps* net_comps) {
         net_comps->visible[visible.first] =
             {visible.second.visible_id, quad_sz};
     }
-    for(auto const& item : comps.item) {
-        net_comps->item[item.first] = {item.second.weight};
-    }
-    for(auto const& container : comps.container) {
-        net_comps->container[container.first] = {container.second.items};
-    }
     for(auto const& orientation : comps.orientation) {
         net_comps->orientation[orientation.first] =
             {orientation.second.origin, orientation.second.angle};
