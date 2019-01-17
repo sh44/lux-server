@@ -121,7 +121,6 @@ static Chunk& load_chunk(ChkPos const& pos) {
             }
         }
     }
-    block_updated_chunks.insert(pos);
     return chunk;
 }
 
@@ -161,17 +160,7 @@ struct LightNode {
 VecMap<ChkPos, Queue<LightNode>> light_nodes;
 VecSet<ChkPos>                   awaiting_light_updates;
 
-void map_tick() {
-    static Uns tick_num = 0;
-    for(auto const& update : awaiting_light_updates) {
-        if(is_chunk_loaded(update)) {
-            light_updated_chunks.emplace(update);
-        }
-    }
-    for(auto const& update : light_updated_chunks) {
-        update_chunk_light(update, chunks.at(update));
-        awaiting_light_updates.erase(update);
-    }
+void map_apply_suspended_updates() {
     for(auto it = suspended_chunks.begin(), end = suspended_chunks.end();
              it != end;) {
         if(is_chunk_loaded(it->first)) {
@@ -183,10 +172,24 @@ void map_tick() {
             it = suspended_chunks.erase(it);
         } else ++it;
     }
+}
+
+void map_tick() {
+    static Uns tick_num = 0;
+    map_apply_suspended_updates();
+    for(auto const& update : awaiting_light_updates) {
+        if(is_chunk_loaded(update)) {
+            light_updated_chunks.emplace(update);
+        }
+    }
+    for(auto const& update : light_updated_chunks) {
+        update_chunk_light(update, chunks.at(update));
+        awaiting_light_updates.erase(update);
+    }
     Uns constexpr ticks_per_day = 1 << 12;
     day_cycle = 1.f;
-    day_cycle = std::sin(tau *
-        (((F32)(tick_num % ticks_per_day) / (F32)ticks_per_day) + 0.25f));
+    /*day_cycle = std::sin(tau *
+        (((F32)(tick_num % ticks_per_day) / (F32)ticks_per_day) + 0.25f));*/
     tick_num++;
 }
 

@@ -22,3 +22,5 @@ Chunk& write_chunk(ChkPos const& pos);
 
 void add_light_node(MapPos const& pos, F32 lum);
 void del_light_node(MapPos const& pos);
+
+void map_apply_suspended_updates();
