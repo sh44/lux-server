@@ -56,7 +56,6 @@ void server_init(U16 port, F64 tick_rate) {
     {
         ENetAddress addr = {ENET_HOST_ANY, port};
         server.host = enet_host_create(&addr, MAX_CLIENTS, CHANNEL_NUM, 0, 0);
-        //@TODO enet_host_compress_with_range_coder(server.host);
         if(server.host == nullptr) {
             LUX_FATAL("couldn't initialize ENet host");
         }
@@ -220,8 +219,8 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
         }
     }
     //@TODO
-    entity_comps.container[client.entity].items =
-        {create_item("item0"_l), create_item("item1"_l), create_item("item2"_l)};
+    //entity_comps.container[client.entity].items =
+        //{create_item("item0"_l), create_item("item1"_l), create_item("item2"_l)};
     entity_comps.name[client.entity] = (Str)client.name;
 
     LUX_LOG("client connected successfully");
@@ -232,20 +231,38 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
     return LUX_OK;
 }
 
-LUX_MAY_FAIL send_blocks(ENetPeer* peer, VecSet<ChkPos> const& requests) {
-    ss_sgnl.tag = NetSsSgnl::BLOCKS;
-    for(auto const& pos : requests) {
+LUX_MAY_FAIL send_chunk_update(ENetPeer* peer, VecSet<ChkPos> const& chunks) {
+    ss_sgnl.tag = NetSsSgnl::CHUNK_UPDATE;
+    for(auto const& pos : chunks) {
+        //@TODO check if client has the chunk?
+        Chunk const& chunk = get_chunk(pos);
+        for(auto const& idx : chunk.updated_blocks) {
+            Block block = chunk.blocks[idx];
+            ss_sgnl.chunk_update.chunks[pos].blocks.insert(
+                {idx, {block.id, block.lvl}});
+        }
+    }
+
+    LUX_RETHROW(send_net_data(peer, &ss_sgnl, SGNL_CHANNEL),
+        "failed to send chunk updates to client");
+    return LUX_OK;
+}
+
+LUX_MAY_FAIL send_chunk_load(ENetPeer* peer, VecSet<ChkPos> const& chunks) {
+    ss_sgnl.tag = NetSsSgnl::CHUNK_LOAD;
+    for(auto const& pos : chunks) {
         guarantee_chunk(pos);
     }
     ///after generating all the chunks, we apply the updates, so that the client
     ///receives it without delay and in the same packet
-    map_apply_suspended_updates();
+    map_apply_suspended_updates(); //@TODO send chunks vec_set there
     ///we separate the loops, because chunk generation can change other chunks
-    for(auto const& pos : requests) {
+    for(auto const& pos : chunks) {
         Chunk const& chunk = get_chunk(pos);
         //@TODO use dst size
-        std::memcpy(ss_sgnl.blocks.chunks[pos].id,
+        std::memcpy(ss_sgnl.chunk_load.chunks[pos].blocks,
                     chunk.blocks, sizeof(chunk.blocks));
+        LUX_LOG_DBG("sending chunk {%d, %d, %d}", pos.x, pos.y, pos.z);
     }
 
     LUX_RETHROW(send_net_data(peer, &ss_sgnl, SGNL_CHANNEL),
@@ -255,8 +272,9 @@ LUX_MAY_FAIL send_blocks(ENetPeer* peer, VecSet<ChkPos> const& requests) {
     ///been received (i.e. sent in this case, enet guarantees that the peer will
     ///either receive it or get disconnected
     Server::Client& client = server.clients[(ClientId)peer->data];
-    for(auto const& pos : requests) {
+    for(auto const& pos : chunks) {
         client.loaded_chunks.emplace(pos);
+        client.just_loaded_chunks.emplace(pos);
     }
     return LUX_OK;
 }
@@ -299,12 +317,7 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
     }
     switch(sgnl.tag) {
         case NetCsSgnl::MAP_REQUEST: {
-            if(send_blocks(peer, sgnl.map_request.requests) == LUX_OK) {
-                Server::Client& client = server.clients[(ClientId)peer->data];
-                for(auto const& pos : sgnl.map_request.requests) {
-                    client.just_loaded_chunks.emplace(pos);
-                }
-            }
+            (void)send_chunk_load(peer, sgnl.map_request.requests);
         } break;
         case NetCsSgnl::RASEN_ASM: {
             ClientId client_id = (ClientId)peer->data;
@@ -332,24 +345,25 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
 
 void server_tick() {
     for(auto pair : server.clients) {
-        static VecSet<ChkPos> block_chunks_to_send;
-        for(auto const& pos : block_updated_chunks) {
+        static VecSet<ChkPos> chunks_to_send;
+        for(auto const& pos : updated_chunks) {
             if(pair.v.loaded_chunks.count(pos) > 0 &&
                pair.v.just_loaded_chunks.count(pos) == 0) {
-                block_chunks_to_send.insert(pos);
+                chunks_to_send.insert(pos);
             }
         }
-        if(block_chunks_to_send.size() > 0) {
-            (void)send_blocks(pair.v.peer, block_chunks_to_send);
-            block_chunks_to_send.clear();
+        if(chunks_to_send.size() > 0) {
+            (void)send_chunk_update(pair.v.peer, chunks_to_send);
+            chunks_to_send.clear();
         }
         pair.v.just_loaded_chunks.clear();
     }
-    block_updated_chunks.clear();
+    updated_chunks.clear();
     { ///handle events
         //@CONSIDER splitting this scope
         ENetEvent event;
-        while(enet_host_service(server.host, &event, 0) > 0) {
+        //@TODO time
+        while(enet_host_service(server.host, &event, 10) > 0) {
             if(event.type == ENET_EVENT_TYPE_CONNECT) {
                 if(add_client(event.peer) != LUX_OK) {
                     kick_peer(event.peer);

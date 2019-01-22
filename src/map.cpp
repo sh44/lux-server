@@ -14,13 +14,15 @@
 
 struct SuspendedChunk {
     BitArr<CHK_VOL> mask;
-    Arr<BlockId, CHK_VOL> blocks;
+    Arr<Block, CHK_VOL> blocks;
 };
+
 static VecMap<ChkPos, Chunk> chunks;
 static VecMap<ChkPos, SuspendedChunk> suspended_chunks;
-static VecMap<Vec2<ChkCoord>, Arr<F32, CHK_SIZE * CHK_SIZE>> height_map;
+static VecMap<Vec2<ChkCoord>,
+              Arr<F32, (CHK_SIZE + 1) * (CHK_SIZE + 1)>> height_map;
 F32 day_cycle;
-VecSet<ChkPos> block_updated_chunks;
+VecSet<ChkPos> updated_chunks;
 VecSet<ChkPos> light_updated_chunks;
 
 constexpr Uns LIGHT_BITS_PER_COLOR = 4;
@@ -32,17 +34,23 @@ static bool is_chunk_loaded(ChkPos const& pos) {
     return chunks.count(pos) > 0;
 }
 
-static void write_suspended_block(MapPos const& pos, BlockId id) {
+static void write_suspended_block(MapPos const& pos, Block block) {
     ChkPos chk_pos = to_chk_pos(pos);
     ChkIdx chk_idx = to_chk_idx(pos);
     if(is_chunk_loaded(chk_pos)) {
-        auto& chk = write_chunk(chk_pos);
-        chk.blocks[chk_idx] = id;
+        updated_chunks.insert(chk_pos);
+        Chunk& chk = chunks.at(chk_pos);
+        chk.blocks[chk_idx] = block;
+        chk.updated_blocks.insert(chk_idx);
     } else {
         auto& chk = suspended_chunks[chk_pos];
-        chk.blocks[chk_idx] = id;
+        chk.blocks[chk_idx] = block;
         chk.mask[chk_idx] = true;
     }
+}
+
+static Vec2F noise2(Vec2F seed) {
+    return {noise_fbm(seed.x, 8), noise_fbm(seed.y, 8)};
 }
 
 static Chunk& load_chunk(ChkPos const& pos) {
@@ -58,20 +66,21 @@ static Chunk& load_chunk(ChkPos const& pos) {
     static const BlockId dirt       = db_block_id("dirt"_l);
     static const BlockId leaves     = db_block_id("tree_leaves"_l);
     static const BlockId wood       = db_block_id("tree_trunk"_l);
-    constexpr Uns octaves    = 8;
-    constexpr F32 base_scale = 0.002f;
+    constexpr Uns octaves    = 16;
+    constexpr F32 base_scale = 0.001f;
     constexpr F32 h_exp      = 3.f;
-    constexpr F32 max_h      = 256.f;
+    constexpr F32 max_h      = 512.f;
     Vec2<ChkCoord> h_pos = pos;
     if(height_map.count(h_pos) == 0) {
         auto& h_chunk = height_map[h_pos];
         Vec2F base_seed = (Vec2F)(h_pos * (ChkCoord)CHK_SIZE) * base_scale;
         Vec2F seed = base_seed;
         Uns idx = 0;
-        for(Uns y = 0; y < CHK_SIZE; ++y) {
-            for(Uns x = 0; x < CHK_SIZE; ++x) {
+        for(Uns y = 0; y < CHK_SIZE + 1; ++y) {
+            for(Uns x = 0; x < CHK_SIZE + 1; ++x) {
+                Vec2F warp = noise2(seed * 0.001f) * 16.f;
                 h_chunk[idx] =
-                    pow(p_norm(noise_fbm(seed, octaves)), h_exp) * max_h;
+                    pow(p_norm(noise_fbm(seed + warp, octaves)), h_exp) * max_h;
                 seed.x += base_scale;
                 ++idx;
             }
@@ -82,18 +91,39 @@ static Chunk& load_chunk(ChkPos const& pos) {
     auto const& h_chunk = height_map.at(h_pos);
     for(Uns i = 0; i < CHK_VOL; ++i) {
         MapPos map_pos = to_map_pos(pos, i);
-        F32 h = h_chunk[i & ((CHK_SIZE * CHK_SIZE) - 1)];
-        MapCoord f_h = glm::floor(h);
+        IdxPos idx_pos = to_idx_pos(i);
+        auto get_h = [&](IdxPos p) {
+            return h_chunk[p.x + p.y * (CHK_SIZE + 1)];
+        };
+        F32 h = get_h(idx_pos);
+        MapCoord f_h = ceil(h);
 
-        BlockId floor = map_pos.z > f_h ? void_block :
-                        map_pos.z > 4 - f_h ? grass :
-                        map_pos.z > 3 - f_h ? dark_grass :
-                        map_pos.z > 0 - f_h ? dirt : raw_stone;
-        F32 r_h = glm::clamp(h - (F32)map_pos.z, 0.f, 1.f);
-        chunk.blocks[i] = floor | ((U16)(r_h * 15.f) << 8);
-        /*if(glm::abs(glm::simplex((Vec3F)map_pos * 0.07f)) > 0.6f) {
-            chunk.blocks[i] = void_block;
-        }*/
+        BlockId block;
+        if(map_pos.z > f_h) {
+            block = void_block;
+        } else {
+            F32 diffx =  abs(h - get_h(idx_pos + IdxPos(1, 0, 0)));
+            F32 diffy =  abs(h - get_h(idx_pos + IdxPos(0, 1, 0)));
+            F32 diffxy = abs(h - get_h(idx_pos + IdxPos(1, 1, 0))) / sqrt(2.f);
+            F32 diff = (diffx + diffy + diffxy) / 3.f;
+            if(map_pos.z >= f_h - 2 - diff * 10.f) {
+                if(diff < 0.7f) {
+                    block = dark_grass;
+                } else if(diff < 1.f) {
+                    block = dirt;
+                } else {
+                    block = raw_stone;
+                }
+            } else if(map_pos.z >= f_h - 4) {
+                block = dirt;
+            } else {
+                block = raw_stone;
+            }
+        }
+        F32 r_h = clamp(h - (F32)map_pos.z, 0.f, 1.f);
+        r_h = r_h == 0.f ? 0.f : r_h;
+        chunk.blocks[i].id  = block;
+        chunk.blocks[i].lvl = (r_h * 255.f);
         /*if(chunk.blocks[i] == void_block) {
             chunk.light_lvl[i] = 0x0F00;
         } else {
@@ -104,20 +134,66 @@ static Chunk& load_chunk(ChkPos const& pos) {
         }*/
     }
     for(Uns i = 0; i < CHK_VOL; ++i) {
-        MapCoord h = glm::round(h_chunk[i & ((CHK_SIZE * CHK_SIZE) - 1)]);
+        MapCoord h = round(h_chunk[i & ((CHK_SIZE * CHK_SIZE) - 1)]);
+        F32 f_h = ceil(h);
         MapPos map_pos = to_map_pos(pos, i);
-        if(map_pos.z == h && lux_randf(map_pos) > 0.99f) {
-            for(Uns j = 0; j < 10; ++j) {
-                write_suspended_block(map_pos + MapPos(0, 0, j), dirt | 0xFF00);
+        if(map_pos.z == f_h && lux_randf(map_pos) > .99f && chunk.blocks[i].id == dark_grass) {
+            I32 h = lux_randmm(8, 20, map_pos, 0);
+            for(Uns j = 0; j < h; ++j) {
+                write_suspended_block(map_pos + MapPos(0, 0, j), {dirt, 0xff});
             }
-            for(MapCoord z = -3; z <= 3; ++z) {
+            for(MapCoord z = -(h / 2 + 2); z <= h / 2; ++z) {
                 for(MapCoord y = -5; y <= 5; ++y) {
                     for(MapCoord x = -5; x <= 5; ++x) {
-                        if(glm::length(Vec3F(x, y, z)) < 5.f) {
-                            write_suspended_block(map_pos + MapPos(x, y, 10 + z), dark_grass | 0xFF00);
+                        F32 diff = (F32)((h / 2) + 2 - z) / 4.f - length(Vec2F(x, y));
+                        F32 rand_factor = lux_randf(map_pos, 3, Vec3F(x, y, z));
+                        if(diff > 0.f &&
+                           lux_randf(map_pos, 1, Vec3F(x, y, z)) <
+                           (((F32)z + (h / 2 + 2)) / ((F32)h * 2.f) + 0.5f) +
+                           rand_factor) {
+                            write_suspended_block(map_pos + MapPos(x, y, h + z), {grass, diff * 255.f});
                         }
                     }
                 }
+            }
+        }
+    }
+    if(pos.z < 0) {
+        U32 worms_num = lux_randf(pos) > 0.99 ? 1 : 0;
+        for(Uns i = 0; i < worms_num; ++i) {
+            Vec3F dir;
+            U32 len = lux_randmm(10, 500, pos, i, 0);
+            Uns tries = 0;
+            do {
+                dir = {lux_randf(pos, i, 1, 0, tries) - 0.5f,
+                       lux_randf(pos, i, 1, 1, tries) - 0.5f,
+                       lux_randf(pos, i, 1, 2, tries) - 0.5f};
+                tries++;
+            } while(dir == Vec3F(0.f));
+            dir = normalize(dir);
+            Vec3F map_pos = to_map_pos(pos, lux_randm(CHK_VOL, pos, i, 2));
+            F32 rad = lux_randfmm(2, 5, pos, i, 3);
+            for(Uns j = 0; j < len; ++j) {
+                //rad += ((lux_randf(pos, i, 4) - 0.5f) * 2.f) / 5.f;
+                rad += noise((F32)(j + i + length((Vec3F)pos)) * 0.05f);
+                rad = clamp(rad, 2.f, 5.f);
+                MapCoord r_rad = ceil(rad);
+                for(MapCoord z = -r_rad; z <= r_rad; ++z) {
+                    for(MapCoord y = -r_rad; y <= r_rad; ++y) {
+                        for(MapCoord x = -r_rad; x <= r_rad; ++x) {
+                            if(length(Vec3F(x, y, z)) < rad) {
+                                write_suspended_block(floor(map_pos + Vec3F(x, y, z)), {void_block, 0x00});
+                            }
+                        }
+                    }
+                }
+                map_pos += dir;
+                Vec3F ch = {lux_randf(pos, i, 5, j, 0) - 0.5f,
+                            lux_randf(pos, i, 5, j, 1) - 0.5f,
+                            lux_randf(pos, i, 5, j, 2) - 0.5f};
+                ch *= 0.4f;
+                dir += ch;
+                dir = normalize(dir);
             }
         }
     }
@@ -136,18 +212,22 @@ Chunk const& get_chunk(ChkPos const& pos) {
     return chunks.at(pos);
 }
 
-Chunk& write_chunk(ChkPos const& pos) {
-    LUX_ASSERT(is_chunk_loaded(pos));
-    block_updated_chunks.emplace(pos);
-    return chunks.at(pos);
+Block& write_block(MapPos const& pos) {
+    ChkPos chk_pos = to_chk_pos(pos);
+    LUX_ASSERT(is_chunk_loaded(chk_pos));
+    updated_chunks.emplace(chk_pos);
+    Chunk& chunk = chunks.at(chk_pos);
+    ChkIdx chk_idx = to_chk_idx(pos);
+    chunk.updated_blocks.insert(chk_idx);
+    return chunk.blocks[chk_idx];
 }
 
-BlockId get_block(MapPos const& pos) {
+Block get_block(MapPos const& pos) {
     return get_chunk(to_chk_pos(pos)).blocks[to_chk_idx(pos)];
 }
 
 BlockBp const& get_block_bp(MapPos const& pos) {
-    return db_block_bp(get_block(pos));
+    return db_block_bp(get_block(pos).id);
 }
 
 //@CONSIDER separate file for lightsim
@@ -165,9 +245,13 @@ void map_apply_suspended_updates() {
              it != end;) {
         if(is_chunk_loaded(it->first)) {
             auto const& src = it->second;
-            auto& dst = write_chunk(it->first);
+            updated_chunks.insert(it->first);
+            Chunk& dst = chunks.at(it->first);
             for(Uns i = 0; i < CHK_VOL; ++i) {
-                if(src.mask[i]) dst.blocks[i] = src.blocks[i];
+                if(src.mask[i]) {
+                    dst.blocks[i] = src.blocks[i];
+                    dst.updated_blocks.insert(i);
+                }
             }
             it = suspended_chunks.erase(it);
         } else ++it;
@@ -186,6 +270,13 @@ void map_tick() {
         update_chunk_light(update, chunks.at(update));
         awaiting_light_updates.erase(update);
     }
+    /*for(auto const& pair : chunks) {
+        if(lux_randf(pair.first, 0, tick_num) > 0.999f) {
+            ChkIdx idx = lux_randm(CHK_VOL, pair.first, 1, tick_num);
+            BlockId& block = write_block(to_map_pos(pair.first, idx));
+            block = 1;
+        }
+    }*/
     Uns constexpr ticks_per_day = 1 << 12;
     day_cycle = 1.f;
     /*day_cycle = std::sin(tau *
@@ -198,7 +289,7 @@ void add_light_node(MapPos const& pos, F32 lum) {
     ChkIdx chk_idx = to_chk_idx(pos);
     //@TODO
     light_nodes[chk_pos].push(
-        LightNode{(F32)glm::round(lum * (F32)LIGHT_RANGE), to_chk_idx(pos)});
+        LightNode{(F32)round(lum * (F32)LIGHT_RANGE), to_chk_idx(pos)});
     awaiting_light_updates.insert(chk_pos);
 }
 
@@ -220,21 +311,20 @@ static void update_chunk_light(ChkPos const &pos, Chunk& chunk) {
 
         LightLvl map_lvl = chunk.light_lvl[node.idx];
         U8 map_lum = (map_lvl & 0xF000) >> 12;
-        if(chunk.blocks[node.idx] != void_block) {
-            node.lum = glm::round((F32)node.lum * 0.5f);
+        if(chunk.blocks[node.idx].id != void_block) {
+            node.lum = round((F32)node.lum * 0.5f);
         }
         if(map_lum < node.lum) {
             /* node.lum is guaranteed to be non-zero when > map_lum */
             U8 new_lum = node.lum;
             chunk.light_lvl[node.idx] &= 0x0FFF;
             chunk.light_lvl[node.idx] |= new_lum << 12;
-            if(chunk.blocks[node.idx] != void_block) {
+            if(chunk.blocks[node.idx].id != void_block) {
                 node.lum = 1;
             }
             if(node.lum >= 2) {
                 U8 side_lum = node.lum - 1;
                 for(auto const &offset : manhattan_hollow<MapCoord>) {
-                    //@TODO don't spread lights through Z if there is floor
                     MapPos map_pos = base_pos + offset;
                     ChkPos chk_pos = to_chk_pos(map_pos);
                     ChkIdx idx     = to_chk_idx(map_pos);
@@ -248,4 +338,70 @@ static void update_chunk_light(ChkPos const &pos, Chunk& chunk) {
             }
         }
     }
+}
+
+bool map_cast_ray_exterior(MapPos *out, Vec3F src, Vec3F dst) {
+    Vec3F ray = dst - src;
+    Vec3F a = abs(ray);
+    int max_i;
+    if(a.x > a.y) {
+        if(a.x > a.z) max_i = 0;
+        else          max_i = 2;
+    } else {
+        if(a.y > a.z) max_i = 1;
+        else          max_i = 2;
+    }
+    F32 max = a[max_i];
+    Vec3F dt = ray / max;
+    Vec3F fr = src - trunc(src);
+    F32    o = fr[max_i];
+
+    Vec3F it = src + o * dt;
+
+    for(Uns i = 0; i < max; ++i)
+    {
+        MapPos map_pos = floor(it);
+        ChkPos chk_pos = to_chk_pos(map_pos);
+        if(!is_chunk_loaded(chk_pos)) return false;
+        if(get_chunk(chk_pos).blocks[to_chk_idx(map_pos)].lvl > 0) {
+            *out = floor(it - dt);
+            return true;
+        }
+
+        it += dt;
+    }
+    return false;
+}
+
+bool map_cast_ray_interior(MapPos *out, Vec3F src, Vec3F dst) {
+    Vec3F ray = dst - src;
+    Vec3F a = abs(ray);
+    int max_i;
+    if(a.x > a.y) {
+        if(a.x > a.z) max_i = 0;
+        else          max_i = 2;
+    } else {
+        if(a.y > a.z) max_i = 1;
+        else          max_i = 2;
+    }
+    F32 max = a[max_i];
+    Vec3F dt = ray / max;
+    Vec3F fr = src - trunc(src);
+    F32    o = fr[max_i];
+
+    Vec3F it = src + o * dt;
+
+    for(Uns i = 0; i < max; ++i)
+    {
+        MapPos map_pos = floor(it);
+        ChkPos chk_pos = to_chk_pos(map_pos);
+        if(!is_chunk_loaded(chk_pos)) return false;
+        if(get_chunk(chk_pos).blocks[to_chk_idx(map_pos)].lvl > 0) {
+            *out = map_pos;
+            return true;
+        }
+
+        it += dt;
+    }
+    return false;
 }

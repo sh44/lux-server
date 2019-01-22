@@ -40,12 +40,12 @@ struct EntityComps {
         DynArr<EntityId> items;
     };
     struct Orientation {
-        Vec2F origin;
-        F32   angle; ///in radians
+        EntityVec origin;
+        Vec2F     angles; ///pitch, yaw, in radians
     };
     struct AVel {
-        F32 vel;
-        F32 damping; ///from 0.f to 1.f
+        Vec2F vel;
+        Vec2F damping; ///from 0.f to 1.f
     };
     struct Ai {
         RasenEnv rn_env;
@@ -74,4 +74,5 @@ EntityId create_player();
 void remove_entity(EntityId entity);
 void entities_tick();
 void get_net_entity_comps(NetSsTick::EntityComps* net_comps);
-LUX_MAY_FAIL entity_do_action(U16 entity_id, U16 action_id, Slice<U8> const& stack);
+LUX_MAY_FAIL entity_do_action(EntityId entity_id, U16 action_id,
+                              Slice<U8> const& stack);
