@@ -28,7 +28,7 @@ endif()
 configure_file("${PROJECT_SOURCE_DIR}/config.hpp.in"
                "${PROJECT_BINARY_DIR}/config.hpp")
 
-include_directories(SYSTEM "deps" "src" "deps/lux_shared/deps"
+include_directories(SYSTEM "include" "src" "deps/lux_shared/include"
                     "${PROJECT_BINARY_DIR}" "${PROJECT_BINARY_DIR}/deps")
 add_subdirectory("deps/lux_shared")
 
@@ -36,9 +36,8 @@ file(GLOB_RECURSE SOURCES "src/*.cpp")
 add_executable(lux-server ${SOURCES})
 
 find_package(Threads REQUIRED)
-find_library(ENET_LIB enet)
 
 target_link_libraries(lux-server lux)
 target_link_libraries(lux-server Threads::Threads)
-target_link_libraries(lux-server "${ENET_LIB}")
+target_link_libraries(lux-server enet)
 
