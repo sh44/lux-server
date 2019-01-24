@@ -5,6 +5,7 @@
 #include <lux_shared/net/data.hpp>
 //
 #include <rasen.hpp>
+#include <physics.hpp>
 
 F32 constexpr ENTITY_L_VEL = 0.015f;
 F32 constexpr ENTITY_A_VEL = tau / 512.f;
@@ -13,23 +14,10 @@ struct Entity {};
 extern SparseDynArr<Entity> entities;
 
 struct EntityComps {
-    typedef EntityVec Pos;
-    typedef EntityVec Vel;
-    typedef StrBuff   Name;
-    struct Shape {
-        union {
-            struct {
-                F32 rad;
-            } sphere;
-            struct {
-                Vec3F sz;
-            } box;
-        };
-        enum Tag : U8 {
-            SPHERE,
-            BOX,
-        } tag;
-    };
+    typedef EntityVec    Pos;
+    typedef EntityVec    Vel;
+    typedef StrBuff      Name;
+    typedef btRigidBody* PhysicsBody;
     struct Visible {
         U32 visible_id;
     };
@@ -57,7 +45,7 @@ struct EntityComps {
     IdMap<EntityId, Vel>         vel;
     IdMap<EntityId, AVel>        a_vel;
     IdMap<EntityId, Name>        name;
-    IdMap<EntityId, Shape>       shape;
+    IdMap<EntityId, PhysicsBody> physics_body;
     IdMap<EntityId, Visible>     visible;
     IdMap<EntityId, Item>        item;
     IdMap<EntityId, Container>   container;

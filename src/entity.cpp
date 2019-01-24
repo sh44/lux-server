@@ -15,9 +15,6 @@
 #include <entity.hpp>
 #include <server.hpp>
 
-F32 constexpr VEL_DAMPING = 0.9f;
-F32 constexpr MIN_SPEED = 0.01f;
-F32 constexpr MAX_SPEED = 1.f;
 static EntityComps          comps;
 EntityComps& entity_comps = comps;
 SparseDynArr<Entity>        entities;
@@ -47,21 +44,18 @@ LUX_MAY_FAIL static entity_break_block(RasenFrame* frame) {
     LUX_RETHROW(comps.pos.count(id) > 0,
                 "entity has no position component");
     Vec2F rot = comps.orientation.at(id).angles;
-    Vec3F src = comps.pos.at(id) + Vec3F(0, 0, 3.6);
+    Vec3F src = comps.pos.at(id) + Vec3F(0, 0, 1.4);
     Vec3F dir;
     dir.x = cos(rot.y) * sin(-rot.x);
     dir.y = cos(rot.y) * cos(-rot.x);
     dir.z = sin(rot.y);
     dir = normalize(dir) * 10.f;
     MapPos hit_pos;
-    if(map_cast_ray_interior(&hit_pos, src, src + dir)) {
+    Vec3F  hit_dir;
+    if(map_cast_ray(&hit_pos, &hit_dir, src, src + dir)) {
         Block& block = write_block(hit_pos);
-        if(block.lvl > 0x0f) {
-            block.lvl -= 0xf;
-        } else {
-            block.lvl = 0x00;
-            block.id = void_block;
-        }
+        block.lvl = 0x00;
+        block.id = void_block;
     }
     return LUX_OK;
 }
@@ -77,23 +71,28 @@ LUX_MAY_FAIL static entity_place_block(RasenFrame* frame) {
     LUX_RETHROW(comps.pos.count(id) > 0,
                 "entity has no position component");
     Vec2F rot = comps.orientation.at(id).angles;
-    Vec3F src = comps.pos.at(id) + Vec3F(0, 0, 3.6);
+    Vec3F src = comps.pos.at(id) + Vec3F(0, 0, 1.4);
     Vec3F dir;
     dir.x = cos(rot.y) * sin(-rot.x);
     dir.y = cos(rot.y) * cos(-rot.x);
     dir.z = sin(rot.y);
     dir = normalize(dir) * 10.f;
-    MapPos hit_pos;
     static BlockId stone = db_block_id("stone_wall"_l);
-    if(map_cast_ray_exterior(&hit_pos, src, src + dir)) {
-        Block& block = write_block(hit_pos);
-        if(block.id != stone) {
-            block.id  = stone;
-            block.lvl = 0x00;
+    MapPos hit_pos;
+    Vec3F  hit_dir;
+    if(map_cast_ray(&hit_pos, &hit_dir, src, src + dir)) {
+        Block& block0 = write_block(hit_pos);
+        if(block0.id != stone) {
+            block0.id = stone;
         }
-        if(block.lvl < 0xf0) {
-            block.lvl += 0xf;
-        } else block.lvl = 0xff;
+        if(block0.lvl == 0xff) {
+            hit_pos = floor((Vec3F)hit_pos - hit_dir);
+            Block& block1 = write_block(hit_pos);
+            if(block1.id != stone) {
+                block1.id = stone;
+            }
+            block1.lvl = 0xff;
+        } else block0.lvl = 0xff;
     }
     return LUX_OK;
 }
@@ -137,10 +136,9 @@ LUX_MAY_FAIL static entity_rotate(RasenFrame* frame) {
 EntityId create_player() {
     LUX_LOG("creating new player");
     EntityId id            = create_entity();
-    comps.pos[id]          = {300, 300, 0};
+    comps.pos[id]          = {0, 0, 80};
     comps.vel[id]          = {0, 0, 0};
-    comps.shape[id]        = EntityComps::Shape
-        {{.box = {{0.8f, 0.5f, 1.f}}}, .tag = EntityComps::Shape::BOX};
+    comps.physics_body[id] = {physics_create_body(comps.pos[id])};
     comps.visible[id]      = {2};
     comps.orientation[id]  = {{0.f, 0.f, 0.f}, {0.f, 0.f}};
     comps.a_vel[id]        = {{0.f, 0.f}, {0.15f, 0.15f}};
@@ -217,44 +215,21 @@ void entities_tick() {
             //@TODO Modular arithmetic class
         }
         if(comps.pos.count(id) > 0 &&
-           comps.vel.count(id) > 0) {
+           comps.vel.count(id) > 0 &&
+           comps.physics_body.count(id) > 0) {
             auto& pos = comps.pos.at(id);
             EntityVec& vel = comps.vel.at(id);
-            /*if(comps.shape.count(id) > 0) {
-                collision_sectors[to_chk_pos(old_pos)].insert(id);
-                F32 speed = glm::length(vel);
-                if(speed < MIN_SPEED) {
-                    vel = {0.f, 0.f};
-                } else if(speed > MAX_SPEED) {
-                    vel = glm::normalize(vel) * MAX_SPEED;
-                }
-                F32 angle = 0.f;
-                if(comps.orientation.count(id) > 0) {
-                    angle = comps.orientation.at(id).angle;
-                }
-                CollisionShape shape = {
-                    comps.shape.at(id),
-                    angle, pos
-                };
-                if(to_chk_pos(old_pos) != to_chk_pos(pos)) {
-                    collision_sectors.at(to_chk_pos(old_pos)).erase(id);
-                    collision_sectors[to_chk_pos(pos)].insert(id);
-                }
-            } else {*/
-                Vec2F angles = comps.orientation.at(id).angles;
-                glm::mat4 bob = glm::eulerAngleZX(angles.x, angles.y);
-                pos += (Vec3F)(bob * Vec4F(vel, 1.f));
-                guarantee_chunk(to_chk_pos(floor(pos)));
-                /*while(get_block(floor(pos)).id == void_block) {
-                    pos.z -= 1;
-                    guarantee_chunk(to_chk_pos(floor(pos)));
-                }
-                while(get_block(floor(pos)).id != void_block) {
-                    pos.z += 1;
-                    guarantee_chunk(to_chk_pos(floor(pos)));
-                }*/
-            //}
-            vel *= VEL_DAMPING;
+            auto* body = comps.physics_body.at(id);
+            Vec2F angles = comps.orientation.at(id).angles;
+            glm::mat4 bob = glm::eulerAngleZ(angles.x);
+            Vec3F rotv = (Vec3F)(bob * Vec4F(vel * 1000.f, 1.f));
+            body->applyCentralForce({rotv.x, rotv.y, rotv.z + 1.f});
+            auto new_pos = body->getCenterOfMassPosition();
+            pos = Vec3F(new_pos.x(), new_pos.y(), new_pos.z());
+            //@TODO better solution that guarantees chunk in the shape's
+            //bounding box
+            guarantee_physics_mesh_around(to_chk_pos(floor(pos)));
+            vel = Vec3F(0.f);
         }
     }
     entities.free_slots();
@@ -265,15 +240,15 @@ void remove_entity(EntityId entity) {
     LUX_LOG("removing entity %u", entity);
     entities.erase(entity);
     ///this is only gonna grow longer...
-    if(comps.pos.count(entity)         > 0) comps.pos.erase(entity);
-    if(comps.vel.count(entity)         > 0) comps.vel.erase(entity);
-    if(comps.name.count(entity)        > 0) comps.name.erase(entity);
-    if(comps.shape.count(entity)       > 0) comps.shape.erase(entity);
-    if(comps.visible.count(entity)     > 0) comps.visible.erase(entity);
-    if(comps.item.count(entity)        > 0) comps.item.erase(entity);
-    if(comps.container.count(entity)   > 0) comps.container.erase(entity);
-    if(comps.orientation.count(entity) > 0) comps.orientation.erase(entity);
-    if(comps.ai.count(entity)          > 0) comps.ai.erase(entity);
+    if(comps.pos.count(entity)          > 0) comps.pos.erase(entity);
+    if(comps.vel.count(entity)          > 0) comps.vel.erase(entity);
+    if(comps.name.count(entity)         > 0) comps.name.erase(entity);
+    if(comps.physics_body.count(entity) > 0) comps.physics_body.erase(entity);
+    if(comps.visible.count(entity)      > 0) comps.visible.erase(entity);
+    if(comps.item.count(entity)         > 0) comps.item.erase(entity);
+    if(comps.container.count(entity)    > 0) comps.container.erase(entity);
+    if(comps.orientation.count(entity)  > 0) comps.orientation.erase(entity);
+    if(comps.ai.count(entity)           > 0) comps.ai.erase(entity);
 }
 
 void get_net_entity_comps(NetSsTick::EntityComps* net_comps) {

@@ -28,9 +28,11 @@ endif()
 configure_file("${PROJECT_SOURCE_DIR}/config.hpp.in"
                "${PROJECT_BINARY_DIR}/config.hpp")
 
-include_directories(SYSTEM "include" "src" "deps/lux_shared/include"
-                    "${PROJECT_BINARY_DIR}" "${PROJECT_BINARY_DIR}/deps")
+include_directories(SYSTEM "include" "deps/lux_shared/include" "${PROJECT_BINARY_DIR}/deps"
+    "include/bullet")
+include_directories("src" "${PROJECT_BINARY_DIR}")
 add_subdirectory("deps/lux_shared")
+add_subdirectory("deps/bullet")
 
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 add_executable(lux-server ${SOURCES})
@@ -40,4 +42,7 @@ find_package(Threads REQUIRED)
 target_link_libraries(lux-server lux)
 target_link_libraries(lux-server Threads::Threads)
 target_link_libraries(lux-server enet)
+target_link_libraries(lux-server BulletDynamics)
+target_link_libraries(lux-server BulletCollision)
+target_link_libraries(lux-server LinearMath)
 

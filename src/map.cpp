@@ -7,9 +7,11 @@
 #include <lux_shared/common.hpp>
 #include <lux_shared/map.hpp>
 #include <lux_shared/noise.hpp>
+#include <lux_shared/marching_cubes.hpp>
 //
 #include <db.hpp>
 #include <entity.hpp>
+#include <physics.hpp>
 #include "map.hpp"
 
 struct SuspendedChunk {
@@ -17,10 +19,50 @@ struct SuspendedChunk {
     Arr<Block, CHK_VOL> blocks;
 };
 
+//@TODO move the meshes to physics.hpp?
+//@TODO share mesh with client?
+struct PhysicsMesh {
+    struct TriangleData {
+        DynArr<Vec3F> verts;
+        DynArr<I32>   idxs;
+    };
+    struct BulletData {
+        template<typename... Args>
+        BulletData(Args&& ...args) :
+            trigs_array(args...) { }
+        btTriangleIndexVertexArray trigs_array;
+        btBvhTriangleMeshShape*    shape;
+    };
+
+    static List<TriangleData> triangle_data;
+    static List<BulletData>   bullet_data;
+
+    btRigidBody* body;
+    decltype(bullet_data)::iterator   bullet_iter;
+    decltype(triangle_data)::iterator triangle_iter;
+    bool allocated = false;
+    ~PhysicsMesh() {
+        if(allocated) {
+            physics_remove_body(body);
+            delete bullet_iter->shape;
+
+            bullet_data.erase(bullet_iter);
+            triangle_data.erase(triangle_iter);
+        }
+    }
+};
+
+List<PhysicsMesh::TriangleData> PhysicsMesh::triangle_data;
+List<PhysicsMesh::BulletData>   PhysicsMesh::bullet_data;
+
+//@TODO might want to use the excess values somehow
+typedef Arr<F32, (CHK_SIZE + 1) * (CHK_SIZE + 1)> HeightChunk;
+
 static VecMap<ChkPos, Chunk> chunks;
 static VecMap<ChkPos, SuspendedChunk> suspended_chunks;
-static VecMap<Vec2<ChkCoord>,
-              Arr<F32, (CHK_SIZE + 1) * (CHK_SIZE + 1)>> height_map;
+static VecMap<ChkPos, PhysicsMesh> physics_meshes;
+static VecMap<Vec2<ChkCoord>, HeightChunk> height_map;
+
 F32 day_cycle;
 VecSet<ChkPos> updated_chunks;
 VecSet<ChkPos> light_updated_chunks;
@@ -32,6 +74,36 @@ constexpr Uns LIGHT_RANGE          = 1 << LIGHT_BITS_PER_COLOR;
 static void update_chunk_light(ChkPos const &pos, Chunk& chunk);
 static bool is_chunk_loaded(ChkPos const& pos) {
     return chunks.count(pos) > 0;
+}
+
+static Vec2F noise2(Vec2F seed) {
+    return {noise_fbm(seed.x, 8), noise_fbm(seed.y, 8)};
+}
+
+static HeightChunk const& guarantee_height_chunk(Vec2<ChkCoord> const& pos) {
+    constexpr Uns octaves    = 16;
+    constexpr F32 base_scale = 0.001f;
+    constexpr F32 h_exp      = 3.f;
+    constexpr F32 max_h      = 512.f;
+    if(height_map.count(pos) == 0) {
+        auto& h_chunk = height_map[pos];
+        Vec2F base_seed = (Vec2F)(pos * (ChkCoord)CHK_SIZE) * base_scale;
+        Vec2F seed = base_seed;
+        Uns idx = 0;
+        for(Uns y = 0; y < CHK_SIZE + 1; ++y) {
+            for(Uns x = 0; x < CHK_SIZE + 1; ++x) {
+                Vec2F warp = noise2(seed * 0.001f) * 16.f;
+                h_chunk[idx] =
+                    pow(u_norm(noise_fbm(seed + warp, octaves)), h_exp) * max_h;
+                seed.x += base_scale;
+                ++idx;
+            }
+            seed.x  = base_seed.x;
+            seed.y += base_scale;
+        }
+    }
+    auto const& h_chunk = height_map[pos];
+    return h_chunk;
 }
 
 static void write_suspended_block(MapPos const& pos, Block block) {
@@ -49,10 +121,6 @@ static void write_suspended_block(MapPos const& pos, Block block) {
     }
 }
 
-static Vec2F noise2(Vec2F seed) {
-    return {noise_fbm(seed.x, 8), noise_fbm(seed.y, 8)};
-}
-
 static Chunk& load_chunk(ChkPos const& pos) {
     LUX_ASSERT(!is_chunk_loaded(pos));
     LUX_LOG("loading chunk");
@@ -66,29 +134,8 @@ static Chunk& load_chunk(ChkPos const& pos) {
     static const BlockId dirt       = db_block_id("dirt"_l);
     static const BlockId leaves     = db_block_id("tree_leaves"_l);
     static const BlockId wood       = db_block_id("tree_trunk"_l);
-    constexpr Uns octaves    = 16;
-    constexpr F32 base_scale = 0.001f;
-    constexpr F32 h_exp      = 3.f;
-    constexpr F32 max_h      = 512.f;
     Vec2<ChkCoord> h_pos = pos;
-    if(height_map.count(h_pos) == 0) {
-        auto& h_chunk = height_map[h_pos];
-        Vec2F base_seed = (Vec2F)(h_pos * (ChkCoord)CHK_SIZE) * base_scale;
-        Vec2F seed = base_seed;
-        Uns idx = 0;
-        for(Uns y = 0; y < CHK_SIZE + 1; ++y) {
-            for(Uns x = 0; x < CHK_SIZE + 1; ++x) {
-                Vec2F warp = noise2(seed * 0.001f) * 16.f;
-                h_chunk[idx] =
-                    pow(p_norm(noise_fbm(seed + warp, octaves)), h_exp) * max_h;
-                seed.x += base_scale;
-                ++idx;
-            }
-            seed.x  = base_seed.x;
-            seed.y += base_scale;
-        }
-    }
-    auto const& h_chunk = height_map.at(h_pos);
+    auto const& h_chunk = guarantee_height_chunk(h_pos);
     for(Uns i = 0; i < CHK_VOL; ++i) {
         MapPos map_pos = to_map_pos(pos, i);
         IdxPos idx_pos = to_idx_pos(i);
@@ -121,7 +168,6 @@ static Chunk& load_chunk(ChkPos const& pos) {
             }
         }
         F32 r_h = clamp(h - (F32)map_pos.z, 0.f, 1.f);
-        r_h = r_h == 0.f ? 0.f : r_h;
         chunk.blocks[i].id  = block;
         chunk.blocks[i].lvl = (r_h * 255.f);
         /*if(chunk.blocks[i] == void_block) {
@@ -151,6 +197,7 @@ static Chunk& load_chunk(ChkPos const& pos) {
                            lux_randf(map_pos, 1, Vec3F(x, y, z)) <
                            (((F32)z + (h / 2 + 2)) / ((F32)h * 2.f) + 0.5f) +
                            rand_factor) {
+                            diff = min(1.f, diff);
                             write_suspended_block(map_pos + MapPos(x, y, h + z), {grass, diff * 255.f});
                         }
                     }
@@ -158,31 +205,35 @@ static Chunk& load_chunk(ChkPos const& pos) {
             }
         }
     }
+    MapPos base_pos = to_map_pos(pos, 0);
     if(pos.z < 0) {
         U32 worms_num = lux_randf(pos) > 0.99 ? 1 : 0;
         for(Uns i = 0; i < worms_num; ++i) {
             Vec3F dir;
             U32 len = lux_randmm(10, 500, pos, i, 0);
-            Uns tries = 0;
-            do {
-                dir = {lux_randf(pos, i, 1, 0, tries) - 0.5f,
-                       lux_randf(pos, i, 1, 1, tries) - 0.5f,
-                       lux_randf(pos, i, 1, 2, tries) - 0.5f};
-                tries++;
-            } while(dir == Vec3F(0.f));
-            dir = normalize(dir);
+            dir = lux_rand_norm(pos, i, 1);
             Vec3F map_pos = to_map_pos(pos, lux_randm(CHK_VOL, pos, i, 2));
             F32 rad = lux_randfmm(2, 5, pos, i, 3);
             for(Uns j = 0; j < len; ++j) {
-                //rad += ((lux_randf(pos, i, 4) - 0.5f) * 2.f) / 5.f;
-                rad += noise((F32)(j + i + length((Vec3F)pos)) * 0.05f);
-                rad = clamp(rad, 2.f, 5.f);
+                rad = noise_fbm(((F32)(j + i) * 1000.f +
+                    length((Vec3F)base_pos)) * 0.05f, 3);
+                rad = u_norm(rad) * 9.f + 1.f;
+                rad *= 1.f - abs(s_norm((F32)j / (F32)len));
+                Vec2<ChkCoord> h_pos = to_chk_pos(map_pos);
+                HeightChunk const& h_chk = guarantee_height_chunk(h_pos);
+                IdxPos idx_pos = to_idx_pos(map_pos);
+                F32 h = h_chk[idx_pos.x + idx_pos.y * (CHK_SIZE + 1)];
+                if(map_pos.z > h + rad) {
+                    ///we have drilled too far into the surface by now
+                    break;
+                }
                 MapCoord r_rad = ceil(rad);
                 for(MapCoord z = -r_rad; z <= r_rad; ++z) {
                     for(MapCoord y = -r_rad; y <= r_rad; ++y) {
                         for(MapCoord x = -r_rad; x <= r_rad; ++x) {
                             if(length(Vec3F(x, y, z)) < rad) {
-                                write_suspended_block(floor(map_pos + Vec3F(x, y, z)), {void_block, 0x00});
+                                write_suspended_block(floor(map_pos + Vec3F(x, y, z)),
+                                    {void_block, 0x00});
                             }
                         }
                     }
@@ -203,6 +254,98 @@ static Chunk& load_chunk(ChkPos const& pos) {
 void guarantee_chunk(ChkPos const& pos) {
     if(!is_chunk_loaded(pos)) {
         load_chunk(pos);
+    }
+}
+
+static void build_physics_mesh(ChkPos const& pos) {
+    LUX_LOG_DBG("building physics_mesh {%zd, %zd, %zd}", pos.x, pos.y, pos.z);
+
+    U32 trigs_num = 0;
+    static DynArr<I32>    idxs(CHK_VOL * 5 * 3);
+    static DynArr<Vec3F> verts(CHK_VOL * 5 * 3);
+
+    MapPos constexpr axis_off[6] =
+        {{-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}};
+
+    constexpr MapPos cell_verts[8] = {
+        {0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0},
+        {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1}};
+    GridCell grid_cell;
+    for(Uns i = 0; i < 8; ++i) {
+        grid_cell.p[i] = (Vec3F)cell_verts[i];
+    }
+    for(ChkIdx i = 0; i < CHK_VOL; ++i) {
+        MapPos map_pos = to_map_pos(pos, i);
+        Vec3F rel_pos = (Vec3F)to_idx_pos(i) + 0.5f;
+        int sign = s_norm((F32)get_block(map_pos).lvl / 255.f) >= 0.f;
+        bool has_face = false;
+        for(Uns j = 0; j < 8; ++j) {
+            MapPos abs_pos = map_pos + cell_verts[j];
+            BlockLvl lvl = get_block(abs_pos).lvl;
+            grid_cell.val[j] = s_norm((F32)lvl / 255.f);
+            if((grid_cell.val[j] > 0.f) != sign) {
+                has_face = true;
+            }
+        }
+        if(!has_face) continue;
+        Triangle cell_trigs[5];
+        Uns cell_trigs_num = polygonise(grid_cell, 0.f, cell_trigs);
+        for(Uns j = 0; j < cell_trigs_num; ++j) {
+            for(Uns k = 0; k < 3; ++k) {
+                idxs[ trigs_num * 3 + k] = trigs_num * 3 + k;
+                verts[trigs_num * 3 + k] = cell_trigs[j].p[k] + rel_pos;
+            }
+            ++trigs_num;
+        }
+    }
+
+    auto& mesh = physics_meshes[pos];
+    if(mesh.allocated) {
+        physics_remove_body(mesh.body);
+        delete mesh.bullet_iter->shape;
+        mesh.bullet_data.erase(mesh.bullet_iter);
+
+        mesh.allocated = false;
+    } else if(trigs_num > 0) {
+        mesh.triangle_data.emplace_back();
+        mesh.triangle_iter = mesh.triangle_data.end();
+        mesh.triangle_iter--;
+    }
+    if(trigs_num > 0) {
+        mesh.triangle_iter->verts.resize(trigs_num * 3);
+        mesh.triangle_iter->verts.cpy(verts, trigs_num * 3);
+        mesh.triangle_iter->idxs.resize(trigs_num * 3);
+        mesh.triangle_iter->idxs.cpy(idxs, trigs_num * 3);
+
+        mesh.bullet_data.emplace_back(
+            trigs_num    , (I32*)mesh.triangle_iter->idxs.beg , sizeof(I32) * 3,
+            trigs_num * 3, (F32*)mesh.triangle_iter->verts.beg, sizeof(Vec3F));
+
+        mesh.bullet_iter = mesh.bullet_data.end();
+        mesh.bullet_iter--;
+        mesh.bullet_iter->shape = new btBvhTriangleMeshShape(
+            &mesh.bullet_iter->trigs_array, false, btVector3{0, 0, 0},
+            btVector3{CHK_SIZE, CHK_SIZE, CHK_SIZE});
+
+        mesh.body = physics_create_mesh(to_map_pos(pos, 0),
+            mesh.bullet_iter->shape);
+        mesh.allocated = true;
+    }
+}
+
+void guarantee_physics_mesh_around(ChkPos const& pos) {
+    if(physics_meshes.count(pos) > 0) return;
+
+    for(ChkCoord z = -2; z <= 2; ++z) {
+        for(ChkCoord y = -2; y <= 2; ++y) {
+            for(ChkCoord x = -2; x <= 2; ++x) {
+                guarantee_chunk(ChkPos(x, y, z) + pos);
+            }
+        }
+    }
+    for(auto const& off : chebyshev<ChkCoord>) {
+        if(physics_meshes.count(off + pos) > 0) continue;
+        build_physics_mesh(off + pos);
     }
 }
 
@@ -260,6 +403,7 @@ void map_apply_suspended_updates() {
 
 void map_tick() {
     static Uns tick_num = 0;
+    physics_tick(1.f / 64.f); //TODO tick time
     map_apply_suspended_updates();
     for(auto const& update : awaiting_light_updates) {
         if(is_chunk_loaded(update)) {
@@ -270,11 +414,36 @@ void map_tick() {
         update_chunk_light(update, chunks.at(update));
         awaiting_light_updates.erase(update);
     }
+    for(auto const& pos : updated_chunks) {
+        if(physics_meshes.count(pos) > 0) {
+            U8 updated_sides = 0b000000;
+            LUX_ASSERT(is_chunk_loaded(pos));
+            Chunk const& chunk = get_chunk(pos);
+            for(auto const& idx : chunk.updated_blocks) {
+                IdxPos idx_pos = to_idx_pos(idx);
+                for(Uns a = 0; a < 3; ++a) {
+                    if(idx_pos[a] == 0) {
+                        updated_sides |= (0b000001 << (a * 2));
+                    } else if(idx_pos[a] == CHK_SIZE - 1) {
+                        updated_sides |= (0b000010 << (a * 2));
+                    }
+                }
+            }
+            auto update_mesh = [&](ChkPos const& r_pos) {
+                ChkPos off_pos = r_pos + pos;
+                if(physics_meshes.count(off_pos) > 0) {
+                    build_physics_mesh(off_pos);
+                }
+            };
+            update_chunks_around(update_mesh, updated_sides);
+        }
+    }
     /*for(auto const& pair : chunks) {
         if(lux_randf(pair.first, 0, tick_num) > 0.999f) {
             ChkIdx idx = lux_randm(CHK_VOL, pair.first, 1, tick_num);
-            BlockId& block = write_block(to_map_pos(pair.first, idx));
-            block = 1;
+            Block& block = write_block(to_map_pos(pair.first, idx));
+            block.id = 1;
+            block.lvl = 0xff;
         }
     }*/
     Uns constexpr ticks_per_day = 1 << 12;
@@ -340,7 +509,7 @@ static void update_chunk_light(ChkPos const &pos, Chunk& chunk) {
     }
 }
 
-bool map_cast_ray_exterior(MapPos *out, Vec3F src, Vec3F dst) {
+bool map_cast_ray(MapPos* out_pos, Vec3F* out_dir, Vec3F src, Vec3F dst) {
     Vec3F ray = dst - src;
     Vec3F a = abs(ray);
     int max_i;
@@ -364,40 +533,10 @@ bool map_cast_ray_exterior(MapPos *out, Vec3F src, Vec3F dst) {
         ChkPos chk_pos = to_chk_pos(map_pos);
         if(!is_chunk_loaded(chk_pos)) return false;
         if(get_chunk(chk_pos).blocks[to_chk_idx(map_pos)].lvl > 0) {
-            *out = floor(it - dt);
-            return true;
-        }
-
-        it += dt;
-    }
-    return false;
-}
-
-bool map_cast_ray_interior(MapPos *out, Vec3F src, Vec3F dst) {
-    Vec3F ray = dst - src;
-    Vec3F a = abs(ray);
-    int max_i;
-    if(a.x > a.y) {
-        if(a.x > a.z) max_i = 0;
-        else          max_i = 2;
-    } else {
-        if(a.y > a.z) max_i = 1;
-        else          max_i = 2;
-    }
-    F32 max = a[max_i];
-    Vec3F dt = ray / max;
-    Vec3F fr = src - trunc(src);
-    F32    o = fr[max_i];
-
-    Vec3F it = src + o * dt;
-
-    for(Uns i = 0; i < max; ++i)
-    {
-        MapPos map_pos = floor(it);
-        ChkPos chk_pos = to_chk_pos(map_pos);
-        if(!is_chunk_loaded(chk_pos)) return false;
-        if(get_chunk(chk_pos).blocks[to_chk_idx(map_pos)].lvl > 0) {
-            *out = map_pos;
+            *out_pos = map_pos;
+            Vec3F norm(0.f);
+            norm[max_i] = sign(ray[max_i]);
+            *out_dir = norm;
             return true;
         }
 
