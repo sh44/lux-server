@@ -281,25 +281,6 @@ IF(COMMAND cmake_policy)
    cmake_policy(SET CMP0003 NEW)
 ENDIF(COMMAND cmake_policy)
 
-
-# This is the shortcut to finding GLU, GLUT and OpenGL if they are properly installed on your system
-# This should be the case.
-
-set(OpenGL_GL_PREFERENCE GLVND)
-FIND_PACKAGE(OpenGL)
-IF (OPENGL_FOUND)
-	MESSAGE("OPENGL FOUND")
-	MESSAGE(${OPENGL_LIBRARIES})
-ELSE (OPENGL_FOUND)
-	MESSAGE("OPENGL NOT FOUND")
-	SET(OPENGL_gl_LIBRARY opengl32)
-	SET(OPENGL_glu_LIBRARY glu32)
-ENDIF (OPENGL_FOUND)
-
-
-#FIND_PACKAGE(GLU)
-
-
 IF (APPLE)
   FIND_LIBRARY(COCOA_LIBRARY Cocoa)
 ENDIF()

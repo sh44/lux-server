@@ -14,7 +14,7 @@
 #include <entity.hpp>
 #include <server.hpp>
 
-std::atomic<bool> exiting = false;
+std::atomic<bool> exiting(false);
 
 void console_main() {
     /*std::string input;

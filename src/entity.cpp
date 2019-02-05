@@ -191,7 +191,7 @@ void entities_tick() {
             EntityId parent = comps.parent.at(id);
             if(!entities.contains(parent)) {
                 LUX_LOG_WARN("stray child entity #%u", id);
-                LUX_LOG_WARN("\tits parent #%u no longer exists", parent)
+                LUX_LOG_WARN("\tits parent #%u no longer exists", parent);
                 LUX_LOG_WARN("\tdeleting the child, it should have been"
                              " deleted along with the parent");
                 remove_entity(id);
