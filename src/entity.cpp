@@ -54,7 +54,7 @@ LUX_MAY_FAIL static entity_break_block(RasenFrame* frame) {
     Vec3F  hit_dir;
     if(map_cast_ray(&hit_pos, &hit_dir, src, src + dir)) {
         Block& block = write_block(hit_pos);
-        block.lvl = 0x00;
+        block.lvl = 0x0;
         block.id = void_block;
     }
     return LUX_OK;
@@ -85,14 +85,14 @@ LUX_MAY_FAIL static entity_place_block(RasenFrame* frame) {
         if(block0.id != stone) {
             block0.id = stone;
         }
-        if(block0.lvl == 0xff) {
+        if(block0.lvl == 0xf) {
             hit_pos = floor((Vec3F)hit_pos - hit_dir);
             Block& block1 = write_block(hit_pos);
             if(block1.id != stone) {
                 block1.id = stone;
             }
-            block1.lvl = 0xff;
-        } else block0.lvl = 0xff;
+            block1.lvl = 0xf;
+        } else block0.lvl = 0xf;
     }
     return LUX_OK;
 }
@@ -136,7 +136,7 @@ LUX_MAY_FAIL static entity_rotate(RasenFrame* frame) {
 EntityId create_player() {
     LUX_LOG("creating new player");
     EntityId id            = create_entity();
-    comps.pos[id]          = {0, 0, 80};
+    comps.pos[id]          = {-30, -30, 80};
     comps.vel[id]          = {0, 0, 0};
     comps.physics_body[id] = {physics_create_body(comps.pos[id])};
     comps.visible[id]      = {2};

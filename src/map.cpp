@@ -7,6 +7,7 @@
 #include <lux_shared/common.hpp>
 #include <lux_shared/map.hpp>
 #include <lux_shared/noise.hpp>
+#include <lux_shared/uninit_obj.hpp>
 #include <lux_shared/marching_cubes.hpp>
 //
 #include <db.hpp>
@@ -27,11 +28,8 @@ struct PhysicsMesh {
         DynArr<I32>   idxs;
     };
     struct BulletData {
-        template<typename... Args>
-        BulletData(Args&& ...args) :
-            trigs_array(args...) { }
-        btTriangleIndexVertexArray trigs_array;
-        btBvhTriangleMeshShape*    shape;
+        UninitObj<btTriangleIndexVertexArray> trigs_array;
+        UninitObj<btBvhTriangleMeshShape>     shape;
     };
 
     static List<TriangleData> triangle_data;
@@ -40,15 +38,31 @@ struct PhysicsMesh {
     btRigidBody* body;
     decltype(bullet_data)::iterator   bullet_iter;
     decltype(triangle_data)::iterator triangle_iter;
-    bool allocated = false;
-    ~PhysicsMesh() {
-        if(allocated) {
-            physics_remove_body(body);
-            delete bullet_iter->shape;
+    bool has_body  = false;
+    bool has_shape = false;
+    PhysicsMesh() {
+        triangle_data.emplace_back();
+        triangle_iter = triangle_data.end();
+        triangle_iter--;
 
-            bullet_data.erase(bullet_iter);
-            triangle_data.erase(triangle_iter);
+        bullet_data.emplace_back();
+        bullet_iter = bullet_data.end();
+        bullet_iter--;
+
+        has_body  = false;
+        has_shape = false;
+    }
+    ~PhysicsMesh() {
+        if(has_body) {
+            physics_remove_body(body);
+            bullet_iter->trigs_array.deinit();
         }
+        if(has_shape) {
+            bullet_iter->shape.deinit();
+        }
+
+        bullet_data.erase(bullet_iter);
+        triangle_data.erase(triangle_iter);
     }
 };
 
@@ -76,10 +90,6 @@ static bool is_chunk_loaded(ChkPos const& pos) {
     return chunks.count(pos) > 0;
 }
 
-static Vec2F noise2(Vec2F seed) {
-    return {noise_fbm(seed.x, 8), noise_fbm(seed.y, 8)};
-}
-
 static HeightChunk const& guarantee_height_chunk(Vec2<ChkCoord> const& pos) {
     constexpr Uns octaves    = 16;
     constexpr F32 base_scale = 0.001f;
@@ -92,9 +102,8 @@ static HeightChunk const& guarantee_height_chunk(Vec2<ChkCoord> const& pos) {
         Uns idx = 0;
         for(Uns y = 0; y < CHK_SIZE + 1; ++y) {
             for(Uns x = 0; x < CHK_SIZE + 1; ++x) {
-                Vec2F warp = noise2(seed * 0.001f) * 16.f;
                 h_chunk[idx] =
-                    pow(u_norm(noise_fbm(seed + warp, octaves)), h_exp) * max_h;
+                    pow(u_norm(noise_fbm(seed, octaves)), h_exp) * max_h;
                 seed.x += base_scale;
                 ++idx;
             }
@@ -169,7 +178,7 @@ static Chunk& load_chunk(ChkPos const& pos) {
         }
         F32 r_h = clamp(h - (F32)map_pos.z, 0.f, 1.f);
         chunk.blocks[i].id  = block;
-        chunk.blocks[i].lvl = (r_h * 255.f);
+        chunk.blocks[i].lvl = (r_h * 15.f);
         /*if(chunk.blocks[i] == void_block) {
             chunk.light_lvl[i] = 0x0F00;
         } else {
@@ -179,6 +188,7 @@ static Chunk& load_chunk(ChkPos const& pos) {
             add_light_node(to_map_pos(pos, i), 0.5f);
         }*/
     }
+#if 1
     for(Uns i = 0; i < CHK_VOL; ++i) {
         MapCoord h = round(h_chunk[i & ((CHK_SIZE * CHK_SIZE) - 1)]);
         F32 f_h = ceil(h);
@@ -205,6 +215,8 @@ static Chunk& load_chunk(ChkPos const& pos) {
             }
         }
     }
+#endif
+#if 1
     MapPos base_pos = to_map_pos(pos, 0);
     if(pos.z < 0) {
         U32 worms_num = lux_randf(pos) > 0.99 ? 1 : 0;
@@ -248,6 +260,7 @@ static Chunk& load_chunk(ChkPos const& pos) {
             }
         }
     }
+#endif
     return chunk;
 }
 
@@ -277,12 +290,12 @@ static void build_physics_mesh(ChkPos const& pos) {
     for(ChkIdx i = 0; i < CHK_VOL; ++i) {
         MapPos map_pos = to_map_pos(pos, i);
         Vec3F rel_pos = (Vec3F)to_idx_pos(i) + 0.5f;
-        int sign = s_norm((F32)get_block(map_pos).lvl / 255.f) >= 0.f;
+        int sign = s_norm((F32)get_block(map_pos).lvl / 15.f) >= 0.f;
         bool has_face = false;
         for(Uns j = 0; j < 8; ++j) {
             MapPos abs_pos = map_pos + cell_verts[j];
             BlockLvl lvl = get_block(abs_pos).lvl;
-            grid_cell.val[j] = s_norm((F32)lvl / 255.f);
+            grid_cell.val[j] = s_norm((F32)lvl / 15.f);
             if((grid_cell.val[j] > 0.f) != sign) {
                 has_face = true;
             }
@@ -300,16 +313,11 @@ static void build_physics_mesh(ChkPos const& pos) {
     }
 
     auto& mesh = physics_meshes[pos];
-    if(mesh.allocated) {
-        physics_remove_body(mesh.body);
-        delete mesh.bullet_iter->shape;
-        mesh.bullet_data.erase(mesh.bullet_iter);
 
-        mesh.allocated = false;
-    } else if(trigs_num > 0) {
-        mesh.triangle_data.emplace_back();
-        mesh.triangle_iter = mesh.triangle_data.end();
-        mesh.triangle_iter--;
+    if(mesh.has_body) {
+        physics_remove_body(mesh.body);
+        mesh.bullet_iter->trigs_array.deinit();
+        mesh.has_body = false;
     }
     if(trigs_num > 0) {
         mesh.triangle_iter->verts.resize(trigs_num * 3);
@@ -317,19 +325,31 @@ static void build_physics_mesh(ChkPos const& pos) {
         mesh.triangle_iter->idxs.resize(trigs_num * 3);
         mesh.triangle_iter->idxs.cpy(idxs, trigs_num * 3);
 
-        mesh.bullet_data.emplace_back(
+        mesh.bullet_iter->trigs_array.init(
             trigs_num    , (I32*)mesh.triangle_iter->idxs.beg , sizeof(I32) * 3,
             trigs_num * 3, (F32*)mesh.triangle_iter->verts.beg, sizeof(Vec3F));
 
-        mesh.bullet_iter = mesh.bullet_data.end();
-        mesh.bullet_iter--;
-        mesh.bullet_iter->shape = new btBvhTriangleMeshShape(
-            &mesh.bullet_iter->trigs_array, false, btVector3{0, 0, 0},
-            btVector3{CHK_SIZE, CHK_SIZE, CHK_SIZE});
+        if(not mesh.has_shape) {
+            mesh.bullet_iter->shape.init(
+                &*mesh.bullet_iter->trigs_array, true, btVector3{0, 0, 0},
+                btVector3{CHK_SIZE, CHK_SIZE, CHK_SIZE});
+            mesh.has_shape = true;
+        } else {
+            /*mesh.bullet_iter->shape->getOptimizedBvh()->build(
+                &*mesh.bullet_iter->trigs_array, true, btVector3{0, 0, 0},
+                btVector3{CHK_SIZE, CHK_SIZE, CHK_SIZE});*/
+            mesh.bullet_iter->shape->getOptimizedBvh()->refit(
+                &*mesh.bullet_iter->trigs_array, btVector3{0, 0, 0},
+                btVector3{CHK_SIZE, CHK_SIZE, CHK_SIZE});
+            /*mesh.bullet_iter->shape->refitTree(btVector3{0, 0, 0},
+                btVector3{CHK_SIZE, CHK_SIZE, CHK_SIZE});*/
+        }
 
         mesh.body = physics_create_mesh(to_map_pos(pos, 0),
-            mesh.bullet_iter->shape);
-        mesh.allocated = true;
+            &*mesh.bullet_iter->shape);
+        mesh.has_body = true;
+        //mesh.triangle_iter->idxs.clear();
+        //mesh.triangle_iter->verts.clear();
     }
 }
 
@@ -405,6 +425,38 @@ void map_tick() {
     static Uns tick_num = 0;
     physics_tick(1.f / 64.f); //TODO tick time
     map_apply_suspended_updates();
+#if 0
+    static VecSet<MapPos> bob;
+    static VecSet<MapPos> new_blocks;
+    for(auto const& block : new_blocks) {
+        bob.insert(block);
+    }
+    new_blocks.clear();
+    for(auto const& pos : updated_chunks) {
+        for(auto const& idx : get_chunk(pos).updated_blocks) {
+            bob.insert(to_map_pos(pos, idx));
+        }
+    }
+    const static BlockId stone_id = db_block_id("stone_wall"_l);
+    for(auto it = bob.begin(), end = bob.end(); it != end; it++) {
+        auto const& pos = *it;
+        for(auto const& off : manhattan_hollow_2d<MapCoord>) {
+            Block b = get_block(pos);
+            MapPos off_pos = pos + MapPos(off, 0);
+            Block const& r_blk = get_block(off_pos);
+            Int diff = (Int)b.lvl - (Int)r_blk.lvl;
+            if(diff >= 2) {
+                Block& src_blk = write_block(pos);
+                Block& dst_blk = write_block(off_pos);
+                dst_blk.lvl++;
+                src_blk.lvl--;
+                dst_blk.id = src_blk.id;
+                new_blocks.insert(off_pos);
+                new_blocks.insert(pos);
+            }
+        }
+    }
+#endif
     for(auto const& update : awaiting_light_updates) {
         if(is_chunk_loaded(update)) {
             light_updated_chunks.emplace(update);
@@ -532,7 +584,7 @@ bool map_cast_ray(MapPos* out_pos, Vec3F* out_dir, Vec3F src, Vec3F dst) {
         MapPos map_pos = floor(it);
         ChkPos chk_pos = to_chk_pos(map_pos);
         if(!is_chunk_loaded(chk_pos)) return false;
-        if(get_chunk(chk_pos).blocks[to_chk_idx(map_pos)].lvl > 0) {
+        if(get_chunk(chk_pos).blocks[to_chk_idx(map_pos)].lvl >= 0x8) {
             *out_pos = map_pos;
             Vec3F norm(0.f);
             norm[max_i] = sign(ray[max_i]);
