@@ -196,7 +196,7 @@ static Chunk& load_chunk(ChkPos const& pos) {
         if(map_pos.z == f_h && lux_randf(map_pos) > .99f && chunk.blocks[i].id == dark_grass) {
             I32 h = lux_randmm(8, 20, map_pos, 0);
             for(Uns j = 0; j < h; ++j) {
-                write_suspended_block(map_pos + MapPos(0, 0, j), {dirt, 0xff});
+                write_suspended_block(map_pos + MapPos(0, 0, j), {dirt, 0xf});
             }
             for(MapCoord z = -(h / 2 + 2); z <= h / 2; ++z) {
                 for(MapCoord y = -5; y <= 5; ++y) {
@@ -208,7 +208,7 @@ static Chunk& load_chunk(ChkPos const& pos) {
                            (((F32)z + (h / 2 + 2)) / ((F32)h * 2.f) + 0.5f) +
                            rand_factor) {
                             diff = min(1.f, diff);
-                            write_suspended_block(map_pos + MapPos(x, y, h + z), {grass, diff * 255.f});
+                            write_suspended_block(map_pos + MapPos(x, y, h + z), {grass, diff * 15.f});
                         }
                     }
                 }
