@@ -111,7 +111,7 @@ LUX_MAY_FAIL static entity_move(RasenFrame* frame) {
     LUX_RETHROW(frame->pop((U8*)&dir.y),
                 "failed to read Y direction");
     dir.z = 0;
-    comps.vel.at(id) += (Vec3F)dir * ENTITY_L_VEL;
+    comps.vel.at(id) = (Vec3F)dir * ENTITY_L_VEL;
     return LUX_OK;
 }
 
@@ -136,7 +136,7 @@ LUX_MAY_FAIL static entity_rotate(RasenFrame* frame) {
 EntityId create_player() {
     LUX_LOG("creating new player");
     EntityId id            = create_entity();
-    comps.pos[id]          = {-30, -30, 80};
+    comps.pos[id]          = {0, 0, 80};
     comps.vel[id]          = {0, 0, 0};
     comps.physics_body[id] = {physics_create_body(comps.pos[id])};
     comps.visible[id]      = {2};
@@ -221,14 +221,16 @@ void entities_tick() {
             EntityVec& vel = comps.vel.at(id);
             auto* body = comps.physics_body.at(id);
             Vec2F angles = comps.orientation.at(id).angles;
-            glm::mat4 bob = glm::eulerAngleZ(angles.x);
+            glm::mat4 bob = glm::eulerAngleZX(angles.x, angles.y);
             Vec3F rotv = (Vec3F)(bob * Vec4F(vel * 1000.f, 1.f));
-            body->applyCentralForce({rotv.x, rotv.y, rotv.z + 1.f});
+            body->setLinearVelocity({rotv.x, rotv.y, rotv.z});
             auto new_pos = body->getCenterOfMassPosition();
             pos = Vec3F(new_pos.x(), new_pos.y(), new_pos.z());
-            //@TODO better solution that guarantees chunk in the shape's
-            //bounding box
-            guarantee_physics_mesh_around(to_chk_pos(floor(pos)));
+            btVector3 bt_min, bt_max;
+            body->getAabb(bt_min, bt_max);
+            Vec3F min(bt_min.x(), bt_min.y(), bt_min.z());
+            Vec3F max(bt_max.x(), bt_max.y(), bt_max.z());
+            guarantee_physics_mesh_for_aabb(floor(min), ceil(max));
             vel = Vec3F(0.f);
         }
     }

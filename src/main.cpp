@@ -33,6 +33,7 @@ void console_main() {
 
 int main(int argc, char** argv) {
     random_seed = std::time(nullptr);
+
     U16 server_port = 31337;
     { ///read commandline args
         if(argc == 1) {
@@ -53,6 +54,8 @@ int main(int argc, char** argv) {
     db_init();
     constexpr F64 TICK_RATE = 64.0;
     rasen_init();
+    map_init();
+    LUX_DEFER { map_deinit(); };
     physics_init();
     server_init(server_port, TICK_RATE);
     LUX_DEFER { server_deinit(); };

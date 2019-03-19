@@ -23,8 +23,7 @@ void db_init() {
     add_block({"dirt"_l});
     add_block({"grass"_l});
     add_block({"dark_grass"_l});
-    add_block({"tree_trunk"_l});
-    add_block({"tree_leaves"_l});
+    add_block({"snow"_l});
 }
 
 BlockBp const& db_block_bp(BlockId id) {

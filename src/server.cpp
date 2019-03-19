@@ -1,9 +1,8 @@
-#define ENET_DEBUG_COMPRESS
+#include <config.hpp>
 #include <cstring>
 #include <algorithm>
 //
 #include <enet/enet.h>
-#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/fast_square_root.hpp>
 #include <glm/gtx/rotate_vector.hpp> //@TODO
 //
@@ -25,9 +24,8 @@ struct Server {
         ENetPeer*      peer;
         StrBuff        name;
         EntityId       entity;
-        ///those chunks have just been loaded, we don't send updates
-        VecSet<ChkPos> just_loaded_chunks;
         VecSet<ChkPos> loaded_chunks;
+        VecSet<ChkPos> pending_requests;
         bool           admin = false;
     };
     SparseDynArr<Client> clients;
@@ -232,7 +230,8 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
 }
 
 LUX_MAY_FAIL send_chunk_update(ENetPeer* peer, VecSet<ChkPos> const& chunks) {
-    ss_sgnl.tag = NetSsSgnl::CHUNK_UPDATE;
+    LUX_UNIMPLEMENTED();
+    /*ss_sgnl.tag = NetSsSgnl::CHUNK_UPDATE;
     for(auto const& pos : chunks) {
         //@TODO check if client has the chunk?
         Chunk const& chunk = get_chunk(pos);
@@ -244,38 +243,7 @@ LUX_MAY_FAIL send_chunk_update(ENetPeer* peer, VecSet<ChkPos> const& chunks) {
     }
 
     LUX_RETHROW(send_net_data(peer, &ss_sgnl, SGNL_CHANNEL),
-        "failed to send chunk updates to client");
-    return LUX_OK;
-}
-
-LUX_MAY_FAIL send_chunk_load(ENetPeer* peer, VecSet<ChkPos> const& chunks) {
-    ss_sgnl.tag = NetSsSgnl::CHUNK_LOAD;
-    for(auto const& pos : chunks) {
-        guarantee_chunk(pos);
-    }
-    ///after generating all the chunks, we apply the updates, so that the client
-    ///receives it without delay and in the same packet
-    map_apply_suspended_updates(); //@TODO send chunks vec_set there
-    ///we separate the loops, because chunk generation can change other chunks
-    for(auto const& pos : chunks) {
-        Chunk const& chunk = get_chunk(pos);
-        //@TODO use dst size
-        std::memcpy(ss_sgnl.chunk_load.chunks[pos].blocks,
-                    chunk.blocks, sizeof(chunk.blocks));
-        LUX_LOG_DBG("sending chunk {%d, %d, %d}", pos.x, pos.y, pos.z);
-    }
-
-    LUX_RETHROW(send_net_data(peer, &ss_sgnl, SGNL_CHANNEL),
-        "failed to send map load data to client");
-
-    ///we need to do it outside, because we must be sure that the packet has
-    ///been received (i.e. sent in this case, enet guarantees that the peer will
-    ///either receive it or get disconnected
-    Server::Client& client = server.clients[(ClientId)peer->data];
-    for(auto const& pos : chunks) {
-        client.loaded_chunks.emplace(pos);
-        client.just_loaded_chunks.emplace(pos);
-    }
+        "failed to send chunk updates to client");*/
     return LUX_OK;
 }
 
@@ -317,7 +285,11 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
     }
     switch(sgnl.tag) {
         case NetCsSgnl::MAP_REQUEST: {
-            (void)send_chunk_load(peer, sgnl.map_request.requests);
+            Server::Client& client = server.clients[(ClientId)peer->data];
+            for(auto const& request : sgnl.map_request.requests) {
+                try_guarantee_chunk_mesh(request);
+                client.pending_requests.insert(request);
+            }
         } break;
         case NetCsSgnl::RASEN_ASM: {
             ClientId client_id = (ClientId)peer->data;
@@ -343,12 +315,48 @@ LUX_MAY_FAIL handle_signal(ENetPeer* peer, ENetPacket* in_pack) {
     return LUX_OK;
 }
 
+static void handle_pending_chunk_requests(Server::Client& client) {
+    if(client.pending_requests.size() == 0) return;
+    ss_sgnl.tag = NetSsSgnl::CHUNK_LOAD;
+
+    static VecSet<ChkPos> loaded_chunks;
+    loaded_chunks.clear();
+    for(auto const& pos : client.pending_requests) {
+        //@TODO we should really serialize this
+        if(try_guarantee_chunk_mesh(pos)) {
+            LUX_LOG_DBG("sending chunk {%d, %d, %d}", pos.x, pos.y, pos.z);
+            ChunkMesh& mesh = *get_chunk(pos).mesh;
+            auto& net_chunk = ss_sgnl.chunk_load.chunks[pos];
+            if(get_chunk(pos).mesh_state != Chunk::BUILT_EMPTY) {
+                net_chunk.idxs = mesh.idxs;
+                net_chunk.verts.resize(mesh.verts.len);
+                for(Uns i = 0; i < mesh.verts.len; ++i) {
+                    net_chunk.verts[i].pos  = mesh.verts[i].pos;
+                    net_chunk.verts[i].id   = mesh.verts[i].id;
+                    net_chunk.verts[i].norm = mesh.verts[i].norm;
+                }
+            }
+            loaded_chunks.insert(pos);
+        }
+    }
+
+    if(send_net_data(client.peer, &ss_sgnl, SGNL_CHANNEL) == LUX_OK) {
+        //we want to be sure that the chunks have been sent,
+        //so that there are no chunks that never load
+        for(auto const& pos : loaded_chunks) {
+            client.loaded_chunks.emplace(pos);
+            client.pending_requests.erase(pos);
+        }
+    } else {
+        LUX_LOG_ERR("failed to send map load data to client");
+    }
+}
+
 void server_tick() {
     for(auto pair : server.clients) {
         static VecSet<ChkPos> chunks_to_send;
         for(auto const& pos : updated_chunks) {
-            if(pair.v.loaded_chunks.count(pos) > 0 &&
-               pair.v.just_loaded_chunks.count(pos) == 0) {
+            if(pair.v.loaded_chunks.count(pos) > 0) {
                 chunks_to_send.insert(pos);
             }
         }
@@ -356,14 +364,13 @@ void server_tick() {
             (void)send_chunk_update(pair.v.peer, chunks_to_send);
             chunks_to_send.clear();
         }
-        pair.v.just_loaded_chunks.clear();
     }
     updated_chunks.clear();
     { ///handle events
         //@CONSIDER splitting this scope
         ENetEvent event;
         //@TODO time
-        while(enet_host_service(server.host, &event, 10) > 0) {
+        while(enet_host_service(server.host, &event, 3) > 0) {
             if(event.type == ENET_EVENT_TYPE_CONNECT) {
                 if(add_client(event.peer) != LUX_OK) {
                     kick_peer(event.peer);
@@ -401,7 +408,7 @@ void server_tick() {
         }
     }
 
-    { ///dispatch ticks
+    { ///dispatch ticks and other pending packets
         //@IMPROVE we might want to turn this into a differential transfer,
         //instead of resending the whole state all the time
         //@TODO static
@@ -413,7 +420,7 @@ void server_tick() {
             ss_tick.entities.emplace(pair.k);
         }
         for(auto pair : server.clients) {
-            auto const& client = pair.v;
+            auto& client = pair.v;
             ss_tick.player_id = client.entity;
             /*EntityId bullet = create_entity();
             entity_comps.vel[bullet] = glm::rotate(Vec2F(0.f, -1.f),
@@ -425,8 +432,9 @@ void server_tick() {
             entity_comps.visible[bullet] = {2};
             entity_comps.orientation[bullet] =
                 {entity_comps.orientation.at(client.entity).angle};*/
-
             (void)send_net_data(client.peer, &ss_tick, TICK_CHANNEL, false);
+
+            handle_pending_chunk_requests(client);
         }
         clear_net_data(&ss_tick);
     }

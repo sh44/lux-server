@@ -13,7 +13,7 @@ static List<btRigidBody> bodies;
 static btCapsuleShapeZ body_shape(1.2, 3.6);
 
 void physics_init() {
-    world.setGravity(btVector3(0, 0, -9.8)); //@TODO 1 block might != 1 meter
+    world.setGravity(btVector3(0, 0, 0));
     //@TODO does it has to be static? (takes reference)
     static btVector3 inertia = {0, 0, 0};
     //@TODO is this needed?
