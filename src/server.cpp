@@ -319,6 +319,7 @@ static void handle_pending_chunk_requests(Server::Client& client) {
     if(client.pending_requests.size() == 0) return;
     ss_sgnl.tag = NetSsSgnl::CHUNK_LOAD;
 
+    //@TODO move to map?
     static VecSet<ChkPos> loaded_chunks;
     loaded_chunks.clear();
     for(auto const& pos : client.pending_requests) {
@@ -328,12 +329,11 @@ static void handle_pending_chunk_requests(Server::Client& client) {
             ChunkMesh& mesh = *get_chunk(pos).mesh;
             auto& net_chunk = ss_sgnl.chunk_load.chunks[pos];
             if(get_chunk(pos).mesh_state != Chunk::BUILT_EMPTY) {
-                net_chunk.idxs = mesh.idxs;
-                net_chunk.verts.resize(mesh.verts.len);
-                for(Uns i = 0; i < mesh.verts.len; ++i) {
-                    net_chunk.verts[i].pos  = mesh.verts[i].pos;
-                    net_chunk.verts[i].id   = mesh.verts[i].id;
-                    net_chunk.verts[i].norm = mesh.verts[i].norm;
+                net_chunk.faces.resize(mesh.faces.len);
+                for(Uns i = 0; i < mesh.faces.len; ++i) {
+                    net_chunk.faces[i].idx         = mesh.faces[i].idx;
+                    net_chunk.faces[i].id          = mesh.faces[i].id;
+                    net_chunk.faces[i].orientation = mesh.faces[i].orientation;
                 }
             }
             loaded_chunks.insert(pos);

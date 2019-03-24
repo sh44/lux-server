@@ -6,31 +6,17 @@
 
 struct Block {
     BlockId  id;
-    BlockLvl lvl;
 };
-
-/*struct BlockChange {
-    enum TypeFlags : U8 {
-        NO_ID   = 0b00, //id does not change
-        ID      = 0b01, //we change id
-        LVL_REL = 0b00, //relative lvl change (can be 0)
-        LVL_ABS = 0b10,
-    } type;
-
-    BlockId  id;
-    I16      lvl;
-};*/
 
 struct ChunkPhysicsMesh;
 
 struct ChunkMesh {
-    struct Vert {
-        Vec3<U16> pos;  ///12.4 fixed point
-        Vec3<U8>  norm;  ///sign.7 fixed point
-        BlockId   id;
+    struct Face {
+        ChkIdx  idx;
+        BlockId id;
+        U8      orientation; //first bit is sign, 2 next bits are axis (XYZ)
     };
-    DynArr<Vert> verts;
-    DynArr<U16>   idxs;
+    DynArr<Face> faces;
 
     ChunkPhysicsMesh* physics_mesh;
 
@@ -39,7 +25,11 @@ struct ChunkMesh {
 };
 
 struct Chunk {
-    Arr<Block   , CHK_VOL> blocks;
+    struct Data {
+        Arr<Block, CHK_VOL> blocks;
+    };
+    //@URGENT we need to deallocate this (using lux_dealloc) when unloading
+    Data* data;
     IdSet<ChkIdx> updated_blocks; //@TODO change this?
     ChunkMesh* mesh;
 
@@ -50,6 +40,8 @@ struct Chunk {
         BUILT_PHYSICS
     } mesh_state = NOT_BUILT;
 
+    Block       &operator[](ChkIdx idx);
+    Block const &operator[](ChkIdx idx) const;
     ~Chunk();
 };
 

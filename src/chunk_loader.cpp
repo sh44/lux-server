@@ -18,7 +18,7 @@ static std::atomic<bool> is_running;
 static std::condition_variable queue_cv;
 
 static VecMap<ChkPos, DynArr<BlockChange>> block_changes;
-static VecMap<ChkPos, Arr<Block, CHK_VOL>> results;
+static VecMap<ChkPos, Chunk::Data*> results;
 //@TODO might want to use the excess values somehow
 //@TODO derivative function
 typedef Arr<F32, (CHK_SIZE + 1) * (CHK_SIZE + 1)> HeightChunk;
@@ -52,14 +52,17 @@ static HeightChunk const& guarantee_height_chunk(Vec2<ChkCoord> const& pos) {
 static void load_chunk(ChkPos const& pos) {
     LUX_LOG("loading chunk");
     LUX_LOG("    pos: {%zd, %zd, %zd}", pos.x, pos.y, pos.z);
-    LUX_ASSERT(results.count(pos) == 0);
-    auto& chunk = results[pos];
+    Chunk::Data* chunk = lux_alloc<Chunk::Data>(1);
+    auto get_block =
+    [&](ChkIdx const& idx) -> Block& {
+        return chunk->blocks[idx];
+    };
     auto write_suspended_block =
     [&](MapPos const& map_pos, Block const& block) {
         ChkPos chk_pos = to_chk_pos(map_pos);
         ChkIdx idx = to_chk_idx(map_pos);
         if(chk_pos == pos) {
-            chunk[idx] = block;
+            get_block(idx) = block;
         } else {
             block_changes_mutex.lock();
             block_changes[chk_pos].push({idx, block});
@@ -78,11 +81,9 @@ static void load_chunk(ChkPos const& pos) {
 
         if(map_pos.z <= 0) {
             chunk[i].id  = dark_grass;
-            chunk[i].lvl = 0xf;
         } else if(!(pos.x % 2) && !(pos.y % 2) && pos.z == 0) {
             F32 len = distance((Vec3F)map_pos, (Vec3F)to_map_pos(pos, 0) + Vec3F(CHK_SIZE / 2));
             chunk[i].id  = raw_stone;
-            chunk[i].lvl = clamp((F32)(CHK_SIZE / 2 - 1) - len, 0.f, 1.f) * 15.f;
         }
     }
 #endif
@@ -99,7 +100,6 @@ static void load_chunk(ChkPos const& pos) {
         Block block;
         if(map_pos.z > f_h) {
             block.id = void_block;
-            block.lvl = 0x0;
         } else {
             F32 diffx = abs(h - get_h(idx_pos + IdxPos(1, 0, 0)));
             F32 diffy = abs(h - get_h(idx_pos + IdxPos(0, 1, 0)));
@@ -117,10 +117,8 @@ static void load_chunk(ChkPos const& pos) {
             } else {
                 block.id = raw_stone;
             }
-            F32 r_h = clamp(h - (F32)map_pos.z, 0.f, 1.f);
-            block.lvl = (r_h * 15.f);
         }
-        chunk[i] = block;
+        get_block(i) = block;
     }
 #endif
     static const BlockId grass = db_block_id("grass"_l);
@@ -131,8 +129,7 @@ static void load_chunk(ChkPos const& pos) {
             Vec3F dir = lux_rand_norm_3(map_pos, 1);
             Vec3F iter = (Vec3F)map_pos;
             for(Uns j = 0; j < 10 * 3; ++j) {
-                F32 lvl = max(0.f, 1.f - fract(iter[j % 3])) * 7.f + 8.f;
-                write_suspended_block((MapPos)floor(iter), {grass, lvl});
+                write_suspended_block((MapPos)floor(iter), {grass});
                 iter[j % 3] += dir[j % 3];
             }
         }
@@ -143,10 +140,11 @@ static void load_chunk(ChkPos const& pos) {
         MapCoord h = round(h_chunk[i & ((CHK_SIZE * CHK_SIZE) - 1)]);
         F32 f_h = ceil(h);
         MapPos map_pos = to_map_pos(pos, i);
-        if(map_pos.z == f_h && lux_randf(map_pos) > .995f && chunk[i].id == dark_grass) {
+        if(map_pos.z == f_h && lux_randf(map_pos) > .995f &&
+            get_block(i).id == dark_grass) {
             I32 h = lux_randmm(8, 20, map_pos, 0);
             for(Uns j = 0; j < h; ++j) {
-                write_suspended_block(map_pos + MapPos(0, 0, j), {dirt, 0xf});
+                write_suspended_block(map_pos + MapPos(0, 0, j), {dirt});
             }
             for(MapCoord z = -(h / 2 + 2); z <= h / 2; ++z) {
                 for(MapCoord y = -5; y <= 5; ++y) {
@@ -154,8 +152,7 @@ static void load_chunk(ChkPos const& pos) {
                         F32 diff = (F32)((h / 2) + 2 - z) / 4.f - length(Vec2F(x, y));
                         F32 rand_factor = 0.f;//lux_randf(map_pos, 3, Vec3F(x, y, z));
                         if(diff > 0.f) {
-                            diff = min(1.f, diff);
-                            write_suspended_block(map_pos + MapPos(x, y, h + z), {grass, diff * 15.f});
+                            write_suspended_block(map_pos + MapPos(x, y, h + z), {grass});
                         }
                     }
                 }
@@ -163,7 +160,7 @@ static void load_chunk(ChkPos const& pos) {
         }
     }
 #endif
-#if 1
+#if 0
     MapPos base_pos = to_map_pos(pos, 0);
     if(pos.z < 0) {
         U32 worms_num = lux_randf(pos) > 0.99 ? 1 : 0;
@@ -208,13 +205,18 @@ static void load_chunk(ChkPos const& pos) {
         }
     }
 #endif
+    block_changes_mutex.lock();
     if(block_changes.count(pos) > 0) {
         auto const& changes = block_changes.at(pos);
         for(auto const& change : changes) {
-            chunk[change.idx] = change.block;
+            get_block(change.idx) = change.block;
         }
         block_changes.erase(pos);
     }
+    block_changes_mutex.unlock();
+    results_mutex.lock();
+    results[pos] = chunk;
+    results_mutex.unlock();
 }
 
 static void thread_main() {
@@ -224,13 +226,13 @@ static void thread_main() {
         if(!is_running.load()) {
             break;
         }
-        results_mutex.lock();
         ChkPos pos = *chunk_queue.begin();
-        chunk_queue.erase(chunk_queue.begin());
         lock.unlock();
         load_chunk(pos);
+        lock.lock();
+        chunk_queue.erase(chunk_queue.begin());
+        lock.unlock();
         queue_cv.notify_one();
-        results_mutex.unlock();
     }
 }
 
@@ -263,24 +265,43 @@ void loader_enqueue_wait(Slice<ChkPos> const& chunks) {
     results_mutex.lock();
     for(auto const& pos : chunks) {
         if(results.count(pos) == 0) {
+            //@TODO put on priority
             chunk_queue.insert(pos);
         }
     }
-    results_mutex.unlock();
     queue_mutex.unlock();
     queue_cv.notify_one();
+    results_mutex.unlock();
     std::unique_lock<std::mutex> lock(queue_mutex);
     queue_cv.wait(lock, []{return chunk_queue.empty();});
 }
 
-VecMap<ChkPos, Arr<Block, CHK_VOL>> const& loader_lock_results() {
+VecMap<ChkPos, Chunk::Data*> const& loader_lock_results() {
     results_mutex.lock();
     return results;
+}
+
+bool loader_try_lock_results(VecMap<ChkPos, Chunk::Data*>*& out) {
+    if(results_mutex.try_lock()) {
+        out = &results;
+        return true;
+    } else {
+        return false;
+    }
 }
 
 void loader_unlock_results() {
     results.clear();
     results_mutex.unlock();
+}
+
+bool loader_try_lock_block_changes(VecMap<ChkPos, DynArr<BlockChange>>*& out) {
+    if(block_changes_mutex.try_lock()) {
+        out = &block_changes;
+        return true;
+    } else {
+        return false;
+    }
 }
 
 VecMap<ChkPos, DynArr<BlockChange>>& loader_lock_block_changes() {
@@ -297,7 +318,7 @@ void loader_write_suspended_block(Block const& block, MapPos const& pos) {
     ChkIdx chk_idx = to_chk_idx(pos);
     results_mutex.lock();
     if(results.count(chk_pos) > 0) {
-        results.at(chk_pos)[chk_idx] = block;
+        results.at(chk_pos)->blocks[chk_idx] = block;
     } else {
         block_changes_mutex.lock();
         block_changes[chk_pos].push({chk_idx, block});

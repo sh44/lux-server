@@ -7,7 +7,7 @@
 #include <rasen.hpp>
 #include <physics.hpp>
 
-F32 constexpr ENTITY_L_VEL = 0.015f;
+F32 constexpr ENTITY_L_VEL = 0.045f;
 F32 constexpr ENTITY_A_VEL = tau / 512.f;
 
 struct Entity {};

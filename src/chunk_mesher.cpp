@@ -22,94 +22,35 @@ static void generate_mesh(MesherRequest const& request) {
     LUX_LOG("building mesh");
     LUX_LOG("    pos: {%zd, %zd, %zd}", pos.x, pos.y, pos.z);
 
-    static VecMap<Vec3<U16>, U16> idx_map;
-    idx_map.clear();
     auto& mesh = results[pos];
-    mesh.verts.reserve_exactly(CHK_VOL * 5 * 3);
-    mesh.idxs.reserve_exactly(CHK_VOL * 5 * 3);
+    mesh.faces.reserve_exactly(CHK_VOL * 3);
 
-    static DynArr<Vec3F> norms(CHK_VOL * 5 * 3);
-
-    auto get_block_l = [&](Vec3I pos) -> Block const& {
-        pos += (Int)1;
-        Int idx = pos.x + (pos.y + pos.z * (CHK_SIZE + 3)) * (CHK_SIZE + 3);
-        LUX_ASSERT(idx < (Int)arr_len(request.blocks) && idx >= 0);
+    auto get_block_l = [&](Vec3U pos) -> Block const& {
+        Uns idx = pos.x + (pos.y + pos.z * (CHK_SIZE + 1)) * (CHK_SIZE + 1);
+        LUX_ASSERT(idx < arr_len(request.blocks));
         return request.blocks[idx];
     };
 
+    Arr<IdxPos, 3> a_off = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+    //@TODO single for loop and chk_idx_axis_off
     for(Uns z = 0; z < CHK_SIZE; ++z) {
         for(Uns y = 0; y < CHK_SIZE; ++y) {
             for(Uns x = 0; x < CHK_SIZE; ++x) {
-                IdxPos idx_pos(x, y, z);
-                Arr<F32, 8> vals;
-                vals[0] = s_norm((F32)get_block_l(idx_pos).lvl / 15.f);
-                int sig = vals[0] < 0.f;
-                bool has_face = false;
-                for(Uns j = 1; j < 8; ++j) {
-                    IdxPos abs_pos = idx_pos + (IdxPos)marching_cubes_offsets[j];
-                    vals[j] = s_norm((F32)get_block_l(abs_pos).lvl / 15.f);
-                    if((vals[j] < 0.f) != sig) {
-                        has_face = true;
-                    }
-                }
-                if(!has_face) continue;
-                Arr<McVert, 5 * 3> cell_trigs;
-                Uns cell_trigs_num = marching_cubes(&cell_trigs, vals);
-                for(Uns j = 0; j < cell_trigs_num * 3; j += 3) {
-                    for(Uns k = 0; k < 3; ++k) {
-                        Uns iter = j + k;
-                        Vec3F u_pos = cell_trigs[iter].p + (Vec3F)idx_pos;
-                        //@NOTE not sure if we should multiply fract by 15,
-                        //16 seems more logical, but it produces small cracks
-                        Vec3<U16> vert_pos = ((Vec3<U16>)u_pos << (U16)4) |
-                            (Vec3<U16>)(fract(u_pos) * 15.f);
-                        if(idx_map.count(vert_pos) == 0) {
-                            idx_map[vert_pos] = mesh.verts.len;
-                            mesh.idxs.emplace(mesh.verts.len);
-                            Vec3F off = (Vec3F)idx_pos +
-                                marching_cubes_offsets[cell_trigs[iter].idx];
-                            //@CONSIDER calculating necessary gradients,
-                            //and then interpolating them instead
-                            auto interp_lvl = [&](Vec3F p) -> U16 {
-                                Vec3I b = floor(p);
-                                Vec3I u = ceil(p);
-                                Vec3F f = fract(p);
-                                Arr<U16, 8> v;
-                                v[0] = get_block_l({b.x, b.y, b.z}).lvl;
-                                v[1] = get_block_l({u.x, b.y, b.z}).lvl;
-                                v[2] = get_block_l({b.x, u.y, b.z}).lvl;
-                                v[3] = get_block_l({u.x, u.y, b.z}).lvl;
-                                v[4] = get_block_l({b.x, b.y, u.z}).lvl;
-                                v[5] = get_block_l({u.x, b.y, u.z}).lvl;
-                                v[6] = get_block_l({b.x, u.y, u.z}).lvl;
-                                v[7] = get_block_l({u.x, u.y, u.z}).lvl;
-                                return trilinear_interp(v, f);
-                            };
-                            F32 constexpr f = 0.5f;
-                            Vec3F norm = Vec3F(
-                                interp_lvl(u_pos + Vec3F( f,  0,  0)) -
-                                interp_lvl(u_pos + Vec3F(-f,  0,  0)),
-                                interp_lvl(u_pos + Vec3F( 0,  f,  0)) -
-                                interp_lvl(u_pos + Vec3F( 0, -f,  0)),
-                                interp_lvl(u_pos + Vec3F( 0,  0,  f)) -
-                                interp_lvl(u_pos + Vec3F( 0,  0, -f)));
-                            norm = normalize(norm);
-                            Vec3<U8> fp = abs(norm) * (F32)(0x7f);
-                            Vec3<U8> cnorm = fp |
-                                (Vec3<U8>(step(Vec3F(0.f), norm)) << (U8)7);
-                            BlockId id = get_block_l((Vec3F)off).id;
-                            mesh.verts.emplace(ChunkMesh::Vert{vert_pos, cnorm,
-                                .id = id});
-                        } else {
-                            mesh.idxs.emplace(idx_map.at(vert_pos));
-                        }
+                for(Uns a = 0; a < 3; ++a) {
+                    IdxPos idx_pos(x, y, z);
+                    auto const& b0 = get_block_l(idx_pos);
+                    auto const& b1 = get_block_l(idx_pos + a_off[a]);
+                    if((b0.id == void_block) != (b1.id == void_block)) {
+                        U8 orient = b0.id != void_block;
+                        BlockId id = orient ? b0.id : b1.id;
+                        mesh.faces.push({to_chk_idx(idx_pos), id,
+                            (a << 1 | orient)});
                     }
                 }
             }
         }
     }
-    mesh.verts.shrink_to_fit();
-    mesh.idxs.shrink_to_fit();
+    mesh.faces.shrink_to_fit();
 }
 
 static void thread_main() {
@@ -119,6 +60,8 @@ static void thread_main() {
         if(!is_running.load()) {
             break;
         }
+        //@TODO narrow down this mutex, so that physics mesher on main thread
+        //waits less
         results_mutex.lock();
         auto requests = move(*queue.begin());
         queue.pop_front();
@@ -157,6 +100,15 @@ void mesher_enqueue_wait(DynArr<MesherRequest>&& data) {
     queue_cv.notify_one();
     std::unique_lock<std::mutex> lock(queue_mutex);
     queue_cv.wait(lock, [&]{return queue.size() < size;});
+}
+
+bool mesher_try_lock_results(MesherResults*& out) {
+    if(results_mutex.try_lock()) {
+        out = &results;
+        return true;
+    } else {
+        return false;
+    }
 }
 
 VecMap<ChkPos, ChunkMesh>& mesher_lock_results() {

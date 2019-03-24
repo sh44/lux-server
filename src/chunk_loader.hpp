@@ -16,7 +16,13 @@ struct BlockChange {
     Block block;
 };
 
+//@TODO use typedef
+typedef VecMap<ChkPos, Chunk::Data*>        LoaderResults;
+typedef VecMap<ChkPos, DynArr<BlockChange>> LoaderBlockChanges;
+
+bool loader_try_lock_block_changes(VecMap<ChkPos, DynArr<BlockChange>>*& out);
+bool loader_try_lock_results(VecMap<ChkPos, Chunk::Data*>*& out);
 VecMap<ChkPos, DynArr<BlockChange>>& loader_lock_block_changes();
 void loader_unlock_block_changes();
-VecMap<ChkPos, Arr<Block, CHK_VOL>> const& loader_lock_results();
+VecMap<ChkPos, Chunk::Data*> const& loader_lock_results();
 void loader_unlock_results();

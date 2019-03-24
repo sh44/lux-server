@@ -54,7 +54,6 @@ LUX_MAY_FAIL static entity_break_block(RasenFrame* frame) {
     Vec3F  hit_dir;
     if(map_cast_ray(&hit_pos, &hit_dir, src, src + dir)) {
         Block& block = write_block(hit_pos);
-        block.lvl = 0x0;
         block.id = void_block;
     }
     return LUX_OK;
@@ -80,7 +79,8 @@ LUX_MAY_FAIL static entity_place_block(RasenFrame* frame) {
     static BlockId stone = db_block_id("stone_wall"_l);
     MapPos hit_pos;
     Vec3F  hit_dir;
-    if(map_cast_ray(&hit_pos, &hit_dir, src, src + dir)) {
+    LUX_UNIMPLEMENTED();
+    /*if(map_cast_ray(&hit_pos, &hit_dir, src, src + dir)) {
         Block& block0 = write_block(hit_pos);
         if(block0.id != stone) {
             block0.id = stone;
@@ -93,7 +93,7 @@ LUX_MAY_FAIL static entity_place_block(RasenFrame* frame) {
             }
             block1.lvl = 0xf;
         } else block0.lvl = 0xf;
-    }
+    }*/
     return LUX_OK;
 }
 

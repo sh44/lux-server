@@ -41,7 +41,7 @@ static void write_suspended_block(MapPos const& pos, Block block) {
     if(is_chunk_loaded(chk_pos)) {
         updated_chunks.insert(chk_pos);
         Chunk& chk = chunks.at(chk_pos);
-        chk.blocks[chk_idx] = block;
+        chk[chk_idx] = block;
         chk.updated_blocks.insert(chk_idx);
     } else {
         loader_write_suspended_block(block, pos);
@@ -65,9 +65,7 @@ void guarantee_chunk(ChkPos const& pos) {
         {   auto const& results = loader_lock_results();
             for(auto const& pair : results) {
                 auto& chunk = chunks[pair.first];
-                for(Uns i = 0; i < CHK_VOL; ++i) {
-                    chunk.blocks[i] = pair.second[i];
-                }
+                chunk.data = move(pair.second);
             }
             loader_unlock_results();
         }
@@ -84,10 +82,17 @@ bool try_guarantee_chunk(ChkPos const& pos) {
 }
 
 ChunkMesh::ChunkMesh(ChunkMesh&& that) {
-    verts = move(that.verts);
-    idxs = move(that.idxs);
+    faces = move(that.faces);
     physics_mesh = that.physics_mesh;
     that.physics_mesh = nullptr;
+}
+
+Block &Chunk::operator[](ChkIdx idx) {
+    return data->blocks[idx];
+}
+
+Block const &Chunk::operator[](ChkIdx idx) const {
+    return data->blocks[idx];
 }
 
 Chunk::~Chunk() {
@@ -120,7 +125,8 @@ bool try_guarantee_chunk_mesh(ChkPos const& pos) {
     if(mesher_requested_chunks.count(pos) > 0) {
         return false;
     }
-    Arr<ChkPos, 3 * 3 * 3> positions;
+    //@TODO we guarantee too much
+    Arr<ChkPos, 4> positions;
     Slice<ChkPos> slice = {positions, 0};
     if(is_chunk_loaded(pos)) {
         Chunk& chunk = chunks.at(pos);
@@ -130,7 +136,8 @@ bool try_guarantee_chunk_mesh(ChkPos const& pos) {
     } else {
         slice[slice.len++] = pos;
     }
-    for(auto const& off : chebyshev_hollow<ChkCoord>) {
+    Arr<ChkPos, 3> offs {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+    for(ChkPos const& off : offs) {
         if(!is_chunk_loaded(pos + off)) {
             slice[slice.len++] = pos + off;
         }
@@ -154,49 +161,10 @@ bool try_guarantee_chunk_mesh(ChkPos const& pos) {
     }
 }
 
-static void synchronize_loader_results() {
-    auto const& results = loader_lock_results();
-    for(auto const& pair : results) {
-        auto& chunk = chunks[pair.first];
-        for(Uns i = 0; i < CHK_VOL; ++i) {
-            chunk.blocks[i] = pair.second[i];
-        }
-    }
-    loader_unlock_results();
-}
-
-static void synchronize_loader_block_changes() {
-    auto& block_changes = loader_lock_block_changes();
-    for(auto it = block_changes.begin(), end = block_changes.end();
-             it != end;) {
-        if(is_chunk_loaded(it->first)) {
-            auto& chunk = chunks.at(it->first);
-            updated_chunks.insert(it->first);
-            for(auto const& change : it->second) {
-                chunk.blocks[change.idx] = change.block;
-                chunk.updated_blocks.insert(change.idx);
-            }
-            it = block_changes.erase(it);
-        } else ++it;
-    }
-    loader_unlock_block_changes();
-}
-
-static void synchronize_mesher_results() {
-    auto& meshes = mesher_lock_results();
-    for(auto&& pair : meshes) {
-        auto& chunk = chunks.at(pair.first);
-        LUX_ASSERT(chunk.mesh_state == Chunk::NOT_BUILT);
-        chunk.mesh = new ChunkMesh(move(pair.second));
-        chunk.mesh_state = Chunk::BUILT_TRIANGLE;
-        mesher_requested_chunks.erase(pair.first);
-    }
-    mesher_unlock_results();
-}
-
 void guarantee_physics_mesh_for_aabb(MapPos const& min, MapPos const& max) {
     ChkPos const c_min = to_chk_pos(min);
     ChkPos const c_max = to_chk_pos(max);
+    //@TODO assert both non-negative?
     ChkPos iter;
 
     //first we do a quick discard of already built meshes (most of the cases)
@@ -214,28 +182,64 @@ void guarantee_physics_mesh_for_aabb(MapPos const& min, MapPos const& max) {
     }
     if(not needs_generation) return;
 
-    //here we load the required chunks
-    ChkPos const cl_min = c_min - (ChkCoord)1;
-    ChkPos const cl_max = c_max + (ChkCoord)1;
     static DynArr<ChkPos> loader_requests;
-    loader_requests.reserve_at_least(glm::compMul(cl_max - cl_min));
-    for(iter.z = cl_min.z; iter.z <= cl_max.z; ++iter.z) {
-        for(iter.y = cl_min.y; iter.y <= cl_max.y; ++iter.y) {
-            for(iter.x = cl_min.x; iter.x <= cl_max.x; ++iter.x) {
+    loader_requests.clear();
+    ChkPos const c_size = (c_max + (ChkCoord)1) - c_min;
+    loader_requests.reserve_at_least(glm::compMul(c_size) +
+        c_size.x * c_size.y + c_size.x * c_size.z + c_size.y * c_size.z);
+    for(iter.z = c_min.z; iter.z <= c_max.z; ++iter.z) {
+        for(iter.y = c_min.y; iter.y <= c_max.y; ++iter.y) {
+            for(iter.x = c_min.x; iter.x <= c_max.x; ++iter.x) {
                 if(!is_chunk_loaded(iter)) {
                     loader_requests.emplace(iter);
                 }
             }
         }
     }
+    iter.x = c_max.x + (ChkCoord)1;
+    for(iter.z = c_min.z; iter.z <= c_max.z; ++iter.z) {
+        for(iter.y = c_min.y; iter.y <= c_max.y; ++iter.y) {
+            if(!is_chunk_loaded(iter)) {
+                loader_requests.emplace(iter);
+            }
+        }
+    }
+    iter.y = c_max.y + (ChkCoord)1;
+    for(iter.z = c_min.z; iter.z <= c_max.z; ++iter.z) {
+        for(iter.x = c_min.x; iter.x <= c_max.x; ++iter.x) {
+            if(!is_chunk_loaded(iter)) {
+                loader_requests.emplace(iter);
+            }
+        }
+    }
+    iter.z = c_max.z + (ChkCoord)1;
+    for(iter.y = c_min.y; iter.y <= c_max.y; ++iter.y) {
+        for(iter.x = c_min.x; iter.x <= c_max.x; ++iter.x) {
+            if(!is_chunk_loaded(iter)) {
+                loader_requests.emplace(iter);
+            }
+        }
+    }
     if(loader_requests.len > 0) {
+        LUX_LOG("BOB");
+        for(auto const& bob : loader_requests) {
+            LUX_LOG("%d, %d, %d", bob.x, bob.y, bob.z);
+        }
         loader_enqueue_wait(loader_requests);
-        synchronize_loader_results();
+        auto const& results = loader_lock_results();
+        LUX_LOG("ACT");
+        for(auto const& pair : results) {
+            LUX_LOG("%d, %d, %d", pair.first.x, pair.first.y, pair.first.z);
+            auto& chunk = chunks[pair.first];
+            chunk.data = pair.second;
+        }
+        LUX_LOG("GEND");
+        loader_unlock_results();
     }
 
     //now we build the meshes
     static DynArr<MesherRequest> mesher_requests;
-    mesher_requests.reserve_at_least(glm::compMul(c_max - c_min));
+    mesher_requests.reserve_at_least(glm::compMul(c_size));
     for(iter.z = c_min.z; iter.z <= c_max.z; ++iter.z) {
         for(iter.y = c_min.y; iter.y <= c_max.y; ++iter.y) {
             for(iter.x = c_min.x; iter.x <= c_max.x; ++iter.x) {
@@ -254,7 +258,15 @@ void guarantee_physics_mesh_for_aabb(MapPos const& min, MapPos const& max) {
     }
     if(mesher_requests.len > 0) {
         mesher_enqueue_wait(move(mesher_requests));
-        synchronize_mesher_results();
+        auto& meshes = mesher_lock_results();
+        for(auto&& pair : meshes) {
+            auto& chunk = chunks.at(pair.first);
+            LUX_ASSERT(chunk.mesh_state == Chunk::NOT_BUILT);
+            chunk.mesh = new ChunkMesh(move(pair.second));
+            chunk.mesh_state = Chunk::BUILT_TRIANGLE;
+            mesher_requested_chunks.erase(pair.first);
+        }
+        mesher_unlock_results();
     }
 
     //finally we build the physics meshes
@@ -262,17 +274,25 @@ void guarantee_physics_mesh_for_aabb(MapPos const& min, MapPos const& max) {
         for(iter.y = c_min.y; iter.y <= c_max.y; ++iter.y) {
             for(iter.x = c_min.x; iter.x <= c_max.x; ++iter.x) {
                 auto& chunk = chunks.at(iter);
-                if(chunk.mesh_state == Chunk::BUILT_TRIANGLE) {
+                LUX_UNIMPLEMENTED();
+                chunk.mesh_state = Chunk::BUILT_PHYSICS;
+                continue;
+                /*if(chunk.mesh_state == Chunk::BUILT_TRIANGLE) {
                     LUX_LOG("building physics mesh {%zd, %zd, %zd}",
                         iter.x, iter.y, iter.z);
                     auto& mesh = *chunk.mesh;
                     chunk.mesh->physics_mesh = new ChunkPhysicsMesh();
                     auto& p_mesh = *chunk.mesh->physics_mesh;
-                    Uns trigs_num = mesh.idxs.len / 3;
-                    p_mesh.verts.resize(mesh.verts.len);
-                    p_mesh.idxs = mesh.idxs;
+                    Uns trigs_num = mesh.faces.len * 2;
+                    p_mesh.verts.resize(mesh.faces.len * 4);
+                    p_mesh.idxs.resize(mesh.faces.len * 6);
                     LUX_ASSERT(p_mesh.idxs.len > 0);
-                    for(Uns i = 0; i < p_mesh.verts.len; ++i) {
+                    for(Uns i = 0; i < mesh.faces.len; ++i) {
+                        auto const& face = mesh.faces[i];
+                        for(Uns j = 0; j < 4; ++j) {
+                            p_mesh.verts[i * 4 + j].pos =
+                                to_idx_pos(face.idx);
+                        }
                         p_mesh.verts[i] =
                             fixed_to_float<4, U16, 3>(mesh.verts[i].pos);
                     }
@@ -287,7 +307,7 @@ void guarantee_physics_mesh_for_aabb(MapPos const& min, MapPos const& max) {
                     p_mesh.body = physics_create_mesh(to_map_pos(iter, 0),
                         &*p_mesh.shape);
                     chunk.mesh_state = Chunk::BUILT_PHYSICS;
-                }
+                }*/
             }
         }
     }
@@ -306,11 +326,11 @@ Block& write_block(MapPos const& pos) {
     Chunk& chunk = chunks.at(chk_pos);
     ChkIdx chk_idx = to_chk_idx(pos);
     chunk.updated_blocks.insert(chk_idx);
-    return chunk.blocks[chk_idx];
+    return chunk[chk_idx];
 }
 
 Block get_block(MapPos const& pos) {
-    return get_chunk(to_chk_pos(pos)).blocks[to_chk_idx(pos)];
+    return get_chunk(to_chk_pos(pos))[to_chk_idx(pos)];
 }
 
 BlockBp const& get_block_bp(MapPos const& pos) {
@@ -318,9 +338,45 @@ BlockBp const& get_block_bp(MapPos const& pos) {
 }
 
 void map_tick() {
-    synchronize_loader_results();
-    synchronize_loader_block_changes();
-    synchronize_mesher_results();
+    {   LoaderResults* results;
+        if(loader_try_lock_results(results)) {
+            for(auto const& pair : *results) {
+                auto& chunk = chunks[pair.first];
+                chunk.data = pair.second;
+            }
+            loader_unlock_results();
+        }
+    }
+    {   LoaderBlockChanges* block_changes;
+        if(loader_try_lock_block_changes(block_changes)) {
+            for(auto it = block_changes->begin(), end = block_changes->end();
+                     it != end;) {
+                if(is_chunk_loaded(it->first)) {
+                    auto& chunk = chunks.at(it->first);
+                    updated_chunks.insert(it->first);
+                    for(auto const& change : it->second) {
+                        chunk[change.idx] = change.block;
+                        chunk.updated_blocks.insert(change.idx);
+                    }
+                    it = block_changes->erase(it);
+                } else ++it;
+            }
+            loader_unlock_block_changes();
+        }
+    }
+    {   MesherResults* results;
+        if(mesher_try_lock_results(results)) {
+            MesherResults& bob = *results;
+            for(auto&& pair : bob) {
+                auto& chunk = chunks.at(pair.first);
+                LUX_ASSERT(chunk.mesh_state == Chunk::NOT_BUILT);
+                chunk.mesh = new ChunkMesh(move(pair.second));
+                chunk.mesh_state = Chunk::BUILT_TRIANGLE;
+                mesher_requested_chunks.erase(pair.first);
+            }
+            mesher_unlock_results();
+        }
+    }
 
     static Uns tick_num = 0;
     physics_tick(1.f / 64.f); //TODO tick time
@@ -349,10 +405,10 @@ void map_tick() {
         }*/
         LUX_UNIMPLEMENTED();
     }
-    Uns constexpr ticks_per_day = 1 << 12;
-    day_cycle = 1.f;
-    /*day_cycle = std::sin(tau *
-        (((F32)(tick_num % ticks_per_day) / (F32)ticks_per_day) + 0.25f));*/
+    Uns constexpr ticks_per_day = 64 * 60 * 24;
+    //day_cycle = 1.f;
+    day_cycle = std::sin(tau *
+        (((F32)(tick_num % ticks_per_day) / (F32)ticks_per_day) + 0.25f));
     tick_num++;
 }
 
@@ -379,7 +435,7 @@ bool map_cast_ray(MapPos* out_pos, Vec3F* out_dir, Vec3F src, Vec3F dst) {
         MapPos map_pos = floor(it);
         ChkPos chk_pos = to_chk_pos(map_pos);
         if(!is_chunk_loaded(chk_pos)) return false;
-        if(get_chunk(chk_pos).blocks[to_chk_idx(map_pos)].lvl >= 0x8) {
+        if(get_chunk(chk_pos)[to_chk_idx(map_pos)].id != void_block) {
             *out_pos = map_pos;
             Vec3F norm(0.f);
             norm[max_i] = sign(ray[max_i]);
@@ -395,215 +451,66 @@ bool map_cast_ray(MapPos* out_pos, Vec3F* out_dir, Vec3F src, Vec3F dst) {
 static bool prepare_mesher_data(MesherRequest& out) {
     ChkPos const& pos = out.pos;
     bool has_any_faces = false;
-    int face_check_sign;
+    bool face_check;
     auto get_block_l = [&](Vec3I pos) -> Block& {
-        pos += (Int)1;
-        Int idx = pos.x + (pos.y + pos.z * (CHK_SIZE + 3)) * (CHK_SIZE + 3);
-        LUX_ASSERT(idx < (Int)arr_len(out.blocks) && idx >= 0);
+        Uns idx = pos.x + (pos.y + pos.z * (CHK_SIZE + 1)) * (CHK_SIZE + 1);
+        LUX_ASSERT(idx < arr_len(out.blocks));
         return out.blocks[idx];
     };
-    //@TODO abstract this code?
-    {   Chunk const& chk = get_chunk(pos + ChkPos(-1, 0, 0));
-        for(Uns z = 0; z < CHK_SIZE; ++z) {
-            for(Uns y = 0; y < CHK_SIZE; ++y) {
-                auto const& block = chk.blocks[to_chk_idx(IdxPos{CHK_SIZE - 1, y, z})];
-                get_block_l({-1, y, z}) = block;
-            }
-        }
-    }
-    {   Chunk const& chk = get_chunk(pos + ChkPos(0, -1, 0));
-        for(Uns z = 0; z < CHK_SIZE; ++z) {
-            for(Uns x = 0; x < CHK_SIZE; ++x) {
-                auto const& block = chk.blocks[to_chk_idx(IdxPos{x, CHK_SIZE - 1, z})];
-                get_block_l({x, -1, z}) = block;
-            }
-        }
-    }
-    {   Chunk const& chk = get_chunk(pos + ChkPos(0, 0, -1));
-        for(Uns y = 0; y < CHK_SIZE; ++y) {
-            for(Uns x = 0; x < CHK_SIZE; ++x) {
-                auto const& block = chk.blocks[to_chk_idx(IdxPos{x, y, CHK_SIZE - 1})];
-                get_block_l({x, y, -1}) = block;
-            }
-        }
-    }
+    //@TODO reduce repetitiveness
+    LUX_LOG("%d, %d, %d", pos.x + 1, pos.y, pos.z);
     {   Chunk const& chk = get_chunk(pos + ChkPos(1, 0, 0));
         {   auto const& block =
-                chk.blocks[to_chk_idx(IdxPos{0, 0, 0})];
+                chk[to_chk_idx(IdxPos{0, 0, 0})];
             get_block_l({CHK_SIZE, 0, 0}) = block;
-            face_check_sign = block.lvl >= 8;
+            face_check = block.id == void_block;
         }
         for(Uns y = 1; y < CHK_SIZE; ++y) {
-            {   auto const& block = chk.blocks[to_chk_idx(IdxPos{0, y, 0})];
-                get_block_l({CHK_SIZE, y, 0}) = block;
-                has_any_faces |= ((block.lvl >= 8) != face_check_sign);
-            }
-            {   auto const& block = chk.blocks[to_chk_idx(IdxPos{1, y, 0})];
-                get_block_l({CHK_SIZE + 1, y, 0}) = block;
-            }
+            auto const& block = chk[to_chk_idx(IdxPos{0, y, 0})];
+            get_block_l({CHK_SIZE, y, 0}) = block;
+            has_any_faces |= (block.id == void_block) != face_check;
         }
         for(Uns z = 1; z < CHK_SIZE; ++z) {
             for(Uns y = 0; y < CHK_SIZE; ++y) {
-                {   auto const& block = chk.blocks[to_chk_idx(IdxPos{0, y, z})];
-                    get_block_l({CHK_SIZE, y, z}) = block;
-                    has_any_faces |= ((block.lvl >= 8) != face_check_sign);
-                }
-                {   auto const& block = chk.blocks[to_chk_idx(IdxPos{1, y, z})];
-                    get_block_l({CHK_SIZE + 1, y, z}) = block;
-                }
+                auto const& block = chk[to_chk_idx(IdxPos{0, y, z})];
+                get_block_l({CHK_SIZE, y, z}) = block;
+                has_any_faces |= (block.id == void_block) != face_check;
             }
         }
     }
     {   Chunk const& chk = get_chunk(pos + ChkPos(0, 1, 0));
         for(Uns z = 0; z < CHK_SIZE; ++z) {
             for(Uns x = 0; x < CHK_SIZE; ++x) {
-                auto const& block = chk.blocks[to_chk_idx(IdxPos{x, 0, z})];
+                auto const& block = chk[to_chk_idx(IdxPos{x, 0, z})];
                 get_block_l({x, CHK_SIZE, z}) = block;
-                has_any_faces |= ((block.lvl >= 8) != face_check_sign);
-            }
-            for(Uns x = 0; x < CHK_SIZE; ++x) {
-                auto const& block = chk.blocks[to_chk_idx(IdxPos{x, 1, z})];
-                get_block_l({x, CHK_SIZE + 1, z}) = block;
+                has_any_faces |= (block.id == void_block) != face_check;
             }
         }
     }
     {   Chunk const& chk = get_chunk(pos + ChkPos(0, 0, 1));
         for(Uns y = 0; y < CHK_SIZE; ++y) {
             for(Uns x = 0; x < CHK_SIZE; ++x) {
-                auto const& block = chk.blocks[to_chk_idx(IdxPos{x, y, 0})];
+                auto const& block = chk[to_chk_idx(IdxPos{x, y, 0})];
                 get_block_l({x, y, CHK_SIZE}) = block;
-                has_any_faces |= ((block.lvl >= 8) != face_check_sign);
+                has_any_faces |= (block.id == void_block) != face_check;
             }
         }
-        for(Uns y = 0; y < CHK_SIZE; ++y) {
-            for(Uns x = 0; x < CHK_SIZE; ++x) {
-                auto const& block = chk.blocks[to_chk_idx(IdxPos{x, y, 1})];
-                get_block_l({x, y, CHK_SIZE + 1}) = block;
-            }
-        }
-    }
-    {   Chunk const& chk = get_chunk(pos + ChkPos(0, 1, 1));
-        for(Uns x = 0; x < CHK_SIZE; ++x) {
-            auto const& block = chk.blocks[to_chk_idx(IdxPos{x, 0, 0})];
-            get_block_l({x, CHK_SIZE, CHK_SIZE}) = block;
-            has_any_faces |= ((block.lvl >= 8) != face_check_sign);
-        }
-        for(Uns x = 0; x < CHK_SIZE; ++x) {
-            auto const& block = chk.blocks[to_chk_idx(IdxPos{x, 1, 0})];
-            get_block_l({x, CHK_SIZE + 1, CHK_SIZE}) = block;
-        }
-        for(Uns x = 0; x < CHK_SIZE; ++x) {
-            auto const& block = chk.blocks[to_chk_idx(IdxPos{x, 0, 1})];
-            get_block_l({x, CHK_SIZE, CHK_SIZE + 1}) = block;
-        }
-    }
-    {   Chunk const& chk = get_chunk(pos + ChkPos(1, 0, 1));
-        for(Uns y = 0; y < CHK_SIZE; ++y) {
-            auto const& block = chk.blocks[to_chk_idx(IdxPos{0, y, 0})];
-            get_block_l({CHK_SIZE, y, CHK_SIZE}) = block;
-            has_any_faces |= ((block.lvl >= 8) != face_check_sign);
-        }
-        for(Uns y = 0; y < CHK_SIZE; ++y) {
-            auto const& block = chk.blocks[to_chk_idx(IdxPos{1, y, 0})];
-            get_block_l({CHK_SIZE + 1, y, CHK_SIZE}) = block;
-        }
-        for(Uns y = 0; y < CHK_SIZE; ++y) {
-            auto const& block = chk.blocks[to_chk_idx(IdxPos{0, y, 1})];
-            get_block_l({CHK_SIZE, y, CHK_SIZE + 1}) = block;
-        }
-    }
-    {   Chunk const& chk = get_chunk(pos + ChkPos(1, 1, 0));
-        for(Uns z = 0; z < CHK_SIZE; ++z) {
-            auto const& block = chk.blocks[to_chk_idx(IdxPos{0, 0, z})];
-            get_block_l({CHK_SIZE, CHK_SIZE, z}) = block;
-            has_any_faces |= ((block.lvl >= 8) != face_check_sign);
-        }
-        for(Uns z = 0; z < CHK_SIZE; ++z) {
-            auto const& block = chk.blocks[to_chk_idx(IdxPos{1, 0, z})];
-            get_block_l({CHK_SIZE + 1, CHK_SIZE, z}) = block;
-        }
-        for(Uns z = 0; z < CHK_SIZE; ++z) {
-            auto const& block = chk.blocks[to_chk_idx(IdxPos{0, 1, z})];
-            get_block_l({CHK_SIZE, CHK_SIZE + 1, z}) = block;
-        }
-    }
-    {   Chunk const& chk = get_chunk(pos + ChkPos(1, 1, 1));
-        {   auto const& block = chk.blocks[to_chk_idx(IdxPos{0, 0, 0})];
-            get_block_l({CHK_SIZE, CHK_SIZE, CHK_SIZE}) = block;
-            has_any_faces |= ((block.lvl >= 8) != face_check_sign);
-        }
-        {   auto const& block = chk.blocks[to_chk_idx(IdxPos{1, 0, 0})];
-            get_block_l({CHK_SIZE + 1, CHK_SIZE, CHK_SIZE}) = block;
-            has_any_faces |= ((block.lvl >= 8) != face_check_sign);
-        }
-        {   auto const& block = chk.blocks[to_chk_idx(IdxPos{0, 1, 0})];
-            get_block_l({CHK_SIZE, CHK_SIZE + 1, CHK_SIZE}) = block;
-            has_any_faces |= ((block.lvl >= 8) != face_check_sign);
-        }
-        {   auto const& block = chk.blocks[to_chk_idx(IdxPos{0, 0, 1})];
-            get_block_l({CHK_SIZE, CHK_SIZE, CHK_SIZE + 1}) = block;
-            has_any_faces |= ((block.lvl >= 8) != face_check_sign);
-        }
-    }
-    {   Chunk const& chk = get_chunk(pos + ChkPos(-1, 1, 0));
-        for(Uns z = 0; z < CHK_SIZE; ++z) {
-            auto const& block = chk.blocks[to_chk_idx(IdxPos{CHK_SIZE - 1, 0, z})];
-            get_block_l({-1, CHK_SIZE, z}) = block;
-        }
-    }
-    {   Chunk const& chk = get_chunk(pos + ChkPos(-1, 0, 1));
-        for(Uns y = 0; y < CHK_SIZE; ++y) {
-            auto const& block = chk.blocks[to_chk_idx(IdxPos{CHK_SIZE - 1, y, 0})];
-            get_block_l({-1, y, CHK_SIZE}) = block;
-        }
-    }
-    {   Chunk const& chk = get_chunk(pos + ChkPos(-1, 1, 1));
-        auto const& block = chk.blocks[to_chk_idx(IdxPos{CHK_SIZE - 1, 0, 0})];
-        get_block_l({-1, CHK_SIZE, CHK_SIZE}) = block;
-    }
-    {   Chunk const& chk = get_chunk(pos + ChkPos(1, -1, 0));
-        for(Uns z = 0; z < CHK_SIZE; ++z) {
-            auto const& block = chk.blocks[to_chk_idx(IdxPos{0, CHK_SIZE - 1, z})];
-            get_block_l({CHK_SIZE, -1, z}) = block;
-        }
-    }
-    {   Chunk const& chk = get_chunk(pos + ChkPos(0, -1, 1));
-        for(Uns x = 0; x < CHK_SIZE; ++x) {
-            auto const& block = chk.blocks[to_chk_idx(IdxPos{x, CHK_SIZE - 1, 0})];
-            get_block_l({x, -1, CHK_SIZE}) = block;
-        }
-    }
-    {   Chunk const& chk = get_chunk(pos + ChkPos(1, -1, 1));
-        auto const& block = chk.blocks[to_chk_idx(IdxPos{0, CHK_SIZE - 1, 0})];
-        get_block_l({CHK_SIZE, -1, CHK_SIZE}) = block;
-    }
-    {   Chunk const& chk = get_chunk(pos + ChkPos(0, 1, -1));
-        for(Uns x = 0; x < CHK_SIZE; ++x) {
-            auto const& block = chk.blocks[to_chk_idx(IdxPos{x, 0, CHK_SIZE - 1})];
-            get_block_l({x, CHK_SIZE, -1}) = block;
-        }
-    }
-    {   Chunk const& chk = get_chunk(pos + ChkPos(1, 0, -1));
-        for(Uns y = 0; y < CHK_SIZE; ++y) {
-            auto const& block = chk.blocks[to_chk_idx(IdxPos{0, y, CHK_SIZE - 1})];
-            get_block_l({CHK_SIZE, y, -1}) = block;
-        }
-    }
-    {   Chunk const& chk = get_chunk(pos + ChkPos(1, 1, -1));
-        auto const& block = chk.blocks[to_chk_idx(IdxPos{0, 0, CHK_SIZE - 1})];
-        get_block_l({CHK_SIZE, CHK_SIZE, -1}) = block;
     }
     Chunk const& chk = get_chunk(pos);
-    Uns idx = 0;
+    Uns src = 0;
+    Uns dst = 0;
     for(Uns z = 0; z < CHK_SIZE; ++z) {
         for(Uns y = 0; y < CHK_SIZE; ++y) {
             for(Uns x = 0; x < CHK_SIZE; ++x) {
-                auto const& block = chk.blocks[idx];
-                get_block_l({x, y, z}) = block;
-                has_any_faces |= ((block.lvl >= 8) != face_check_sign);
-                idx++;
+                auto const& block = chk[src];
+                out.blocks[dst] = block;
+                has_any_faces |= (block.id == void_block) != face_check;
+                src++;
+                dst++;
             }
+            dst++;
         }
+        dst += CHK_SIZE + 1;
     }
-    return has_any_faces;
+    return true;
 }
