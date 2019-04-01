@@ -11,12 +11,9 @@ struct Block {
 struct ChunkPhysicsMesh;
 
 struct ChunkMesh {
-    struct Face {
-        ChkIdx  idx;
-        BlockId id;
-        U8      orientation; //first bit is sign, 2 next bits are axis (XYZ)
-    };
-    DynArr<Face> faces;
+    DynArr<BlockFace> faces;
+    DynArr<Uns>       removed_faces;
+    DynArr<BlockFace> added_faces;
 
     ChunkPhysicsMesh* physics_mesh;
 
@@ -30,9 +27,11 @@ struct Chunk {
     };
     //@URGENT we need to deallocate this (using lux_dealloc) when unloading
     Data* data;
-    IdSet<ChkIdx> updated_blocks; //@TODO change this?
+    //@TODO this probably can be moved to chunk mesh
+    IdSet<ChkIdx> updated_blocks;
     ChunkMesh* mesh;
 
+    //@TODO move to ChunkMesh?
     enum MeshState : U8 {
         NOT_BUILT,
         BUILT_EMPTY,
@@ -46,7 +45,7 @@ struct Chunk {
 };
 
 extern F32 day_cycle;
-extern VecSet<ChkPos> updated_chunks;
+extern VecSet<ChkPos> updated_meshes;
 
 Block get_block(MapPos const& pos);
 BlockBp const& get_block_bp(MapPos const& pos);

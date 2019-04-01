@@ -28,6 +28,7 @@ static VecMap<ChkPos, Chunk> chunks;
 
 F32 day_cycle;
 VecSet<ChkPos> updated_chunks;
+VecSet<ChkPos> updated_meshes;
 
 //needs the out.pos set
 static bool prepare_mesher_data(MesherRequest& out);
@@ -221,19 +222,12 @@ void guarantee_physics_mesh_for_aabb(MapPos const& min, MapPos const& max) {
         }
     }
     if(loader_requests.len > 0) {
-        LUX_LOG("BOB");
-        for(auto const& bob : loader_requests) {
-            LUX_LOG("%d, %d, %d", bob.x, bob.y, bob.z);
-        }
         loader_enqueue_wait(loader_requests);
         auto const& results = loader_lock_results();
-        LUX_LOG("ACT");
         for(auto const& pair : results) {
-            LUX_LOG("%d, %d, %d", pair.first.x, pair.first.y, pair.first.z);
             auto& chunk = chunks[pair.first];
             chunk.data = pair.second;
         }
-        LUX_LOG("GEND");
         loader_unlock_results();
     }
 
@@ -263,6 +257,7 @@ void guarantee_physics_mesh_for_aabb(MapPos const& min, MapPos const& max) {
             auto& chunk = chunks.at(pair.first);
             LUX_ASSERT(chunk.mesh_state == Chunk::NOT_BUILT);
             chunk.mesh = new ChunkMesh(move(pair.second));
+            LUX_ASSERT(chunk.mesh->faces.len > 0);
             chunk.mesh_state = Chunk::BUILT_TRIANGLE;
             mesher_requested_chunks.erase(pair.first);
         }
@@ -274,30 +269,46 @@ void guarantee_physics_mesh_for_aabb(MapPos const& min, MapPos const& max) {
         for(iter.y = c_min.y; iter.y <= c_max.y; ++iter.y) {
             for(iter.x = c_min.x; iter.x <= c_max.x; ++iter.x) {
                 auto& chunk = chunks.at(iter);
-                LUX_UNIMPLEMENTED();
-                chunk.mesh_state = Chunk::BUILT_PHYSICS;
-                continue;
-                /*if(chunk.mesh_state == Chunk::BUILT_TRIANGLE) {
+                if(chunk.mesh_state == Chunk::BUILT_TRIANGLE) {
                     LUX_LOG("building physics mesh {%zd, %zd, %zd}",
                         iter.x, iter.y, iter.z);
                     auto& mesh = *chunk.mesh;
                     chunk.mesh->physics_mesh = new ChunkPhysicsMesh();
                     auto& p_mesh = *chunk.mesh->physics_mesh;
-                    Uns trigs_num = mesh.faces.len * 2;
-                    p_mesh.verts.resize(mesh.faces.len * 4);
-                    p_mesh.idxs.resize(mesh.faces.len * 6);
-                    LUX_ASSERT(p_mesh.idxs.len > 0);
-                    for(Uns i = 0; i < mesh.faces.len; ++i) {
+                    Uns faces_num = mesh.faces.len;
+                    LUX_ASSERT(faces_num > 0);
+                    p_mesh.verts.resize(faces_num * 4);
+                    p_mesh.idxs.resize(faces_num * 6);
+                    Arr<Vec3F, 3 * 4> vert_offs = {
+                        {0, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0, 1, 1},
+                        {0, 0, 0}, {0, 0, 1}, {1, 0, 0}, {1, 0, 1},
+                        {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0},
+                    };
+                    for(Uns i = 0; i < faces_num; ++i) {
                         auto const& face = mesh.faces[i];
-                        for(Uns j = 0; j < 4; ++j) {
-                            p_mesh.verts[i * 4 + j].pos =
-                                to_idx_pos(face.idx);
+                        ChkIdx idx = face.idx;
+                        U8 axis = (face.orientation & 0b110) >> 1;
+                        LUX_ASSERT(axis != 0b11);
+                        U8 sign = (face.orientation & 1);
+                        Vec3F face_off(0);
+                        face_off[axis] = 1;
+                        if(sign) {
+                            for(Uns j = 0; j < 6; ++j) {
+                                p_mesh.idxs[i * 6 + j] = quad_idxs<U16>[j] + i * 4;
+                            }
+                        } else {
+                            for(Uns j = 0; j < 6; ++j) {
+                                p_mesh.idxs[i * 6 + j] = quad_idxs<U16>[5 - j] + i * 4;
+                            }
                         }
-                        p_mesh.verts[i] =
-                            fixed_to_float<4, U16, 3>(mesh.verts[i].pos);
+                        for(Uns j = 0; j < 4; ++j) {
+                            auto& vert = p_mesh.verts[i * 4 + j];
+                            vert = (Vec3F)to_idx_pos(idx) + face_off +
+                                vert_offs[axis * 4 + j];
+                        }
                     }
                     p_mesh.trigs_array.init(
-                        trigs_num, (I32*)p_mesh.idxs.beg , sizeof(I32) * 3,
+                        faces_num * 2, (I32*)p_mesh.idxs.beg , sizeof(I32) * 3,
                         p_mesh.verts.len, (F32*)p_mesh.verts.beg, sizeof(Vec3F));
 
                     p_mesh.shape.init(
@@ -307,7 +318,7 @@ void guarantee_physics_mesh_for_aabb(MapPos const& min, MapPos const& max) {
                     p_mesh.body = physics_create_mesh(to_map_pos(iter, 0),
                         &*p_mesh.shape);
                     chunk.mesh_state = Chunk::BUILT_PHYSICS;
-                }*/
+                }
             }
         }
     }
@@ -336,6 +347,8 @@ Block get_block(MapPos const& pos) {
 BlockBp const& get_block_bp(MapPos const& pos) {
     return db_block_bp(get_block(pos).id);
 }
+
+static void chunk_mesh_update(ChkPos const& chk_pos);
 
 void map_tick() {
     {   LoaderResults* results;
@@ -378,9 +391,8 @@ void map_tick() {
         }
     }
 
-    static Uns tick_num = 0;
-    physics_tick(1.f / 64.f); //TODO tick time
     for(auto const& pos : updated_chunks) {
+        LUX_UNIMPLEMENTED(); //@TODO physics
         /*if(physics_meshes.count(pos) > 0) {
             U8 updated_sides = 0b000000;
             LUX_ASSERT(is_chunk_loaded(pos));
@@ -403,10 +415,12 @@ void map_tick() {
             };
             update_chunks_around(update_mesh, updated_sides);
         }*/
-        LUX_UNIMPLEMENTED();
+        chunk_mesh_update(pos);
     }
+    updated_chunks.clear();
+    static Uns tick_num = 0;
+    physics_tick(1.f / 64.f); //TODO tick time
     Uns constexpr ticks_per_day = 64 * 60 * 24;
-    //day_cycle = 1.f;
     day_cycle = std::sin(tau *
         (((F32)(tick_num % ticks_per_day) / (F32)ticks_per_day) + 0.25f));
     tick_num++;
@@ -430,22 +444,147 @@ bool map_cast_ray(MapPos* out_pos, Vec3F* out_dir, Vec3F src, Vec3F dst) {
 
     Vec3F it = src + o * dt;
 
-    for(Uns i = 0; i < max; ++i)
-    {
-        MapPos map_pos = floor(it);
-        ChkPos chk_pos = to_chk_pos(map_pos);
-        if(!is_chunk_loaded(chk_pos)) return false;
-        if(get_chunk(chk_pos)[to_chk_idx(map_pos)].id != void_block) {
-            *out_pos = map_pos;
-            Vec3F norm(0.f);
-            norm[max_i] = sign(ray[max_i]);
-            *out_dir = norm;
-            return true;
+    for(Uns i = 0; i < max; ++i) {
+        for(Uns j = 0; j < 3; ++j) {
+            MapPos map_pos = floor(it);
+            ChkPos chk_pos = to_chk_pos(map_pos);
+            if(!is_chunk_loaded(chk_pos)) return false;
+            if(get_chunk(chk_pos)[to_chk_idx(map_pos)].id != void_block) {
+                *out_pos = map_pos;
+                Vec3F norm(0.f);
+                norm[max_i] = sign(ray[max_i]);
+                *out_dir = norm;
+                return true;
+            }
+            it[j] += dt[j];
         }
-
-        it += dt;
     }
     return false;
+}
+
+static void chunk_mesh_update(ChkPos const& chk_pos) {
+    LUX_ASSERT(is_chunk_loaded(chk_pos));
+    Chunk& chunk = chunks.at(chk_pos);
+    if(chunk.mesh_state == Chunk::NOT_BUILT) return;
+    if(chunk.mesh_state == Chunk::BUILT_EMPTY) {
+        LUX_UNIMPLEMENTED();
+        return;
+    }
+    ChunkMesh& mesh = *chunk.mesh;
+    for(auto const& idx : chunk.updated_blocks) {
+        IdxPos i_pos = to_idx_pos(idx);
+        auto const& b0 = chunk[idx];
+        Uns removed_count = 0;
+        for(Uns i = 0; i < mesh.faces.len;) {
+            auto const& face = mesh.faces[i];
+            if(face.idx == idx) {
+                mesh.faces.erase(i);
+                mesh.removed_faces.emplace(i);
+                updated_meshes.insert(chk_pos);
+                removed_count++;
+            } else ++i;
+            if(removed_count == 3) break;
+        }
+        for(Uns a = 0; a < 3; ++a) {
+            if(i_pos[a] == 0) {
+                ChkPos off_pos = chk_pos;
+                off_pos[a]--;
+                if(is_chunk_loaded(off_pos)) {
+                    Chunk& off_chunk = chunks.at(off_pos);
+                    if(off_chunk.mesh_state != Chunk::NOT_BUILT) {
+                        if(off_chunk.mesh_state == Chunk::BUILT_EMPTY) {
+                            LUX_UNIMPLEMENTED();
+                            continue;
+                        }
+                        ChunkMesh& off_mesh = *off_chunk.mesh;
+                        IdxPos off_i_pos = i_pos;
+                        off_i_pos[a] = CHK_SIZE - 1;
+                        for(Uns i = 0; i < off_mesh.faces.len;) {
+                            auto const& face = off_mesh.faces[i];
+                            if(to_idx_pos(face.idx) == off_i_pos &&
+                               (face.orientation & 0b110) >> 1 == a) {
+                                off_mesh.faces.erase(i);
+                                off_mesh.removed_faces.emplace(i);
+                                updated_meshes.insert(off_pos);
+                                break;
+                            } else ++i;
+                        }
+                        ChkIdx off_idx = to_chk_idx(off_i_pos);
+                        auto const& b1 = off_chunk[off_idx];
+                        if((b0.id == void_block) != (b1.id == void_block)) {
+                            U8 orient = b0.id == void_block;
+                            BlockId id = not orient ? b0.id : b1.id;
+                            off_mesh.faces.push({off_idx, id, (((U8)a << 1) | orient)});
+                            off_mesh.added_faces.emplace(off_mesh.faces.last());
+                            updated_meshes.insert(off_pos);
+                        }
+                    }
+                }
+                {   IdxPos off_i_pos = i_pos;
+                    off_i_pos[a]++;
+                    auto const& b1 = chunk[to_chk_idx(off_i_pos)];
+                    if((b0.id == void_block) != (b1.id == void_block)) {
+                        U8 orient = b0.id != void_block;
+                        BlockId id = orient ? b0.id : b1.id;
+                        mesh.faces.push({idx, id, (((U8)a << 1) | orient)});
+                        mesh.added_faces.emplace(mesh.faces.last());
+                        updated_meshes.insert(chk_pos);
+                    }
+                }
+            } else {
+                {   IdxPos off_i_pos = i_pos;
+                    off_i_pos[a]--;
+                    ChkIdx off_idx = to_chk_idx(off_i_pos);
+                    for(Uns i = 0; i < mesh.faces.len;) {
+                        auto const& face = mesh.faces[i];
+                        if(face.idx == off_idx &&
+                           (face.orientation & 0b110) >> 1 == a) {
+                            mesh.faces.erase(i);
+                            mesh.removed_faces.emplace(i);
+                            updated_meshes.insert(chk_pos);
+                            break;
+                        } else ++i;
+                    }
+                    auto const& b1 = chunk[off_idx];
+                    if((b0.id == void_block) != (b1.id == void_block)) {
+                        U8 orient = b0.id == void_block;
+                        BlockId id = not orient ? b0.id : b1.id;
+                        mesh.faces.push({off_idx, id, (((U8)a << 1) | orient)});
+                        mesh.added_faces.emplace(mesh.faces.last());
+                        updated_meshes.insert(chk_pos);
+                    }
+                }
+                if(i_pos[a] == CHK_SIZE - 1) {
+                    ChkPos off_pos = chk_pos;
+                    off_pos[a]++;
+                    LUX_ASSERT(is_chunk_loaded(off_pos));
+                    Chunk& off_chunk = chunks.at(off_pos);
+                    IdxPos off_i_pos = i_pos;
+                    off_i_pos[a] = 0;
+                    auto const& b1 = off_chunk[to_chk_idx(off_i_pos)];
+                    if((b0.id == void_block) != (b1.id == void_block)) {
+                        U8 orient = b0.id != void_block;
+                        BlockId id = orient ? b0.id : b1.id;
+                        mesh.faces.push({idx, id, (((U8)a << 1) | orient)});
+                        mesh.added_faces.emplace(mesh.faces.last());
+                        updated_meshes.insert(chk_pos);
+                    }
+                } else {
+                    IdxPos off_i_pos = i_pos;
+                    off_i_pos[a]++;
+                    auto const& b1 = chunk[to_chk_idx(off_i_pos)];
+                    if((b0.id == void_block) != (b1.id == void_block)) {
+                        U8 orient = b0.id != void_block;
+                        BlockId id = orient ? b0.id : b1.id;
+                        mesh.faces.push({idx, id, (((U8)a << 1) | orient)});
+                        mesh.added_faces.emplace(mesh.faces.last());
+                        updated_meshes.insert(chk_pos);
+                    }
+                }
+            }
+        }
+    }
+    chunk.updated_blocks.clear();
 }
 
 static bool prepare_mesher_data(MesherRequest& out) {
@@ -458,7 +597,6 @@ static bool prepare_mesher_data(MesherRequest& out) {
         return out.blocks[idx];
     };
     //@TODO reduce repetitiveness
-    LUX_LOG("%d, %d, %d", pos.x + 1, pos.y, pos.z);
     {   Chunk const& chk = get_chunk(pos + ChkPos(1, 0, 0));
         {   auto const& block =
                 chk[to_chk_idx(IdxPos{0, 0, 0})];
@@ -512,5 +650,5 @@ static bool prepare_mesher_data(MesherRequest& out) {
         }
         dst += CHK_SIZE + 1;
     }
-    return true;
+    return has_any_faces;
 }

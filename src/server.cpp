@@ -230,20 +230,18 @@ LUX_MAY_FAIL add_client(ENetPeer* peer) {
 }
 
 LUX_MAY_FAIL send_chunk_update(ENetPeer* peer, VecSet<ChkPos> const& chunks) {
-    LUX_UNIMPLEMENTED();
-    /*ss_sgnl.tag = NetSsSgnl::CHUNK_UPDATE;
+    ss_sgnl.tag = NetSsSgnl::CHUNK_UPDATE;
     for(auto const& pos : chunks) {
         //@TODO check if client has the chunk?
         Chunk const& chunk = get_chunk(pos);
-        for(auto const& idx : chunk.updated_blocks) {
-            Block block = chunk.blocks[idx];
-            ss_sgnl.chunk_update.chunks[pos].blocks.insert(
-                {idx, {block.id, block.lvl}});
-        }
+        LUX_ASSERT(chunk.mesh_state != Chunk::NOT_BUILT);
+        auto const& mesh = *chunk.mesh;
+        ss_sgnl.chunk_update.chunks[pos].removed_faces = mesh.removed_faces;
+        ss_sgnl.chunk_update.chunks[pos].added_faces = mesh.added_faces;
     }
 
     LUX_RETHROW(send_net_data(peer, &ss_sgnl, SGNL_CHANNEL),
-        "failed to send chunk updates to client");*/
+        "failed to send chunk updates to client");
     return LUX_OK;
 }
 
@@ -355,7 +353,7 @@ static void handle_pending_chunk_requests(Server::Client& client) {
 void server_tick() {
     for(auto pair : server.clients) {
         static VecSet<ChkPos> chunks_to_send;
-        for(auto const& pos : updated_chunks) {
+        for(auto const& pos : updated_meshes) {
             if(pair.v.loaded_chunks.count(pos) > 0) {
                 chunks_to_send.insert(pos);
             }
@@ -365,7 +363,12 @@ void server_tick() {
             chunks_to_send.clear();
         }
     }
-    updated_chunks.clear();
+    for(auto const& pos : updated_meshes) {
+        auto const& chunk = get_chunk(pos);
+        chunk.mesh->added_faces.clear();
+        chunk.mesh->removed_faces.clear();
+    }
+    updated_meshes.clear();
     { ///handle events
         //@CONSIDER splitting this scope
         ENetEvent event;

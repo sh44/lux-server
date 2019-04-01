@@ -79,21 +79,10 @@ LUX_MAY_FAIL static entity_place_block(RasenFrame* frame) {
     static BlockId stone = db_block_id("stone_wall"_l);
     MapPos hit_pos;
     Vec3F  hit_dir;
-    LUX_UNIMPLEMENTED();
-    /*if(map_cast_ray(&hit_pos, &hit_dir, src, src + dir)) {
-        Block& block0 = write_block(hit_pos);
-        if(block0.id != stone) {
-            block0.id = stone;
-        }
-        if(block0.lvl == 0xf) {
-            hit_pos = floor((Vec3F)hit_pos - hit_dir);
-            Block& block1 = write_block(hit_pos);
-            if(block1.id != stone) {
-                block1.id = stone;
-            }
-            block1.lvl = 0xf;
-        } else block0.lvl = 0xf;
-    }*/
+    if(map_cast_ray(&hit_pos, &hit_dir, src, src + dir)) {
+        Block& block0 = write_block(floor((Vec3F)hit_pos - hit_dir));
+        block0.id = stone;
+    }
     return LUX_OK;
 }
 

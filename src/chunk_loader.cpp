@@ -37,7 +37,8 @@ static HeightChunk const& guarantee_height_chunk(Vec2<ChkCoord> const& pos) {
         for(Uns y = 0; y < CHK_SIZE + 1; ++y) {
             for(Uns x = 0; x < CHK_SIZE + 1; ++x) {
                 h_chunk[idx] =
-                    pow(u_norm(noise_fbm(seed, octaves)), h_exp) * max_h;
+                    pow(u_norm(noise_fbm(seed, octaves)), h_exp) * max_h +
+                    lux_randf(seed) * 0.15f;
                 seed.x += base_scale;
                 ++idx;
             }
@@ -90,6 +91,7 @@ static void load_chunk(ChkPos const& pos) {
 #if 1
     for(Uns i = 0; i < CHK_VOL; ++i) {
         MapPos map_pos = to_map_pos(pos, i);
+        Vec2<MapCoord> h_pos = (Vec2<MapCoord>)map_pos;
         IdxPos idx_pos = to_idx_pos(i);
         auto get_h = [&](IdxPos p) {
             return h_chunk[p.x + p.y * (CHK_SIZE + 1)];
@@ -104,8 +106,11 @@ static void load_chunk(ChkPos const& pos) {
             F32 diffx = abs(h - get_h(idx_pos + IdxPos(1, 0, 0)));
             F32 diffy = abs(h - get_h(idx_pos + IdxPos(0, 1, 0)));
             F32 diff = (diffx + diffy) / 2.f;
+            if(map_pos.z > f_h - max(diffx, diffy) + 1 && (map_pos.z - 240.f) * 0.005f > noise_fbm((Vec2F)h_pos * 0.09f, 4) - 0.2f) {
+                    block.id = snow;
+            } else
             if(map_pos.z >= f_h - 2 - diff * 10.f) {
-                if(diff < 0.7f) {
+                if(diff < 0.7f && lux_randf(h_pos, 1) < pow(noise_fbm((Vec2F)h_pos * 0.08f, 2), 3.f) + 0.97f) {
                     block.id = dark_grass;
                 } else if(diff < 1.f) {
                     block.id = dirt;
@@ -160,10 +165,10 @@ static void load_chunk(ChkPos const& pos) {
         }
     }
 #endif
-#if 0
+#if 1
     MapPos base_pos = to_map_pos(pos, 0);
-    if(pos.z < 0) {
-        U32 worms_num = lux_randf(pos) > 0.99 ? 1 : 0;
+    if(pos.z < 40) {
+        U32 worms_num = lux_randf(pos) > 0.99 ? 10 : 0;
         for(Uns i = 0; i < worms_num; ++i) {
             Vec3F dir;
             U32 len = lux_randmm(10, 500, pos, i, 0);
@@ -189,7 +194,7 @@ static void load_chunk(ChkPos const& pos) {
                         for(MapCoord x = -r_rad; x <= r_rad; ++x) {
                             if(length(Vec3F(x, y, z)) < rad) {
                                 write_suspended_block(floor(map_pos + Vec3F(x, y, z)),
-                                    {void_block, 0x00});
+                                    {void_block});
                             }
                         }
                     }
@@ -227,9 +232,10 @@ static void thread_main() {
             break;
         }
         ChkPos pos = *chunk_queue.begin();
-        lock.unlock();
+        //lock.unlock(); @TODO for some reason this causes early wakeup from
+        //enqueue_wait
         load_chunk(pos);
-        lock.lock();
+        //lock.lock();
         chunk_queue.erase(chunk_queue.begin());
         lock.unlock();
         queue_cv.notify_one();
@@ -269,9 +275,9 @@ void loader_enqueue_wait(Slice<ChkPos> const& chunks) {
             chunk_queue.insert(pos);
         }
     }
+    results_mutex.unlock();
     queue_mutex.unlock();
     queue_cv.notify_one();
-    results_mutex.unlock();
     std::unique_lock<std::mutex> lock(queue_mutex);
     queue_cv.wait(lock, []{return chunk_queue.empty();});
 }

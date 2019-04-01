@@ -10,7 +10,7 @@ static btDiscreteDynamicsWorld             world(&dispatcher, &broadphase,
 static List<btDefaultMotionState> motion_states;
 static List<btRigidBody> bodies;
 
-static btCapsuleShapeZ body_shape(1.2, 3.6);
+static btCapsuleShapeZ body_shape(0.8, 3.8);
 
 void physics_init() {
     world.setGravity(btVector3(0, 0, 0));

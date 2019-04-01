@@ -59,6 +59,9 @@ int main(int argc, char** argv) {
     physics_init();
     server_init(server_port, TICK_RATE);
     LUX_DEFER { server_deinit(); };
+    LUX_LOG("chunk: %zu", sizeof(Chunk));
+    LUX_LOG("chunk.data: %zu", sizeof(Chunk::Data));
+    LUX_LOG("chunk.mesh: %zu", sizeof(ChunkMesh));
 
     std::thread console_thread = std::thread(&console_main);
     { ///main loop
