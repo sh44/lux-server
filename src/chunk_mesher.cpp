@@ -6,7 +6,6 @@
 #include <lux_shared/common.hpp>
 //
 #include <chunk_mesher.hpp>
-#include <marching_cubes.hpp>
 
 static std::thread thread;
 static std::atomic<bool> is_running;
@@ -14,13 +13,11 @@ static List<DynArr<MesherRequest>> queue;
 static std::mutex queue_mutex;
 static std::mutex results_mutex;
 static std::condition_variable queue_cv;
-static VecMap<ChkPos, ChunkMesh> results;
+static MesherResults results;
 
 static void generate_mesh(MesherRequest const& request) {
     ChkPos pos = request.pos;
     if(results.count(pos) > 0) return;
-    LUX_LOG("building mesh");
-    LUX_LOG("    pos: {%zd, %zd, %zd}", pos.x, pos.y, pos.z);
 
     auto& mesh = results[pos];
     mesh.faces.reserve_exactly(CHK_VOL * 3);
@@ -32,7 +29,6 @@ static void generate_mesh(MesherRequest const& request) {
     };
 
     Arr<IdxPos, 3> a_off = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-    //@TODO single for loop and chk_idx_axis_off
     for(Uns z = 0; z < CHK_SIZE; ++z) {
         for(Uns y = 0; y < CHK_SIZE; ++y) {
             for(Uns x = 0; x < CHK_SIZE; ++x) {
@@ -60,8 +56,6 @@ static void thread_main() {
         if(!is_running.load()) {
             break;
         }
-        //@TODO narrow down this mutex, so that physics mesher on main thread
-        //waits less
         results_mutex.lock();
         auto requests = move(*queue.begin());
         queue.pop_front();
@@ -111,7 +105,7 @@ bool mesher_try_lock_results(MesherResults*& out) {
     }
 }
 
-VecMap<ChkPos, ChunkMesh>& mesher_lock_results() {
+MesherResults& mesher_lock_results() {
     results_mutex.lock();
     return results;
 }

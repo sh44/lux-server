@@ -4,63 +4,33 @@
 #include <lux_shared/entity.hpp>
 #include <lux_shared/net/data.hpp>
 //
-#include <rasen.hpp>
 #include <physics.hpp>
 
-F32 constexpr ENTITY_L_VEL = 0.03f;
-F32 constexpr ENTITY_A_VEL = tau / 512.f;
+F32 constexpr ENTITY_L_VEL = 40.f;
 
 struct Entity {};
-extern SparseDynArr<Entity> entities;
+extern SparseDynArr<Entity> entities; //@TODO
 
 struct EntityComps {
-    typedef EntityVec    Pos;
-    typedef EntityVec    Vel;
     typedef StrBuff      Name;
     typedef btRigidBody* PhysicsBody;
-    struct Visible {
-        U32 visible_id;
-    };
-    struct Item {
-        F32 weight;
-    };
-    struct Container {
-        DynArr<EntityId> items;
-    };
-    struct Orientation {
-        EntityVec origin;
-        Vec2F     angles; ///pitch, yaw, in radians
-    };
-    struct AVel {
-        Vec2F vel;
-        Vec2F damping; ///from 0.f to 1.f
-    };
-    struct Ai {
-        RasenEnv rn_env;
-        bool active = true;
+    struct Model {
+        U32 id;
     };
 
     //@IMPROVE more space efficient solution
-    IdMap<EntityId, Pos>         pos;
-    IdMap<EntityId, Vel>         vel;
-    IdMap<EntityId, AVel>        a_vel;
     IdMap<EntityId, Name>        name;
     IdMap<EntityId, PhysicsBody> physics_body;
-    IdMap<EntityId, Visible>     visible;
-    IdMap<EntityId, Item>        item;
-    IdMap<EntityId, Container>   container;
-    IdMap<EntityId, Orientation> orientation;
-    IdMap<EntityId, EntityId>    parent;
-    IdMap<EntityId, Ai>          ai;
+    IdMap<EntityId, Model>       model;
 };
 
 extern EntityComps& entity_comps;
 
 EntityId create_entity();
-EntityId create_item(Str name);
 EntityId create_player();
-void remove_entity(EntityId entity);
+void entity_erase(EntityId entity);
 void entities_tick();
 void get_net_entity_comps(NetSsTick::EntityComps* net_comps);
-LUX_MAY_FAIL entity_do_action(EntityId entity_id, U16 action_id,
-                              Slice<U8> const& stack);
+void entity_set_vel(EntityId id, EntityVec vel);
+void entity_rotate_yaw(EntityId id, F32 yaw);
+void entity_rotate_yaw_pitch(EntityId id, Vec2F yaw_pitch);

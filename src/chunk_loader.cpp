@@ -9,7 +9,8 @@
 
 static std::thread thread;
 
-static VecSet<ChkPos> chunk_queue;
+static VecSet<ChkPos> chunk_queue_set;
+static Queue<ChkPos>  chunk_queue;
 
 static std::mutex queue_mutex;
 static std::mutex results_mutex;
@@ -17,8 +18,8 @@ static std::mutex block_changes_mutex;
 static std::atomic<bool> is_running;
 static std::condition_variable queue_cv;
 
-static VecMap<ChkPos, DynArr<BlockChange>> block_changes;
-static VecMap<ChkPos, Chunk::Data*> results;
+static LoaderBlockChanges block_changes;
+static LoaderResults results;
 //@TODO might want to use the excess values somehow
 //@TODO derivative function
 typedef Arr<F32, (CHK_SIZE + 1) * (CHK_SIZE + 1)> HeightChunk;
@@ -51,8 +52,6 @@ static HeightChunk const& guarantee_height_chunk(Vec2<ChkCoord> const& pos) {
 }
 
 static void load_chunk(ChkPos const& pos) {
-    LUX_LOG("loading chunk");
-    LUX_LOG("    pos: {%zd, %zd, %zd}", pos.x, pos.y, pos.z);
     Chunk::Data* chunk = lux_alloc<Chunk::Data>(1);
     auto get_block =
     [&](ChkIdx const& idx) -> Block& {
@@ -147,17 +146,16 @@ static void load_chunk(ChkPos const& pos) {
         MapPos map_pos = to_map_pos(pos, i);
         if(map_pos.z == f_h && lux_randf(map_pos) > .995f &&
             get_block(i).id == dark_grass) {
-            I32 h = lux_randmm(8, 20, map_pos, 0);
+            Uns h = lux_randmm(8, 20, map_pos, 0);
             for(Uns j = 0; j < h; ++j) {
                 write_suspended_block(map_pos + MapPos(0, 0, j), {dirt});
             }
-            for(MapCoord z = -(h / 2 + 2); z <= h / 2; ++z) {
+            for(MapCoord z = -((Int)h / 2 + 2); z <= (Int)h / 2; ++z) {
                 for(MapCoord y = -5; y <= 5; ++y) {
                     for(MapCoord x = -5; x <= 5; ++x) {
-                        F32 diff = (F32)((h / 2) + 2 - z) / 4.f - length(Vec2F(x, y));
-                        F32 rand_factor = 0.f;//lux_randf(map_pos, 3, Vec3F(x, y, z));
-                        if(diff > 0.f) {
-                            write_suspended_block(map_pos + MapPos(x, y, h + z), {grass});
+                        if((F32)((h / 2) + 2 - z) / 4.f > length(Vec2F(x, y))) {
+                            write_suspended_block(map_pos + MapPos(x, y, h + z),
+                                                  {grass});
                         }
                     }
                 }
@@ -167,8 +165,8 @@ static void load_chunk(ChkPos const& pos) {
 #endif
 #if 1
     MapPos base_pos = to_map_pos(pos, 0);
-    if(pos.z < 40) {
-        U32 worms_num = lux_randf(pos) > 0.99 ? 10 : 0;
+    if(pos.z < 0) {
+        U32 worms_num = lux_randf(pos) > 0.99 ? 1 : 0;
         for(Uns i = 0; i < worms_num; ++i) {
             Vec3F dir;
             U32 len = lux_randmm(10, 500, pos, i, 0);
@@ -231,12 +229,12 @@ static void thread_main() {
         if(!is_running.load()) {
             break;
         }
-        ChkPos pos = *chunk_queue.begin();
-        //lock.unlock(); @TODO for some reason this causes early wakeup from
-        //enqueue_wait
+        ChkPos pos = chunk_queue.front();
+        lock.unlock();
         load_chunk(pos);
-        //lock.lock();
-        chunk_queue.erase(chunk_queue.begin());
+        lock.lock();
+        chunk_queue.pop();
+        chunk_queue_set.erase(pos);
         lock.unlock();
         queue_cv.notify_one();
     }
@@ -257,8 +255,10 @@ void loader_enqueue(Slice<ChkPos> const& chunks) {
     queue_mutex.lock();
     results_mutex.lock();
     for(auto const& pos : chunks) {
-        if(results.count(pos) == 0) {
-            chunk_queue.insert(pos);
+        if(results.count(pos) == 0 &&
+           chunk_queue_set.count(pos) == 0) {
+            chunk_queue.push(pos);
+            chunk_queue_set.insert(pos);
         }
     }
     results_mutex.unlock();
@@ -270,24 +270,28 @@ void loader_enqueue_wait(Slice<ChkPos> const& chunks) {
     queue_mutex.lock();
     results_mutex.lock();
     for(auto const& pos : chunks) {
-        if(results.count(pos) == 0) {
-            //@TODO put on priority
-            chunk_queue.insert(pos);
+        if(results.count(pos) == 0 &&
+           chunk_queue_set.count(pos) == 0) {
+            chunk_queue.push(pos);
+            chunk_queue_set.insert(pos);
         }
     }
     results_mutex.unlock();
     queue_mutex.unlock();
     queue_cv.notify_one();
     std::unique_lock<std::mutex> lock(queue_mutex);
+    //@XXX this woke up before the queue was empty in the past, as we unlocked
+    //the queue_mutex in thread_main before loading the chunk,
+    //however right now it seems to work
     queue_cv.wait(lock, []{return chunk_queue.empty();});
 }
 
-VecMap<ChkPos, Chunk::Data*> const& loader_lock_results() {
+LoaderResults const& loader_lock_results() {
     results_mutex.lock();
     return results;
 }
 
-bool loader_try_lock_results(VecMap<ChkPos, Chunk::Data*>*& out) {
+bool loader_try_lock_results(LoaderResults*& out) {
     if(results_mutex.try_lock()) {
         out = &results;
         return true;
@@ -301,7 +305,7 @@ void loader_unlock_results() {
     results_mutex.unlock();
 }
 
-bool loader_try_lock_block_changes(VecMap<ChkPos, DynArr<BlockChange>>*& out) {
+bool loader_try_lock_block_changes(LoaderBlockChanges*& out) {
     if(block_changes_mutex.try_lock()) {
         out = &block_changes;
         return true;
@@ -310,7 +314,7 @@ bool loader_try_lock_block_changes(VecMap<ChkPos, DynArr<BlockChange>>*& out) {
     }
 }
 
-VecMap<ChkPos, DynArr<BlockChange>>& loader_lock_block_changes() {
+LoaderBlockChanges& loader_lock_block_changes() {
     block_changes_mutex.lock();
     return block_changes;
 }

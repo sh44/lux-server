@@ -6,6 +6,8 @@ build
 # Ignore generated files
 callgrind*
 vgcore*
+massif*
+perf*
 *~
 *.swp
 

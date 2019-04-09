@@ -12,8 +12,7 @@ struct MesherRequest {
     ChkPos pos;
     InputData blocks;
 };
-//
-//@TODO use typedef
+
 typedef VecMap<ChkPos, ChunkMesh> MesherResults;
 
 void mesher_init();
@@ -22,6 +21,6 @@ void mesher_deinit();
 void mesher_enqueue(DynArr<MesherRequest>&& data);
 void mesher_enqueue_wait(DynArr<MesherRequest>&& data);
 
-VecMap<ChkPos, ChunkMesh>& mesher_lock_results();
+MesherResults& mesher_lock_results();
 bool mesher_try_lock_results(MesherResults*& out);
 void mesher_unlock_results();

@@ -21,6 +21,10 @@ struct ChunkPhysicsMesh {
     DynArr<U32>   idxs;
 
     btRigidBody* body;
+
+    ~ChunkPhysicsMesh() {
+        physics_remove_body(body);
+    }
 };
 
 static VecSet<ChkPos> mesher_requested_chunks;
@@ -99,9 +103,9 @@ Block const &Chunk::operator[](ChkIdx idx) const {
 Chunk::~Chunk() {
     switch(mesh_state) {
         case BUILT_PHYSICS: {
-            //@TODO we might want to remove the physics body here
             delete mesh->physics_mesh;
         }
+        [[fallthrough]];
         case BUILT_TRIANGLE: {
             delete mesh;
         }
@@ -126,7 +130,6 @@ bool try_guarantee_chunk_mesh(ChkPos const& pos) {
     if(mesher_requested_chunks.count(pos) > 0) {
         return false;
     }
-    //@TODO we guarantee too much
     Arr<ChkPos, 4> positions;
     Slice<ChkPos> slice = {positions, 0};
     if(is_chunk_loaded(pos)) {
@@ -162,10 +165,61 @@ bool try_guarantee_chunk_mesh(ChkPos const& pos) {
     }
 }
 
+static void chunk_physics_mesh_build(ChkPos const& pos) {
+    auto& chunk = chunks.at(pos);
+    if(chunk.mesh_state == Chunk::BUILT_TRIANGLE) {
+        auto& mesh = *chunk.mesh;
+        chunk.mesh->physics_mesh = new ChunkPhysicsMesh();
+        auto& p_mesh = *chunk.mesh->physics_mesh;
+        Uns faces_num = mesh.faces.len;
+        LUX_ASSERT(faces_num > 0);
+        p_mesh.verts.resize(faces_num * 4);
+        p_mesh.idxs.resize(faces_num * 6);
+        Arr<Vec3F, 3 * 4> vert_offs = {
+            {0, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0, 1, 1},
+            {0, 0, 0}, {0, 0, 1}, {1, 0, 0}, {1, 0, 1},
+            {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0},
+        };
+        for(Uns i = 0; i < faces_num; ++i) {
+            auto const& face = mesh.faces[i];
+            ChkIdx idx = face.idx;
+            U8 axis = (face.orientation & 0b110) >> 1;
+            LUX_ASSERT(axis != 0b11);
+            U8 sign = (face.orientation & 1);
+            Vec3F face_off(0);
+            face_off[axis] = 1;
+            if(sign) {
+                for(Uns j = 0; j < 6; ++j) {
+                    p_mesh.idxs[i * 6 + j] = quad_idxs<U16>[j] + i * 4;
+                }
+            } else {
+                for(Uns j = 0; j < 6; ++j) {
+                    p_mesh.idxs[i * 6 + j] = quad_idxs<U16>[5 - j] + i * 4;
+                }
+            }
+            for(Uns j = 0; j < 4; ++j) {
+                auto& vert = p_mesh.verts[i * 4 + j];
+                vert = (Vec3F)to_idx_pos(idx) + face_off +
+                    vert_offs[axis * 4 + j];
+            }
+        }
+        p_mesh.trigs_array.init(
+            faces_num * 2, (I32*)p_mesh.idxs.beg , sizeof(I32) * 3,
+            p_mesh.verts.len, (F32*)p_mesh.verts.beg, sizeof(Vec3F));
+
+        p_mesh.shape.init(
+            &*p_mesh.trigs_array, true, btVector3{0, 0, 0},
+            btVector3{CHK_SIZE, CHK_SIZE, CHK_SIZE});
+
+        p_mesh.body = physics_create_mesh(to_map_pos(pos, 0), &*p_mesh.shape);
+        chunk.mesh_state = Chunk::BUILT_PHYSICS;
+    }
+}
+
 void guarantee_physics_mesh_for_aabb(MapPos const& min, MapPos const& max) {
     ChkPos const c_min = to_chk_pos(min);
     ChkPos const c_max = to_chk_pos(max);
-    //@TODO assert both non-negative?
+    LUX_ASSERT(glm::all(glm::lessThanEqual(c_min, c_max)));
     ChkPos iter;
 
     //first we do a quick discard of already built meshes (most of the cases)
@@ -268,57 +322,7 @@ void guarantee_physics_mesh_for_aabb(MapPos const& min, MapPos const& max) {
     for(iter.z = c_min.z; iter.z <= c_max.z; ++iter.z) {
         for(iter.y = c_min.y; iter.y <= c_max.y; ++iter.y) {
             for(iter.x = c_min.x; iter.x <= c_max.x; ++iter.x) {
-                auto& chunk = chunks.at(iter);
-                if(chunk.mesh_state == Chunk::BUILT_TRIANGLE) {
-                    LUX_LOG("building physics mesh {%zd, %zd, %zd}",
-                        iter.x, iter.y, iter.z);
-                    auto& mesh = *chunk.mesh;
-                    chunk.mesh->physics_mesh = new ChunkPhysicsMesh();
-                    auto& p_mesh = *chunk.mesh->physics_mesh;
-                    Uns faces_num = mesh.faces.len;
-                    LUX_ASSERT(faces_num > 0);
-                    p_mesh.verts.resize(faces_num * 4);
-                    p_mesh.idxs.resize(faces_num * 6);
-                    Arr<Vec3F, 3 * 4> vert_offs = {
-                        {0, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0, 1, 1},
-                        {0, 0, 0}, {0, 0, 1}, {1, 0, 0}, {1, 0, 1},
-                        {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0},
-                    };
-                    for(Uns i = 0; i < faces_num; ++i) {
-                        auto const& face = mesh.faces[i];
-                        ChkIdx idx = face.idx;
-                        U8 axis = (face.orientation & 0b110) >> 1;
-                        LUX_ASSERT(axis != 0b11);
-                        U8 sign = (face.orientation & 1);
-                        Vec3F face_off(0);
-                        face_off[axis] = 1;
-                        if(sign) {
-                            for(Uns j = 0; j < 6; ++j) {
-                                p_mesh.idxs[i * 6 + j] = quad_idxs<U16>[j] + i * 4;
-                            }
-                        } else {
-                            for(Uns j = 0; j < 6; ++j) {
-                                p_mesh.idxs[i * 6 + j] = quad_idxs<U16>[5 - j] + i * 4;
-                            }
-                        }
-                        for(Uns j = 0; j < 4; ++j) {
-                            auto& vert = p_mesh.verts[i * 4 + j];
-                            vert = (Vec3F)to_idx_pos(idx) + face_off +
-                                vert_offs[axis * 4 + j];
-                        }
-                    }
-                    p_mesh.trigs_array.init(
-                        faces_num * 2, (I32*)p_mesh.idxs.beg , sizeof(I32) * 3,
-                        p_mesh.verts.len, (F32*)p_mesh.verts.beg, sizeof(Vec3F));
-
-                    p_mesh.shape.init(
-                        &*p_mesh.trigs_array, true, btVector3{0, 0, 0},
-                        btVector3{CHK_SIZE, CHK_SIZE, CHK_SIZE});
-
-                    p_mesh.body = physics_create_mesh(to_map_pos(iter, 0),
-                        &*p_mesh.shape);
-                    chunk.mesh_state = Chunk::BUILT_PHYSICS;
-                }
+                chunk_physics_mesh_build(iter);
             }
         }
     }
@@ -351,6 +355,7 @@ BlockBp const& get_block_bp(MapPos const& pos) {
 static void chunk_mesh_update(ChkPos const& chk_pos);
 
 void map_tick() {
+    benchmark("tick", 1.0 / 64.0, [&](){
     {   LoaderResults* results;
         if(loader_try_lock_results(results)) {
             for(auto const& pair : *results) {
@@ -390,9 +395,12 @@ void map_tick() {
             mesher_unlock_results();
         }
     }
+    });
 
+    benchmark("chunk updates", 1.0 / 64.0, [&](){
     for(auto const& pos : updated_chunks) {
-        LUX_UNIMPLEMENTED(); //@TODO physics
+        //@URGENT
+        //LUX_UNIMPLEMENTED(); //@TODO physics
         /*if(physics_meshes.count(pos) > 0) {
             U8 updated_sides = 0b000000;
             LUX_ASSERT(is_chunk_loaded(pos));
@@ -417,6 +425,7 @@ void map_tick() {
         }*/
         chunk_mesh_update(pos);
     }
+    });
     updated_chunks.clear();
     static Uns tick_num = 0;
     physics_tick(1.f / 64.f); //TODO tick time
@@ -475,6 +484,8 @@ static void chunk_mesh_update(ChkPos const& chk_pos) {
         IdxPos i_pos = to_idx_pos(idx);
         auto const& b0 = chunk[idx];
         Uns removed_count = 0;
+        //@TODO in this function, we will probably need something more efficient
+        //than linear search of the faces
         for(Uns i = 0; i < mesh.faces.len;) {
             auto const& face = mesh.faces[i];
             if(face.idx == idx) {
@@ -493,7 +504,8 @@ static void chunk_mesh_update(ChkPos const& chk_pos) {
                     Chunk& off_chunk = chunks.at(off_pos);
                     if(off_chunk.mesh_state != Chunk::NOT_BUILT) {
                         if(off_chunk.mesh_state == Chunk::BUILT_EMPTY) {
-                            LUX_UNIMPLEMENTED();
+                            //@URGENT
+                    //        LUX_UNIMPLEMENTED();
                             continue;
                         }
                         ChunkMesh& off_mesh = *off_chunk.mesh;
@@ -596,7 +608,6 @@ static bool prepare_mesher_data(MesherRequest& out) {
         LUX_ASSERT(idx < arr_len(out.blocks));
         return out.blocks[idx];
     };
-    //@TODO reduce repetitiveness
     {   Chunk const& chk = get_chunk(pos + ChkPos(1, 0, 0));
         {   auto const& block =
                 chk[to_chk_idx(IdxPos{0, 0, 0})];

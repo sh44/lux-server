@@ -14,10 +14,6 @@ static btCapsuleShapeZ body_shape(0.8, 3.8);
 
 void physics_init() {
     world.setGravity(btVector3(0, 0, 0));
-    //@TODO does it has to be static? (takes reference)
-    static btVector3 inertia = {0, 0, 0};
-    //@TODO is this needed?
-    body_shape.calculateLocalInertia(1, inertia);
 }
 
 btRigidBody* physics_create_body(EntityVec const& pos) {

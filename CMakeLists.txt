@@ -9,10 +9,10 @@ set(LUX_SERVER_VERSION_PATCH 0)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR})
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -fno-exceptions \
-    -Wno-type-limits")
+-Wno-type-limits -include ${PROJECT_BINARY_DIR}/config.hpp -Wno-narrowing")
 set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} -Og -pipe \
     -fasynchronous-unwind-tables -fstack-protector-strong -D_GLIBCXX_ASSERTIONS\
-    -ftrapv")
+    -ftrapv -fno-omit-frame-pointer")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Ofast -flto -DNDEBUG")
 set(CMAKE_CXX_STANDARD 14)
 

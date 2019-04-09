@@ -53,7 +53,6 @@ int main(int argc, char** argv) {
 
     db_init();
     constexpr F64 TICK_RATE = 64.0;
-    rasen_init();
     map_init();
     LUX_DEFER { map_deinit(); };
     physics_init();
@@ -69,9 +68,9 @@ int main(int argc, char** argv) {
         util::TickClock clock(tick_len);
         while(server_is_running()) {
             clock.start();
-            entities_tick();
-            map_tick();
-            server_tick();
+            benchmark("entities tick", 1.0 / TICK_RATE, [&](){entities_tick();});
+            benchmark("map tick"     , 1.0 / TICK_RATE, [&](){map_tick();});
+            benchmark("server tick"  , 1.0 / TICK_RATE, [&](){server_tick();});
 
             clock.stop();
             auto remaining = clock.synchronize();

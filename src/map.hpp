@@ -27,11 +27,9 @@ struct Chunk {
     };
     //@URGENT we need to deallocate this (using lux_dealloc) when unloading
     Data* data;
-    //@TODO this probably can be moved to chunk mesh
     IdSet<ChkIdx> updated_blocks;
     ChunkMesh* mesh;
 
-    //@TODO move to ChunkMesh?
     enum MeshState : U8 {
         NOT_BUILT,
         BUILT_EMPTY,
